@@ -248,6 +248,12 @@ public:
   }
   bool readGmlGraph(std::istream& in, IOGraph& graph) const;
 
+  bool readGraphmlGraph(const std::string& filename, IOGraph& graph) const {
+    auto func = static_cast<bool (GraphParser::*)(std::istream&, IOGraph&) const>(&GraphParser::readGraphmlGraph);
+    return wrapRead(func, filename, graph);
+  }
+  bool readGraphmlGraph(std::istream& in, IOGraph& graph) const;
+
   bool writeDotGraph(const std::string& filename, IOGraph& graph) const {
     auto func = static_cast<bool (GraphParser::*)(std::ostream&, IOGraph&) const>(&GraphParser::writeDotGraph);
     return wrapWrite(func, filename, graph);

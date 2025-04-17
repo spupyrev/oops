@@ -548,6 +548,10 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
     LOG("parsing gml graph from '%s'", filename.c_str());
     GraphParser parser;
     CHECK(parser.readGmlGraph(filename, ioGraph), "gml file parsing failed");
+  } else if (extension == "graphml") {
+    LOG("parsing graphml graph from '%s'", filename.c_str());
+    GraphParser parser;
+    CHECK(parser.readGraphmlGraph(filename, ioGraph), "graphml file parsing failed");
   } else {
     ERROR("unknown file extension: " + extension);
   }

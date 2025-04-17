@@ -7,6 +7,8 @@
 
 using namespace std;
 
+namespace gml_parser {
+
 string getAttr(map<string, string>& attrs, const string& name) {
   if (!attrs.count(name)) {
     std::cerr << "attribute '" << name << "' not found\n";
@@ -145,9 +147,11 @@ bool readGmlGraphInt(istream& in, IOGraph& graph) {
   return graph.nodes.size() > 0;
 }
 
+} // namespace gml_parser
+
 bool GraphParser::readGmlGraph(istream& in, IOGraph& graph) const {
   try {
-    return readGmlGraphInt(in, graph);
+    return gml_parser::readGmlGraphInt(in, graph);
   } catch (int code) {
     LOG("gml file parsing exception: %d", code);
     return false;

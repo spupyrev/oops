@@ -535,7 +535,7 @@ int ConflictPair::lowest(LRPlanarity *planarity_state) const {
   return std::min(dataL.lowpt, dataR.lowpt);
 }
 
-}; // namespace planarity_lr
+} // namespace planarity_lr
 
 bool isPlanar(const int n, const std::vector<std::pair<int, int>>& edges, int verbose) {  
   // Check if the input is correct
