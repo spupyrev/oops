@@ -23,34 +23,10 @@ PARALLEL_RUN = True
 NUM_THREADS = 6
 #PARALLEL_RUN = False
 
-### Generate with plantri
 N=10
-TYPE="A"  ### m3c3 -- triangulations, d - cubic, bd - cubic bipartite, q - quadrangulations, qc2m2 - 2-conn quadrangulations, A - Appolonian networks
-# CMD_PLANTRI="../../plantri53/plantri -%(type)s %(n)d %(thread_id)d/%(num_threads)d n%(n)d_%(type)s_part%(thread_id)d.pc"
-# CMD="./bob -action=test-plantri -i=n%(n)d_%(type)s_part%(thread_id)d.pc -verbose=0 -queues=2 -graphs=-1"
-# CMD_CLEAN="rm n%(n)d_%(type)s_part%(thread_id)d.pc"
-# CMD = (CMD_PLANTRI + " && " + CMD + " && " + CMD_CLEAN)
 
-### Generate samples
-# CMD_PLANTRI="../../plantri_sample/split_samples n%(n)d_m3c3_samples10000.pc n%(n)d_m3c3_samples10000_part%(seed)d.pc %(seed)d %(total)d"
-# CMD="./bob -action=test-plantri -i=n%(n)d_m3c3_samples10000_part%(seed)d.pc -stack -pages=3 -verbose=false"
-# CMD_CLEAN="rm n%(n)d_m3c3_samples10000_part%(seed)d.pc"
-
-### Generate random
-# CMD="./bob -action=gen-3-stack -stacks=4 -n=30 -trees -graphs=1 -verbose=0 -seed=%(seed)d"
-# CMD="./bob -action=gen-max-planar -twists=2 -n=15 -graphs=100 -verbose=0 -seed=%(seed)d"
-# CMD="./bob -action=gen-2-tree -queues=2 -n=50 -graphs=100 -verbose=0 -seed=%(seed)d"
-# CMD="./bob -action=gen-product -stacks=5 -graphs=10 -n=90 -custom=nA:6,nB:15 -verbose=0 -seed=%(seed)d"
-# CMD="./bob -action=gen-mixed-bipartite -queues=4 -n=30 -graphs=100 -constraint=separated -verbose=0 -seed=%(seed)d"
-# CMD="./bob -action=test-mixed -stacks=1 -queues=4 -n=22 -graphs=10 -verbose=2 -o=graph20_ -seed=%(seed)d"
-# CMD="./bob -action=test-poset -queues=3 -n=10 -graphs=100000 -verbose=0 -seed=%(seed)d"
-# CMD="./bob -action=gen-h-planar -queues=1 -n=200 -graphs=1000 -verbose=0 -skipSAT -seed=%(seed)d"
-# CMD="./bob -action=gen-upward-outerplanar -stacks=6 -n=1200 -graphs=5 -verbose=0 -directed -constraint=upward -fixedOrder -seed=%(seed)d"
-# CMD="./bob -action=test-magma -i=../../graphs/CubicVT4-300.mgm -stacks=3 -dispersable -verbose=1 -breakID -n=40 -seed=%(seed)d"
-# CMD="./bob -action=test-thickness -n=11 -graphs=1000 -verbose=0 -seed=%(seed)d"
-# CMD="./bob -action=test-shift-chains -n=30 -m=4 -graphs=100000 -verbose=0 -seed=%(seed)d"
-CMD="./bob_release -action=test-one-planar -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub28-b.g6 -Ccross2 -timeout=300 -part=%(thread_id)d/%(num_threads)d"
-
+CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub18.g6 -Ccross2 -Cnic -part=%(thread_id)d/%(num_threads)d"
+# CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub22-gir6.g6 -Ccross2 -part=%(thread_id)d/%(num_threads)d"
 ################################################################################
 
 
@@ -132,7 +108,7 @@ def start_thread(thread_id, thread_desc, cmd):
     return 1
 
 
-def start_threads():
+def main():
     # remove previous logs
     for thread_id in range(0, 100):
         log_file = "log_" + str(thread_id)
@@ -180,10 +156,7 @@ def start_threads():
             "thread_id": thread_id,
             "num_threads": NUM_THREADS,
             "n": N,
-            "type": TYPE,
         }
-        # taskset
-        # cmd = "taskset -c {} {}".format(thread_id, cmd)
 
         # start the thread
         t = Thread(
@@ -206,4 +179,5 @@ def start_threads():
 ################################################################################
 ################################ MAIN ##########################################
 ################################################################################
-start_threads()
+if __name__ == "__main__":
+    main()
