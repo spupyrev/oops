@@ -379,6 +379,7 @@ ResultCodeTy isOnePlanar(
 }
 
 std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {  
+  const int verbose = options.getInt("-verbose");
   const std::string input = options.getStr("-i");
 
   // gen random
@@ -396,6 +397,8 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
       int n = n0;
       std::vector<EdgeTy> edges;
       genByClass(graphClass, n, edges);
+      LOG_IF(verbose, "generated %s graph with |V| = %d  |E| = %d", graphClass.c_str(), n, edges.size());
+      
       graphs.push_back({
         "seed_" + to_string(t), 
         edges_to_adj(n, edges)

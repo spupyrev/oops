@@ -10,3 +10,4 @@ void genByClass(const std::string& graphClass, int& n, std::vector<EdgeTy>& edge
 void genComplete(std::vector<EdgeTy>& edges, int n);
 void genCompleteBipartite(std::vector<EdgeTy>& edges, int n, int m);
 void genCirculant(std::vector<EdgeTy>& edges, int n, const std::vector<int>& S);
+void genGrid(std::vector<EdgeTy>& edges, int rows, int columns);

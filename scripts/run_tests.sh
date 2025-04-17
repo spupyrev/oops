@@ -50,6 +50,7 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1"
 # gen random
 assert_pass "${OP} -verbose=1 -i=gen-complete -graphs=5 -n=10"
 assert_pass "${OP} -verbose=1 -i=gen-complete-bipartite -graphs=1 -n=10"
+assert_pass "${OP} -verbose=1 -i=gen-grid -graphs=2 -n=20"
 
 # write to files
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=0 -o=/tmp/test1.gml"

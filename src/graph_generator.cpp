@@ -18,6 +18,12 @@ void genByClass(const std::string& graphClass, int& n, std::vector<EdgeTy>& edge
     genCompleteBipartite(edges, n1, n2);
   } else if (graphClass == "circulant") {
     genCirculant(edges, n, {1, 2, 3});
+  } else if (graphClass == "grid") {
+    CHECK(n >= 4);
+    const int rows = Rand::next(2, n / 2);
+    const int columns = (n + rows - 1) / rows;
+    genGrid(edges, rows, columns);
+    n = rows * columns;
   } else {
     ERROR("unknown graph class: '" + graphClass + "'");
   }
@@ -147,4 +153,37 @@ void genCirculant(std::vector<EdgeTy>& edges, int n, const vector<int>& S) {
   }
 
   sort_unique(edges);
+}
+
+/// A square grid with diagonals
+void genGrid(std::vector<EdgeTy>& edges, int rows, int columns) {
+  CHECK(rows >= 1 && columns >= 1);
+
+  auto idx = vector<vector<int>>(rows, vector<int>(columns, -1));
+  int nn = 0;
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < columns; j++) {
+      idx[i][j] = nn;
+      nn++;
+    }
+  }
+
+  vector<int> di = {-1, 0, 1, 0};
+  vector<int> dj = {0, 1, 0, -1};
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < columns; j++) {
+      if (i + 1 < rows) {
+        edges.push_back(std::make_pair(idx[i][j], idx[i + 1][j]));
+      }
+      if (j + 1 < columns) {
+        edges.push_back(std::make_pair(idx[i][j], idx[i][j + 1]));
+      }
+      if (i + 1 < rows && j + 1 < columns) {
+        edges.push_back(std::make_pair(idx[i][j], idx[i + 1][j + 1]));
+      }
+      if (i + 1 < rows && j - 1 >= 0) {
+        edges.push_back(std::make_pair(idx[i][j], idx[i + 1][j - 1]));
+      }
+    }
+  }
 }
