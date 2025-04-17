@@ -26,7 +26,7 @@ assert_pass() { assert "$1" 0 "$2"; }
 assert_fail() { assert "$1" 1 "$2"; }
 
 
-OP=${PWD}/op
+OP=${PWD}/oops
 assert_pass "[ -f ${OP} ]" "Binary ${OP} exists" 
 DATA_DIR=${PWD}/data
 assert_pass "[ -d ${DATA_DIR} ]" "Folder ${DATA_DIR} exists" 

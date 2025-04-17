@@ -1,6 +1,4 @@
-#include "io_graph.h"
-#include "graph_parser.h"
-
+#include "io.h"
 #include "common.h"
 #include "logging.h"
 

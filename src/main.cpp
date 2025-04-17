@@ -1,8 +1,6 @@
 #include "logging.h"
 #include "cmd_options.h"
-#include "io_graph.h"
-#include "io_utils.h"
-#include "graph_parser.h"
+#include "io.h"
 #include "graph_algorithms.h"
 #include "one_planar.h"
 
@@ -488,7 +486,7 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
 
   // gen random
   if (input.substr(0, 4) == "gen-") {
-    const string gClass = input.substr(4);
+    const string graphClass = input.substr(4);
     const int numGraphs = options.getInt("-graphs");
     const int startSeed = options.getInt("-seed");
     const int n0 = options.getInt("-n");
@@ -540,46 +538,23 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
     return std::make_unique<GraphListRaw>(readCfg(filename, part, graphFilter));
   }
 
-  ERROR("not implemented");
-  // // read a single instance
-  // PlanarGraph graph;
-  // if (extension == "dot") {
-  //   LOG("parsing dot graph from '%s'", filename.c_str());
-  //   GraphParser parser;
-  //   CHECK(parser.readDotGraph(filename, graph.ioGraph), "dot file parsing failed");
-  // } else if (extension == "gml") {
-  //   LOG("parsing gml graph from '%s'", filename.c_str());
-  //   GraphParser parser;
-  //   CHECK(parser.readGmlGraph(filename, graph.ioGraph), "gml file parsing failed");
-  // } else {
-  //   ERROR("unknown file extension: " + extension);
-  // }
-
-  // const bool directed = options.getBool("-directed");
-  // const int n = (int)graph.ioGraph.nodes.size();
-  // std::vector<EdgeTy> edges;
-  // std::vector<bool> directions;
-  // CHECK(n > 0, "empty input dot graph");
-  // for (auto& e : graph.ioGraph.edges) {
-  //   const auto u = graph.ioGraph.getNode(e.source);
-  //   const auto v = graph.ioGraph.getNode(e.target);
-  //   CHECK(u->index != v->index);
-  //   // LOG("parsed edge (%d -> %d)", u->index, v->index);
-
-  //   if (u->index < v->index) {
-  //     edges.push_back(EdgeTy(u->index, v->index));
-  //   } else {
-  //     edges.push_back(EdgeTy(v->index, u->index));
-  //   }
-  //   if (directed) {
-  //     directions.push_back(u->index < v->index);
-  //   }
-  // }
+  // read a single instance
+  IOGraph ioGraph;
+  if (extension == "dot") {
+    LOG("parsing dot graph from '%s'", filename.c_str());
+    GraphParser parser;
+    CHECK(parser.readDotGraph(filename, ioGraph), "dot file parsing failed");
+  } else if (extension == "gml") {
+    LOG("parsing gml graph from '%s'", filename.c_str());
+    GraphParser parser;
+    CHECK(parser.readGmlGraph(filename, ioGraph), "gml file parsing failed");
+  } else {
+    ERROR("unknown file extension: " + extension);
+  }
 
   int n;
   std::vector<EdgeTy> edges;
-
-
+  ioGraph.extractEdges(n, edges);
   const int numGraphs = options.getInt("-graphs");
   for (int i = 0; i < numGraphs; i++) {
     std::string graphName = (numGraphs == 1 ? filename : filename + "_" + to_string(i));
@@ -587,6 +562,7 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
       filename,
       edges_to_adj(n, edges)
     });
+    // TODO: all but the first graph have random directions
   }
 
   return std::make_unique<GraphListRaw>(graphs);
@@ -675,13 +651,6 @@ void testOnePlanar(CMDOptions& options) {
       genDirections(options, n, edges, directions);
     }
 
-    // if (!isPlanar(n, edges, 0) && edges.size() <= 4 * n - 8) {
-    //   LOG("processing graph %d (%s); n = %d, m = %d", t, graphName.c_str(), n, edges.size());
-    //   //InputGraph graph(n, edges, directions);
-    //   //printInput("tmp.cfg", graphName, graph);
-    // }
-    // //continue;
-
     // make sure it is 1-planar
     if (directions.empty() && isPlanar(n, edges, 0)) {
       if (verbose)
@@ -698,21 +667,11 @@ void testOnePlanar(CMDOptions& options) {
         if (verbose)
           LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
         numNon1Planar++;
-        if (directed) {
-          for (size_t i = 0; i < edges.size(); i++) {
-            if (directions[i])
-              std::cerr << edges[i].first << " -> " << edges[i].second << "\n";
-            else
-              std::cerr << edges[i].second << " -> " << edges[i].first << "\n";
-          }
-          std::cerr << "\n";
-          break;
-        }
       } else if (res == ResultCodeTy::TIMEOUT) {
         LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
         numUnknown++;
       } else {
-        ERROR(false);
+        ERROR("unreachable");
       }
     }
 

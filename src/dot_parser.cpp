@@ -1,6 +1,4 @@
-#include "io_graph.h"
-#include "graph_parser.h"
-
+#include "io.h"
 #include "common.h"
 #include "logging.h"
 
@@ -9,33 +7,33 @@
 
 using namespace std;
 
-bool ReadLines(istream& in, vector<string>& lines);
+bool readLines(istream& in, vector<string>& lines);
 bool isSpecial(const string& line);
 bool isNode(const string& line);
 bool isEdge(const string& line);
-IOEdge* ParseEdge(IOGraph& graph, const string& line);
-IONode* ParseNode(IOGraph& graph, const string& line);
-string ExtractId(const string& line);
-map<string, string> ParseAttr(const string& line);
-void ExtractAttr(const string& line, string& key, string& value);
-void SplitLine(const string& line, string& beforeBrakets, string& insideBrackets);
-vector<string> SplitAttr(const string& line, char separator);
+IOEdge* parseEdge(IOGraph& graph, const string& line);
+IONode* parseNode(IOGraph& graph, const string& line);
+string extractId(const string& line);
+map<string, string> parseAttr(const string& line);
+void extractAttr(const string& line, string& key, string& value);
+void splitLine(const string& line, string& beforeBrakets, string& insideBrackets);
+vector<string> splitAttr(const string& line, char separator);
 string trim(const string& line);
 
 bool readDotGraphInt(istream& in, IOGraph& graph) {
   vector<string> lines;
 
-  if (!ReadLines(in, lines)) {
+  if (!readLines(in, lines)) {
     return false;
   }
 
   for (size_t i = 0; i < lines.size(); i++) {
     if (isSpecial(lines[i])) {
-      ParseNode(graph, lines[i]);
+      parseNode(graph, lines[i]);
     } else if (isEdge(lines[i])) {
-      ParseEdge(graph, lines[i]);
+      parseEdge(graph, lines[i]);
     } else if (isNode(lines[i])) {
-      ParseNode(graph, lines[i]);
+      parseNode(graph, lines[i]);
     } else {
       cerr << "Unknown entry: " << lines[i] << "\n";
       return false;
@@ -63,7 +61,7 @@ bool GraphParser::readDotGraph(istream& in, IOGraph& graph) const {
   }
 }
 
-bool ReadLines(istream& in, vector<string>& res) {
+bool readLines(istream& in, vector<string>& res) {
   char c;
   string s = "";
   int state = -1;
@@ -102,7 +100,7 @@ bool ReadLines(istream& in, vector<string>& res) {
 
 bool isSpecial(const string& line) {
   string beforeBrakets, insideBrackets;
-  SplitLine(line, beforeBrakets, insideBrackets);
+  splitLine(line, beforeBrakets, insideBrackets);
   string s = trim(beforeBrakets);
 
   if (s == "node") {
@@ -122,7 +120,7 @@ bool isSpecial(const string& line) {
 
 bool isNode(const string& line) {
   string beforeBrakets, insideBrackets;
-  SplitLine(line, beforeBrakets, insideBrackets);
+  splitLine(line, beforeBrakets, insideBrackets);
 
   for (int j = 0; j + 1 < (int)beforeBrakets.length(); j++)
     if (beforeBrakets[j] == '-' && beforeBrakets[j + 1] == '-') {
@@ -134,7 +132,7 @@ bool isNode(const string& line) {
 
 bool isEdge(const string& line) {
   string beforeBrakets, insideBrackets;
-  SplitLine(line, beforeBrakets, insideBrackets);
+  splitLine(line, beforeBrakets, insideBrackets);
 
   for (int j = 0; j + 1 < (int)beforeBrakets.length(); j++)
     if (beforeBrakets[j] == '-' && beforeBrakets[j + 1] == '-') {
@@ -144,7 +142,7 @@ bool isEdge(const string& line) {
   return false;
 }
 
-string ExtractId(const string& line) {
+string extractId(const string& line) {
   string s = trim(line);
 
   if (s[0] == '"') {
@@ -155,9 +153,9 @@ string ExtractId(const string& line) {
   return s;
 }
 
-IOEdge* ParseEdge(IOGraph& graph, const string& line) {
+IOEdge* parseEdge(IOGraph& graph, const string& line) {
   string beforeBrakets, insideBrackets;
-  SplitLine(line, beforeBrakets, insideBrackets);
+  splitLine(line, beforeBrakets, insideBrackets);
   IOEdge* e = nullptr;
 
   //ids
@@ -170,25 +168,25 @@ IOEdge* ParseEdge(IOGraph& graph, const string& line) {
         return nullptr;
       }
 
-      e = graph.addEdge(ExtractId(n1), ExtractId(n2));
+      e = graph.addEdge(extractId(n1), extractId(n2));
       break;
     }
   }
 
   assert(e != nullptr);
   //attrs
-  e->setAttr(ParseAttr(insideBrackets));
+  e->setAttr(parseAttr(insideBrackets));
   return e;
 }
 
-IONode* ParseNode(IOGraph& graph, const string& line) {
+IONode* parseNode(IOGraph& graph, const string& line) {
   string beforeBrakets, insideBrackets;
-  SplitLine(line, beforeBrakets, insideBrackets);
+  splitLine(line, beforeBrakets, insideBrackets);
 
-  string id = ExtractId(beforeBrakets);
+  string id = extractId(beforeBrakets);
   auto node = graph.addNode(id);
 
-  auto attrs = ParseAttr(insideBrackets);
+  auto attrs = parseAttr(insideBrackets);
   node->setAttr(attrs);
   if (attrs.count("label") == 0) {
     node->setAttr("label", id);
@@ -196,28 +194,28 @@ IONode* ParseNode(IOGraph& graph, const string& line) {
   return node;
 }
 
-map<string, string> ParseAttr(const string& line) {
+map<string, string> parseAttr(const string& line) {
   string s = trim(line);
-  vector<string> tmp = SplitAttr(s, ',');
+  vector<string> tmp = splitAttr(s, ',');
   map<string, string> attr;
 
   for (int i = 0; i < (int)tmp.size(); i++) {
     string key, value;
-    ExtractAttr(tmp[i], key, value);
+    extractAttr(tmp[i], key, value);
     attr[key] = value;
   }
 
   return attr;
 }
 
-void ExtractAttr(const string& line, string& key, string& value) {
-  vector<string> tmp = SplitAttr(line, '=');
+void extractAttr(const string& line, string& key, string& value) {
+  vector<string> tmp = splitAttr(line, '=');
   CHECK(tmp.size() == 2, 110);
   key = trim(tmp[0]);
-  value = ExtractId(tmp[1]);
+  value = extractId(tmp[1]);
 }
 
-void SplitLine(const string& line, string& beforeBrakets, string& insideBrackets) {
+void splitLine(const string& line, string& beforeBrakets, string& insideBrackets) {
   beforeBrakets = insideBrackets = "";
   int i = 0;
   bool insideQuote = false;
@@ -255,12 +253,12 @@ void SplitLine(const string& line, string& beforeBrakets, string& insideBrackets
   }
 }
 
-vector<string> SplitAttr(const string& line, char separator) {
+vector<string> splitAttr(const string& line, char separator) {
   vector<string> res;
   bool insideQuotes = false;
   string s = "";
 
-  for (int i = 0; i < (int)line.length(); i++) {
+  for (size_t i = 0; i < line.length(); i++) {
     if (!insideQuotes) {
       if (line[i] == '"') {
         insideQuotes = true;
@@ -325,47 +323,47 @@ string trim(const string& line) {
   return line.substr(i, j - i + 1);
 }
 
-void WriteStyles(ostream& out, IOGraph& g);
-void WriteNodes(ostream& out, IOGraph& g);
-void WriteStyle(ostream& out, const IONode& n, bool useQ);
-void WriteNode(ostream& out, const IONode& n, bool useQ);
-void WriteAttr(ostream& out, const map<string, string>& attr);
-void WriteEdges(ostream& out, IOGraph& g);
-void WriteEdge(ostream& out, const IOEdge& n);
+void writeStyles(ostream& out, IOGraph& g);
+void writeNodes(ostream& out, IOGraph& g);
+void writeStyle(ostream& out, const IONode& n, bool useQ);
+void writeNode(ostream& out, const IONode& n, bool useQ);
+void writeAttr(ostream& out, const map<string, string>& attr);
+void writeEdges(ostream& out, IOGraph& g);
+void writeEdge(ostream& out, const IOEdge& n);
 
 bool GraphParser::writeDotGraph(ostream& out, IOGraph& graph) const {
   out << "graph {\n";
-  WriteStyles(out, graph);
-  WriteNodes(out, graph);
-  WriteEdges(out, graph);
+  writeStyles(out, graph);
+  writeNodes(out, graph);
+  writeEdges(out, graph);
   out << "}\n";
   return true;
 }
 
-void WriteStyles(ostream& out, IOGraph& g) {
+void writeStyles(ostream& out, IOGraph& g) {
   for (size_t i = 0; i < g.style.size(); i++) {
-    WriteStyle(out, g.style[i], false);
+    writeStyle(out, g.style[i], false);
   }
 }
 
-void WriteNodes(ostream& out, IOGraph& g) {
+void writeNodes(ostream& out, IOGraph& g) {
   for (size_t i = 0; i < g.nodes.size(); i++) {
-    WriteNode(out, g.nodes[i], true);
+    writeNode(out, g.nodes[i], true);
   }
 }
 
-void WriteStyle(ostream& out, const IONode& n, bool useQ) {
+void writeStyle(ostream& out, const IONode& n, bool useQ) {
   if (useQ) {
     out << "  \"" << n.id << "\" ";
   } else {
     out << "  " << n.id << " ";
   }
 
-  WriteAttr(out, n.attr);
+  writeAttr(out, n.attr);
   out << ";\n";
 }
 
-void WriteNode(ostream& out, const IONode& n, bool useQ) {
+void writeNode(ostream& out, const IONode& n, bool useQ) {
   if (useQ) {
     out << "  \"" << n.id << "\" ";
   } else {
@@ -373,13 +371,13 @@ void WriteNode(ostream& out, const IONode& n, bool useQ) {
   }
 
   if (n.attr.size() > 0) {
-    WriteAttr(out, n.attr);
+    writeAttr(out, n.attr);
   }
 
   out << ";\n";
 }
 
-void WriteAttr(ostream& out, const map<string, string>& attr) {
+void writeAttr(ostream& out, const map<string, string>& attr) {
   out << "[";
 
   for (auto iter = attr.begin(); iter != attr.end(); iter++) {
@@ -396,17 +394,17 @@ void WriteAttr(ostream& out, const map<string, string>& attr) {
   out << "]";
 }
 
-void WriteEdges(ostream& out, IOGraph& g) {
+void writeEdges(ostream& out, IOGraph& g) {
   for (size_t i = 0; i < g.edges.size(); i++) {
-    WriteEdge(out, g.edges[i]);
+    writeEdge(out, g.edges[i]);
   }
 }
 
-void WriteEdge(ostream& out, const IOEdge& e) {
+void writeEdge(ostream& out, const IOEdge& e) {
   out << "  \"" << e.source << "\" -- \"" << e.target << "\" ";
 
   if (e.attr.size() > 0) {
-    WriteAttr(out, e.attr);
+    writeAttr(out, e.attr);
   }
 
   out << ";\n";

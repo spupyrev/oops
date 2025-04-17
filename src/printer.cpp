@@ -1,8 +1,5 @@
-#include "io_utils.h"
-
+#include "io.h"
 #include "logging.h"
-#include "io_graph.h"
-#include "graph_parser.h"
 #include "one_planar.h"
 
 #include <iostream>

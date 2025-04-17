@@ -28,6 +28,7 @@ PCOBJS     = $(addsuffix p,  $(COBJS))
 DCOBJS     = $(addsuffix d,  $(COBJS))
 RCOBJS     = $(addsuffix r,  $(COBJS))
 
+# TODO: drop this
 LLVM_HOME = /home/spupyrev/dev/llvm/build/bin
 
 #CXX       = g++
