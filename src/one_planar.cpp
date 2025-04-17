@@ -934,7 +934,7 @@ void encodeMovePlanar(
     const bool useNIC) {
   LOG_IF(verbose, "encodeMovePlanar [useCross2Constraints=%d; useCross1Constraints=%d; IC=%d; NIC=%d]", 
       useCross2Constraints, useCross1Constraints, useIC, useNIC);
-  CHECK(useCross2Constraints, "move-planarity should be used with -Ccross2");
+  CHECK(useCross2Constraints, "move-planarity should be used with -cross2");
 
   // Main encoding
   encodeRelativeVariables(model, graph, verbose);
@@ -1329,11 +1329,11 @@ Result runSolver(CMDOptions& options, const InputGraph& graph) {
   const std::string modelFile = options.getStr("-dimacs");
   const int timeout = options.getInt("-timeout");
 
-  const bool useMovePlanarity = options.hasCustomOption("move-planar");
-  const bool useCross2Constraints = options.hasCustomOption("cross2");
-  const bool useCross1Constraints = options.hasCustomOption("cross1");
-  const bool useIC = options.hasCustomOption("ic");
-  const bool useNIC = options.hasCustomOption("nic");
+  const bool useMovePlanarity = options.getBool("-move-planar");
+  const bool useCross2Constraints = options.getBool("-cross2");
+  const bool useCross1Constraints = options.getBool("-cross1");
+  const bool useIC = options.getBool("-ic");
+  const bool useNIC = options.getBool("-nic");
 
   CHECK(!graph.isDirected() || useMovePlanarity, "directed edges should be used with move-planarity");
   CHECK(!useIC || !useNIC);

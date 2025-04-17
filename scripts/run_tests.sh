@@ -46,21 +46,28 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test6.graphml"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test7.graphml"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1"
 # TODO: read directed
+
 # gen random
 assert_pass "${OP} -verbose=1 -i=gen-complete -graphs=5 -n=10"
+assert_pass "${OP} -verbose=1 -i=gen-complete-bipartite -graphs=1 -n=10"
 
 # write to files
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=0 -o=/tmp/test1.gml"
 
 # test misc options
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2"
-assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross1"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1 -Cic -timeout=2"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1 -Cnic -timeout=1"
+assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -invalid-option"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2"
+assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross1"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2 -cross1"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2 -cross1 -ic -timeout=2"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2 -cross1 -nic -timeout=1"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -satsuma"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -breakID"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross1 -Ccross2 -satsuma"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross1 -cross2 -satsuma"
+assert_fail "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -move-planar"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -move-planar -cross2"
+
+sparsify
 
 # timeout
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=5"
@@ -71,7 +78,7 @@ assert_fail "[ -f /tmp/test8.dimacs ]"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -dimacs=/tmp/test8.dimacs"
 assert_pass "[ -f /tmp/test8.dimacs ]"
 
-# dimacs e2e
+# dimacs-result e2e
 #assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -dimacs-result=/tmp/test8.dimacs"
 
 echo "✅ ALL TESTS PASSED"

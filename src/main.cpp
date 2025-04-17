@@ -22,95 +22,40 @@
 
 using namespace std;
 
-/// TODO
+/// Prepare command-line arguments
 void prepareOptions(CMDOptions& options) {
-  options.setUsageMessage("Usage: op [options]");
+  options.setUsageMessage("Usage: oops [options]");
 
-  options.addAllowedOption("-i", "Input graph file name");
-  options.addAllowedOption("-o", "", "Output graph file name");
-
-  options.addAllowedOption("-action", "Action to be performed");
-  options.addAllowedValue("-action", "index");
-  options.addAllowedValue("-action", "gml2dot");
-  options.addAllowedValue("-action", "mw2dot");
-  options.addAllowedValue("-action", "gml2json");
-  options.addAllowedValue("-action", "dot2gml");
-  options.addAllowedValue("-action", "stats");
-  options.addAllowedValue("-action", "auto-lower-bound");
-  options.addAllowedValue("-action", "gen-[a-z0-9-]*");
-  options.addAllowedValue("-action", "test-[a-z-]*");
-
-  options.addAllowedOption("-export", "none", "Whether to export generated graphs in some format");
-  options.addAllowedValue("-export", "none");
-  options.addAllowedValue("-export", "plantri");
-  options.addAllowedValue("-export", "col");
-  options.addAllowedValue("-export", "gml");
-
-  options.addAllowedOption("-layout", "none", "Whether to layout a graph before printing");
-  options.addAllowedValue("-layout", "none");
-  options.addAllowedValue("-layout", "tracks");
-  options.addAllowedValue("-layout", "lex-bfs");
-  options.addAllowedValue("-layout", "ordered-bfs");
-  options.addAllowedValue("-layout", "circular");
-  options.addAllowedValue("-layout", "planar");
-  options.addAllowedValue("-layout", "subdivision");
-  options.addAllowedValue("-layout", "treewidth");
-  options.addAllowedValue("-layout", "separate-pages");
-  options.addAllowedValue("-layout", "matrix[a-z-]*");
-  options.addAllowedOption("-print-page", "-1", "If specified, prints only specified page");
-
-  options.addAllowedOption("-graphs", "1", "How many graphs to process");
-  options.addAllowedOption("-n", "20", "The number of vertices in the generated graph");
-  options.addAllowedOption("-maxn", "-1", "The maximum number of vertices in the generated graph");
-  options.addAllowedOption("-m", "-1", "The number of edges in the generated graph");
-  options.addAllowedOption("-degree", "-1", "Max vertex degree in the generated graph");
-  options.addAllowedOption("-sparsify", "false", "Try to remove vertices/edges while keeping the same thickness");
-  options.addAllowedOption("-sparsifyTo", "0", "Try to remove vertices up to the specified number while keeping the same thickness");
-  options.addAllowedOption("-analyze-poset", "false", "Analyze poset and print chain partition");
-  options.addAllowedOption("-find-best", "false", "Find the best relation");
-  options.addAllowedOption("-part", "", "The part of input to process in the form of part_idx/num_parts");
-
-  options.addAllowedOption("-stacks", "0", "The number of stacks to use");
-  options.addAllowedOption("-queues", "0", "The number of queues to use");
-  options.addAllowedOption("-twists", "0", "The maximum size of a twist to use");
-  options.addAllowedOption("-tracks", "0", "The number of tracks to use");
-  options.addAllowedOption("-mixed-pages", "0", "The number of mixed pages to use");
-  options.addAllowedOption("-trees-old", "false", "Whether to use trees for embedding");
-  options.addAllowedOption("-trees", "false", "Whether to use trees for embedding");
-  options.addAllowedOption("-adjacent", "false", "Whether to keep all edges of adjacent vertices on the same page");
-  options.addAllowedOption("-dispersable", "false", "Whether the embedding is dispersable");
-  options.addAllowedOption("-span", "0", "Maximum edge span (for track layouts)");
+  // IO
+  options.addAllowedOption("-i", "Input file name");
+  options.addAllowedOption("-o", "", "Output file name");
+  options.addAllowedOption("-part", "", "The part of the input to process in the form of part_idx/num_parts");
+  options.addAllowedOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
+  options.addAllowedOption("-max-degree", "-1", "Max vertex degree in the processed graph");
   options.addAllowedOption("-directed", "false", "Whether the input graph is directed");
-  options.addAllowedOption("-multi", "false", "Allow edges on multiple pages");
-  options.addAllowedOption("-local", "0", "The number of local pages");
-  options.addAllowedOption("-colors", "0", "The number of colors");
-  options.addAllowedOption("-strict", "false", "Enforce strict queue layouts");
-  options.addAllowedOption("-weak-coloring", "false", "Whether to compute weak-coloring numbers");
-  options.addAllowedOption("-width", "0", "Width of a poset/graph");
-  options.addAllowedOption("-depth", "0", "Depth of a poset/graph");
 
-  options.addAllowedOption("-skipSAT", "false", "Whether to skip SAT model");
-  options.addAllowedOption("-skipSolve", "false", "Whether to skip SAT solver");
-  options.addAllowedOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
-  options.addAllowedOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
+  // Debug
   options.addAllowedOption("-verbose", "1", "Output debug info");
-  options.addAllowedOption("-check", "true", "Whether to run checks for constructed embedding");
   options.addAllowedOption("-seed", "0", "Random seed");
-  options.addAllowedOption("-custom", "", "A custom cmd parameter");
-  options.addAllowedOption("-fixedOrder", "false", "Whether the vertex order is fixed");
-  options.addAllowedOption("-timeout", "0", "Maximim time (in seconds) to solve SAT");
 
+  // Solver options
+  options.addAllowedOption("-move-planar", "false", "Use `move-planar` SAT encoding instead of `stack` encoding");
+  options.addAllowedOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
+  options.addAllowedOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
+  options.addAllowedOption("-timeout", "0", "Maximim time (in seconds) to solve SAT");
+  options.addAllowedOption("-sparsify", "false", "Try to eliminate crossings in the resulting solution");
+  options.addAllowedOption("-cross2", "false", "Use cross2 constraints");
+  options.addAllowedOption("-cross1", "false", "Use cross1 constraints");
+  options.addAllowedOption("-ic", "false", "Enforce IC constraints");
+  options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
+
+  // External SAT solver
   options.addAllowedOption("-dimacs", "", "Output dimacs file");
   options.addAllowedOption("-dimacs-result", "", "Input dimacs file with a solution");
 
-  options.addAllowedOption("-solver", "simp21", "A SAT solver to use");
-  options.addAllowedValue("-solver", "glucose");
-  options.addAllowedValue("-solver", "simp21");
-
-  options.addAllowedOption("-product", "strong", "The type of graph product");
-  options.addAllowedValue("-product", "strong");
-  options.addAllowedValue("-product", "cartesian");
-  options.addAllowedValue("-product", "direct");
+  // Graph generation
+  options.addAllowedOption("-graphs", "1", "How many graphs to generate");
+  options.addAllowedOption("-n", "20", "The number of vertices in the generated graph");
 }
 
 /// Check if a given graph with specified pairs of crossed edges is planar
@@ -359,8 +304,8 @@ ResultCodeTy isOnePlanar(
     const std::string& graphName) {
   const int verbose = options.getInt("-verbose");
   const int timeout = options.getInt("-timeout");
-  const bool useIC = options.hasCustomOption("ic");
-  const bool useNIC = options.hasCustomOption("nic");
+  const bool useIC = options.getBool("-ic");
+  const bool useNIC = options.getBool("-nic");
 
   const int n = graph.n;
   const auto& edges = graph.edges;
@@ -447,13 +392,6 @@ ResultCodeTy isOnePlanar(
   auto endTimeSAT = chrono::steady_clock::now();
   LOG_IF(verbose >= 1, "SAT solving took %s for %s [timeout = %d sec]", ms_to_str(startTimeSAT, endTimeSAT).c_str(), graphName.c_str(), timeout);
 
-  // print difficult instances
-  // const auto durationMs = chrono::duration_cast<chrono::milliseconds>(endTimeSAT - startTimeSAT).count();
-  // if (durationMs >= 10000) {
-  //   LOG("TMP%d: SAT solving took %s for %s [timeout = %d sec]", result.code, ms_to_str(startTimeSAT, endTimeSAT).c_str(), graphName.c_str(), timeout);
-  //   printText(graphName + ".cfg", graphName, n, edges);
-  // }
-
   if (result.code != ResultCodeTy::SAT) {
     return result.code;
   }
@@ -510,8 +448,8 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
   const std::string filename = options.getStr("-i");
   const std::string extension = filename.substr(filename.find_last_of(".") + 1);
 
-  const int maxN = options.getInt("-maxn");
-  const int maxD = options.getInt("-degree");
+  const int maxN = options.getInt("-max-n");
+  const int maxD = options.getInt("-max-degree");
   auto graphFilter = [maxN,maxD](const int n, const std::vector<EdgeTy>& edges) -> bool {
     if (maxN != -1 && n > maxN)
       return false;
