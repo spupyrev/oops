@@ -307,24 +307,6 @@ bool is2Connected(int n, const std::vector<EdgeTy>& edges) {
   return biComponents.size() == 1;
 }
 
-void reduceMaxDegree(int n, std::vector<EdgeTy>& edges, int maxDegree) {
-  if (maxDegree <= 0) {
-    return;
-  }
-
-  std::vector<EdgeTy> newEdges;
-  Rand::shuffle(edges.begin(), edges.end());
-  std::vector<int> degree(n, 0);
-  for (const auto& [u, v] : edges) {
-    if (degree[u] + 1 > maxDegree || degree[v] + 1 > maxDegree)
-      continue;
-    newEdges.push_back({u, v});
-    degree[u] += 1;
-    degree[v] += 1;
-  }
-  edges = newEdges;
-}
-
 bool isTree(const int n, const std::vector<EdgeTy>& edges) {
   Adjacency adj(n);
   adj.from_edges(edges);

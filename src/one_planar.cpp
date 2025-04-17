@@ -405,18 +405,14 @@ void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int v
     }
   }
 
-  // disable some pairs of crossings
-  // encodeICConstraints(model, n, edges, verbose, 3);
-  // return;
-
   if (!graph.isDirected()) {
-    // TODO: enable for UNSAT?
+    // TODO: always enable for UNSAT?
     encodeICConstraints(model, graph, verbose, 2);
 
-    // TODO: enable for UNSAT?
+    // TODO: always enable for UNSAT?
     encodeSwapConstraints(model, graph, verbose);
 
-    // TODO: enable for UNSAT?
+    // TODO: always enable for UNSAT?
     encodeK4Constraints(model, graph, verbose);
   }
 }
@@ -712,7 +708,26 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const int v
     }
   }
 
-  LOG_IF(verbose, "added %2d swap constraints", numConstraints);
+  LOG_IF(verbose, "added %3d swap constraints", numConstraints);
+
+  int num3Constraints = 0;
+  // forbid crossings between every pair of edges for two degree-3 vertices
+  for (int u = 0; u < n; u++) {
+    if (graph.degree(u) != 3) 
+      continue;
+    for (int v = u + 1; v < n; v++) {
+      if (graph.degree(v) != 3) 
+        continue;
+      if (graph.hasEdge(u, v))
+        continue;
+
+      // vertex u is adjacent with (a, b, c) via edges (ea, eb, ec)
+      ///const int a
+      // HERE!!!
+    }
+  }
+
+  LOG_IF(verbose, "added %3d 3-swap constraints", num3Constraints);
 }
 
 /// A pair cross => K4-edges do not cross
@@ -932,7 +947,7 @@ void encodeMovePlanar(
     const bool useCross1Constraints,
     const bool useIC,
     const bool useNIC) {
-  LOG_IF(verbose, "encodeMovePlanar [useCross2Constraints=%d; useCross1Constraints=%d; IC=%d; NIC=%d]", 
+  LOG_IF(verbose, "encodeMovePlanar [Cross2=%d; Cross1=%d; IC=%d; NIC=%d]", 
       useCross2Constraints, useCross1Constraints, useIC, useNIC);
   CHECK(useCross2Constraints, "move-planarity should be used with -cross2");
 
@@ -1058,7 +1073,7 @@ void encodeStackPlanar(
     const bool useCross1Constraints,
     const bool useIC,
     const bool useNIC) {
-  LOG_IF(verbose, "encodeStackPlanar [useCross2Constraints=%d; useCross1Constraints=%d; IC=%d, NIC=%d]", 
+  LOG_IF(verbose, "encodeStackPlanar [Cross2=%d; Cross1=%d; IC=%d, NIC=%d]", 
       useCross2Constraints, useCross1Constraints, useIC, useNIC);
 
   // Main encoding
@@ -1074,11 +1089,11 @@ void encodeStackPlanar(
     encodeCross1Constraints(model, graph, verbose);
   }
   if (useIC) {
-    CHECK(useCross2Constraints);
+    CHECK(useCross2Constraints, "IC constraints should be used with `-cross2`");
     encodeICConstraints(model, graph, verbose, 0);
   }
   if (useNIC) {
-    CHECK(useCross2Constraints);
+    CHECK(useCross2Constraints, "NIC constraints should be used with `-cross2`");
     encodeICConstraints(model, graph, verbose, 1);
   }
 

@@ -223,48 +223,6 @@ void minimizeCrossings(const int n, const std::vector<EdgeTy>& edges, Result& re
   LOG_IF(verbose, "reduced the number of crossings from %d to %d", orgNumCrossings, newNumCrossings);
 }
 
-/// TODO: move to InputGraph
-void verifyInput(const int n, const std::vector<EdgeTy>& edges) {
-  // Sanity check
-  for (size_t i = 0; i < edges.size(); i++) {
-    const auto& ei = edges[i];
-    CHECK(ei.first < ei.second);
-    CHECK(0 <= ei.first && ei.first < n);
-    CHECK(0 <= ei.second && ei.second < n);
-    for (size_t j = i + 1; j < edges.size(); j++) {
-      const auto& ej = edges[j];
-      CHECK(ei.first != ej.first || ei.second != ej.second, "(%d, %d) -- (%d, %d)", ei.first, ei.second, ej.first, ej.second);
-    }
-  }
-
-  // Check degree-1 vertices
-  const int md = minDegree(n, edges);
-  CHECK(n == 2 || md >= 2, "the graph contains low degree vertices");
-}
-
-/// TODO: move to InputGraph
-InputGraph reindex(const int n, const std::vector<EdgeTy>& edges) {
-  std::vector<bool> used(n, false);
-  for (const auto& [u, v] : edges) {
-    used[u] = true;
-    used[v] = true;
-  }
-  int nC = 0;
-  std::vector<int> index(n, -1);
-  for (int i = 0; i < n; i++) {
-    if (!used[i]) continue;
-    index[i] = nC;
-    nC++;
-  }
-  std::vector<EdgeTy> edgesC;
-  for (const auto& [u, v] : edges) {
-    CHECK(index[u] != -1 && index[v] != -1);
-    CHECK(index[u] < index[v], "u = %d; v = %d", u, v);
-    edgesC.push_back({index[u], index[v]});
-  }
-  return InputGraph(nC, edgesC, std::vector<bool>());
-}
-
 /// Check if 1-planarity test can be skipped because of graphs size or density
 bool skipTestingBySize(const int n, const std::vector<EdgeTy>& edges, const int verbose, ResultCodeTy& resultCode) {
   const int m = (int)edges.size();
@@ -342,18 +300,18 @@ ResultCodeTy isOnePlanar(
           [](const std::vector<EdgeTy>& l, const std::vector<EdgeTy>& r) { 
               return l.size() < r.size(); 
       });
-      for (auto& comp : biComponents) {
+      for (auto& compEdges : biComponents) {
         // skip small components
         if (SkipBySize) {
           // planar
-          if (comp.size() < 9)
+          if (compEdges.size() < 9)
             continue;
           // 1-planar
-          if (comp.size() < 18)
+          if (compEdges.size() < 18)
             continue;
         }
         // create a graph for the component
-        InputGraph compGraph = reindex(n, comp);
+        InputGraph compGraph(compEdges);
         // start testing for the component
         ResultCodeTy res = isOnePlanar(options, compGraph, false, graphName);
         if (res != ResultCodeTy::SAT) {
@@ -364,8 +322,9 @@ ResultCodeTy isOnePlanar(
     }
   }
 
-  // make sure the input is sane
-  verifyInput(n, edges);
+  // make sure the input is sane (check degree-1 vertices)
+  const int md = graph.minDegree();
+  CHECK(n == 2 || md >= 2, "the bi-connected graph contains low degree vertices");
 
   // check if planarity test can be skipped
   ResultCodeTy resultCode = ResultCodeTy::ERROR;

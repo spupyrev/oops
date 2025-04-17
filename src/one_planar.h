@@ -30,8 +30,42 @@ struct InputGraph {
 
   InputGraph() {}
 
+  /// Create a graph for a given number of vertices and given edges
   InputGraph(int n, const std::vector<EdgeTy>& edges, const std::vector<bool>& directions) : 
       n(n), edges(edges), directions(directions) {
+    init();
+  }
+
+  /// Create a graph for a given set of edges (possibly by re-indexing its vertices)
+  InputGraph(const std::vector<EdgeTy>& edgesC) {
+    int maxN = 0;
+    for (const auto& [u, v] : edgesC) {
+      maxN = std::max(maxN, u);
+      maxN = std::max(maxN, v);
+    }
+    std::vector<bool> used(maxN + 1, false);
+    for (const auto& [u, v] : edgesC) {
+      used[u] = true;
+      used[v] = true;
+    }
+
+    n = 0;
+    std::vector<int> index(maxN + 1, -1);
+    for (int i = 0; i < maxN + 1; i++) {
+      if (!used[i]) continue;
+      index[i] = n;
+      n++;
+    }
+    for (const auto& [u, v] : edgesC) {
+      CHECK(index[u] != -1 && index[v] != -1);
+      CHECK(index[u] < index[v], "u = %d; v = %d", u, v);
+      edges.push_back({index[u], index[v]});
+    }
+
+    init();
+  }
+
+  void init() {
     CHECK(edges.size() > 0, "empty input graph");
     CHECK(directions.empty() || directions.size() == edges.size());
     for (const auto& [u, v] : edges) {
@@ -50,6 +84,20 @@ struct InputGraph {
   /// Check if the input graph is directed
   bool isDirected() const {
     return !directions.empty();
+  }
+
+  /// Minimum vertex degree
+  int minDegree() const {
+    int res = (int)adj[0].size();
+    for (int i = 1; i < n; i++) {
+      res = std::min(res, (int)adj[i].size());
+    }
+    return res;
+  }
+
+  /// Vertex degree
+  int degree(int v) const {
+    return (int)adj[v].size();
   }
 
   /// Check if the edge exists
