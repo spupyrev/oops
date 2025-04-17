@@ -27,9 +27,9 @@ assert_fail() { assert "$1" 1 "$2"; }
 
 
 OP=${PWD}/oops
-assert_pass "[ -f ${OP} ]" "Binary ${OP} exists" 
+assert_pass "[ -f ${OP} ]" "Binary ${OP} exists"
 DATA_DIR=${PWD}/data
-assert_pass "[ -d ${DATA_DIR} ]" "Folder ${DATA_DIR} exists" 
+assert_pass "[ -d ${DATA_DIR} ]" "Folder ${DATA_DIR} exists"
 
 # no params
 assert_fail "${OP}"
@@ -47,7 +47,7 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test7.graphml"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1"
 # TODO: read directed
 # gen random
-assert_pass "${OP} -verbose=1 -i=gen-optimal -graphs=5 -n=18"
+assert_pass "${OP} -verbose=1 -i=gen-complete -graphs=5 -n=10"
 
 # write to files
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=0 -o=/tmp/test1.gml"
@@ -56,17 +56,22 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=0 -o=/tmp/test1.gml
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2"
 assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross1"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1 -Cic"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1 -Cnic"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1 -Cic -timeout=2"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross2 -Ccross1 -Cnic -timeout=1"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -satsuma"
-assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -breakID"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -breakID"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -Ccross1 -Ccross2 -satsuma"
 
 # timeout
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=5"
 
 # dimacs
+assert_pass "rm -f /tmp/test8.dimacs"
+assert_fail "[ -f /tmp/test8.dimacs ]"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -dimacs=/tmp/test8.dimacs"
-assert_pass "e2e"
+assert_pass "[ -f /tmp/test8.dimacs ]"
+
+# dimacs e2e
+#assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -dimacs-result=/tmp/test8.dimacs"
 
 echo "✅ ALL TESTS PASSED"

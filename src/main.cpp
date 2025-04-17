@@ -2,6 +2,7 @@
 #include "cmd_options.h"
 #include "io.h"
 #include "graph_algorithms.h"
+#include "graph_generator.h"
 #include "one_planar.h"
 
 #include <iostream>
@@ -480,8 +481,7 @@ ResultCodeTy isOnePlanar(
   return result.code;
 }
 
-std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
-  std::vector<std::pair<std::string, AdjListTy>> graphs;
+std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {  
   const std::string input = options.getStr("-i");
 
   // gen random
@@ -490,17 +490,15 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
     const int numGraphs = options.getInt("-graphs");
     const int startSeed = options.getInt("-seed");
     const int n0 = options.getInt("-n");
+
+    std::vector<std::pair<std::string, AdjListTy>> graphs;
     for (int t = 0; t < numGraphs; t++) {
       const int seed = t + startSeed;
       Rand::setSeed(seed);
 
       int n = n0;
       std::vector<EdgeTy> edges;
-      //genOptimal1Planar(edges, n);
-      //genComplete(edges, n);
-      //genCompleteBipartite(edges, 4, 4); n = 8;
-      //edges.pop_back();
-      //genCirculant(edges, n, {1, 2, 3});
+      genByClass(graphClass, n, edges);
       graphs.push_back({
         "seed_" + to_string(t), 
         edges_to_adj(n, edges)
@@ -560,6 +558,7 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
   std::vector<EdgeTy> edges;
   ioGraph.extractEdges(n, edges);
   const int numGraphs = options.getInt("-graphs");
+  std::vector<std::pair<std::string, AdjListTy>> graphs;
   for (int i = 0; i < numGraphs; i++) {
     std::string graphName = (numGraphs == 1 ? filename : filename + "_" + to_string(i));
     graphs.push_back({
