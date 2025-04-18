@@ -17,7 +17,6 @@
 #include <regex>
 
 // TODO: make options
-#define MAX_SKEWNESS 1
 #define SKIP_BY_SIZE 1
 
 using namespace std;
@@ -40,6 +39,7 @@ void prepareOptions(CMDOptions& options) {
 
   // Solver options
   options.addAllowedOption("-move-planar", "false", "Use `move-planar` SAT encoding instead of `stack` encoding");
+  options.addAllowedOption("-skewness", "1", "Maximum value of skewness");
   options.addAllowedOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
   options.addAllowedOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
   options.addAllowedOption("-timeout", "0", "Maximim time (in seconds) to solve SAT");
@@ -257,6 +257,7 @@ bool skipTestingBySize(const int n, const std::vector<EdgeTy>& edges, const int 
 
 ResultCodeTy isOnePlanar(
     CMDOptions& options, 
+    const Params& params,
     const InputGraph& graph,
     const bool splitIntoBiconnected, 
     const std::string& graphName) {
@@ -313,7 +314,7 @@ ResultCodeTy isOnePlanar(
         // create a graph for the component
         InputGraph compGraph(compEdges);
         // start testing for the component
-        ResultCodeTy res = isOnePlanar(options, compGraph, false, graphName);
+        ResultCodeTy res = isOnePlanar(options, params, compGraph, false, graphName);
         if (res != ResultCodeTy::SAT) {
           return res;
         }
@@ -338,16 +339,17 @@ ResultCodeTy isOnePlanar(
 
   // check skewness (max number of crossings)
   if (!graph.isDirected()) {
-    const int skewness = computeSkewness(graph, verbose, MAX_SKEWNESS);
-    if (skewness <= MAX_SKEWNESS) {
-      LOG_IF(verbose, "the graph has skewness %d (<= %d)", skewness, MAX_SKEWNESS);
+    const int maxSkewness = options.getInt("-skewness");
+    const int skewness = computeSkewness(graph, verbose, maxSkewness);
+    if (skewness <= maxSkewness) {
+      LOG_IF(verbose, "the graph has skewness %d (<= %d)", skewness, maxSkewness);
       return ResultCodeTy::SAT;
     }
     LOG_IF(verbose, "the graph has skewness >= %d", skewness);
   }
 
   auto startTimeSAT = chrono::steady_clock::now();
-  Result result = runSolver(options, graph);
+  Result result = runSolver(params, graph);
   auto endTimeSAT = chrono::steady_clock::now();
   LOG_IF(verbose >= 1, "SAT solving took %s for %s [timeout = %d sec]", ms_to_str(startTimeSAT, endTimeSAT).c_str(), graphName.c_str(), timeout);
 
@@ -398,7 +400,7 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
       std::vector<EdgeTy> edges;
       genByClass(graphClass, n, edges);
       LOG_IF(verbose, "generated %s graph with |V| = %d  |E| = %d", graphClass.c_str(), n, edges.size());
-      
+
       graphs.push_back({
         "seed_" + to_string(t), 
         edges_to_adj(n, edges)
@@ -520,12 +522,37 @@ void genDirections(CMDOptions& options, const int n, std::vector<EdgeTy>& edges,
   }
 }
 
+/// Create parameters for SAT solving
+void initSATParams(CMDOptions& options, Params& params) {
+  params.verbose = options.getInt("-verbose");;
+  params.timeout = options.getInt("-timeout");;
+  //params.directed = options.getBool("-directed");
+  params.applyBreakID = options.getBool("-breakID");
+  params.applySatsuma = options.getBool("-satsuma");
+  params.modelFile = options.getStr("-dimacs");
+  params.resultFile = options.getStr("-dimacs");
+
+  params.useMovePlanarity = options.getBool("-move-planar");
+  params.useCross2Constraints = options.getBool("-cross2");
+  params.useCross1Constraints = options.getBool("-cross1");
+  params.useIC = options.getBool("-ic");
+  params.useNIC = options.getBool("-nic");
+
+  //CHECK(!params.directed || params.useMovePlanarity, "directed edges should be used with move-planarity");
+  CHECK(!params.useIC || !params.useNIC, "cannot simultanosly use IC and NIC modes");
+  CHECK(!params.useCross1Constraints || params.useCross2Constraints, "`-cross1` constraints should be used with `-cross2`");
+  CHECK(!params.useIC || params.useCross2Constraints, "`-useIC` constraints should be used with `-cross2`");
+  CHECK(!params.useNIC || params.useCross2Constraints, "`-useNIC` constraints should be used with `-cross2`");
+}
+
 /// Gen a random 1-planar graph and verify the 1-planar SAT model
 void testOnePlanar(CMDOptions& options) {
-  const int verbose = options.getInt("-verbose");
-  const std::string outFilename = options.getStr("-o");
-  const bool directed = options.getBool("-directed");
   const int startSeed = options.getInt("-seed");
+  const int verbose = options.getInt("-verbose");
+  const bool directed = options.getBool("-directed");
+
+  Params params;
+  initSATParams(options, params);
 
   auto graphs = genGraphs(options);
   const int numGraphs = graphs->size();
@@ -561,7 +588,7 @@ void testOnePlanar(CMDOptions& options) {
       numPlanar++;
     } else {
       InputGraph graph(n, edges, directions);
-      ResultCodeTy res = isOnePlanar(options, graph, true, graphName);
+      ResultCodeTy res = isOnePlanar(options, params, graph, true, graphName);
       if (res == ResultCodeTy::SAT) {
         if (verbose)
           LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
@@ -577,20 +604,6 @@ void testOnePlanar(CMDOptions& options) {
         ERROR("unreachable");
       }
     }
-
-    // // Only for optimal-1-planar: add an extra edge and make sure it is not 1-planar
-    // if ((int)edges.size() < n * (n - 1) / 2) {
-    //   int u = Rand::next(n);
-    //   int v = Rand::next(n);
-    //   while (u == v || hasEdge(u, v, edges)) {
-    //     u = Rand::next(n);
-    //     v = Rand::next(n);
-    //   }
-    //   edges.push_back(std::make_pair(std::min(u, v), std::max(u, v)));
-    //   LOG_IF(verbose, "added edge (%d, %d)", edges.back().first, edges.back().second);
-    //   // make sure it is not 1-planar
-    //   CHECK(!isOnePlanar(options, n, edges, true));
-    // }
 
     times.push_back(chrono::steady_clock::now());
     processingTimes.push_back(chrono::duration_cast<chrono::milliseconds>(times[t + 1] - times[t]).count());

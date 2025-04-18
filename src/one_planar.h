@@ -2,16 +2,14 @@
 
 #include "common.h"
 #include "logging.h"
-#include "cmd_options.h"
 #include "glucose/SolverSimp21.h"
 #include "breakid/sat_symmetry.h"
 #include "satsuma/sat_symmetry.h"
 
-#include <sstream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <map>
 #include <unordered_map>
 #include <zlib.h>
 
@@ -170,7 +168,52 @@ struct InputGraph {
     else
       return std::make_pair(ee.second, edge_idx + n);
   }
+};
 
+/// SAT solver parameters
+struct Params {
+  Params() = default;
+
+  Params(const Params&) = delete;
+  Params& operator=(const Params&) = delete;
+  Params(Params&&) = delete;
+  Params& operator=(Params&&) = delete;  
+
+  // Verbosity level
+  int verbose = 0;
+  // Timeout (in seconds)
+  int timeout = 0;
+
+  // Whether to apply symmetry-breaking constraints
+  bool applyBreakID = false;
+  bool applySatsuma = false;
+
+  // Dimacs input/output
+  std::string modelFile = "";
+  std::string resultFile = "";
+
+  bool useMovePlanarity = false;
+  bool useCross2Constraints = false;
+  bool useCross1Constraints = false;
+  bool useIC = false;
+  bool useNIC = false;
+
+  std::string to_string() const {
+    std::ostringstream ss;
+    if (useMovePlanarity)
+      ss << "move-planar ";
+    else
+      ss << "stack-planar ";
+
+    ss << "[";
+    ss << "cross2=" << int(useCross2Constraints);
+    ss << "; cross1=" << int(useCross1Constraints);
+    ss << "; IC=" << int(useIC);
+    ss << "; NIC=" << int(useNIC);
+    ss << "]";
+
+    return ss.str();
+  }
 };
 
 enum class ResultCodeTy { SAT, UNSAT, TIMEOUT, ERROR };
@@ -657,4 +700,4 @@ class SATModel {
 
 bool canBeMerged(int u, int v, const int n, const std::vector<EdgeTy>& edges);
 void initCrossablePairs(const InputGraph& graph, const int verbose);
-Result runSolver(CMDOptions& options, const InputGraph& graph);
+Result runSolver(const Params& params, const InputGraph& graph);

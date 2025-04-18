@@ -1,10 +1,7 @@
 #include "one_planar.h"
-
 #include "logging.h"
-#include "cmd_options.h"
 
 // TODO: make options
-#define MAX_SKEWNESS 1
 #define SKIP_BY_SIZE 1
 #define FORBID_CROSSINGS 0
 
@@ -723,7 +720,7 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const int v
 
       // vertex u is adjacent with (a, b, c) via edges (ea, eb, ec)
       ///const int a
-      // HERE!!!
+      //HERE!!!
     }
   }
 
@@ -942,37 +939,32 @@ void encodeMoveSymmetry(SATModel& model, const InputGraph& graph, const int verb
 void encodeMovePlanar(
     SATModel& model, 
     const InputGraph& graph,
-    const int verbose,
-    const bool useCross2Constraints,
-    const bool useCross1Constraints,
-    const bool useIC,
-    const bool useNIC) {
-  LOG_IF(verbose, "encodeMovePlanar [Cross2=%d; Cross1=%d; IC=%d; NIC=%d]", 
-      useCross2Constraints, useCross1Constraints, useIC, useNIC);
-  CHECK(useCross2Constraints, "move-planarity should be used with -cross2");
+    const Params& params) {
+  LOG_IF(params.verbose, "encode %s", params.to_string().c_str()); 
+  CHECK(params.useCross2Constraints, "move-planarity should be used with -cross2");
 
   // Main encoding
-  encodeRelativeVariables(model, graph, verbose);
-  encodeCross2Variables(model, graph, verbose);
-  encodeMoveVariables(model, graph, verbose);
-  encodeMoveConstraints(model, graph, verbose);
+  encodeRelativeVariables(model, graph, params.verbose);
+  encodeCross2Variables(model, graph, params.verbose);
+  encodeMoveVariables(model, graph, params.verbose);
+  encodeMoveConstraints(model, graph, params.verbose);
 
   // Optional encoding
-  if (useCross1Constraints) {
-    CHECK(useCross2Constraints);
-    encodeCross1Constraints(model, graph, verbose);
+  if (params.useCross1Constraints) {
+    CHECK(params.useCross2Constraints);
+    encodeCross1Constraints(model, graph, params.verbose);
   }
-  if (useIC) {
-    CHECK(useCross2Constraints);
-    encodeICConstraints(model, graph, verbose, 0);
+  if (params.useIC) {
+    CHECK(params.useCross2Constraints);
+    encodeICConstraints(model, graph, params.verbose, 0);
   }
-  if (useNIC) {
-    CHECK(useCross2Constraints);
-    encodeICConstraints(model, graph, verbose, 1);
+  if (params.useNIC) {
+    CHECK(params.useCross2Constraints);
+    encodeICConstraints(model, graph, params.verbose, 1);
   }
 
   // Symmetry
-  encodeMoveSymmetry(model, graph, verbose);
+  encodeMoveSymmetry(model, graph, params.verbose);
 }
 
 void encodeStackConstraints(SATModel& model, const InputGraph& graph, const int verbose) {
@@ -1068,37 +1060,33 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
 void encodeStackPlanar(
     SATModel& model, 
     const InputGraph& graph,
-    const int verbose,
-    const bool useCross2Constraints,
-    const bool useCross1Constraints,
-    const bool useIC,
-    const bool useNIC) {
-  LOG_IF(verbose, "encodeStackPlanar [Cross2=%d; Cross1=%d; IC=%d, NIC=%d]", 
-      useCross2Constraints, useCross1Constraints, useIC, useNIC);
+    const Params& params) {
+  LOG_IF(params.verbose, "encode %s", params.to_string().c_str()); 
+  CHECK(!graph.isDirected(), "directed edges should be used with move-planarity");
 
   // Main encoding
-  encodeRelativeVariables(model, graph, verbose);
-  encodeStackConstraints(model, graph, verbose);
+  encodeRelativeVariables(model, graph, params.verbose);
+  encodeStackConstraints(model, graph, params.verbose);
 
   // Optional encoding
-  if (useCross2Constraints) {
-    encodeCross2Variables(model, graph, verbose);
+  if (params.useCross2Constraints) {
+    encodeCross2Variables(model, graph, params.verbose);
   }
-  if (useCross1Constraints) {
-    CHECK(useCross2Constraints);
-    encodeCross1Constraints(model, graph, verbose);
+  if (params.useCross1Constraints) {
+    CHECK(params.useCross2Constraints);
+    encodeCross1Constraints(model, graph, params.verbose);
   }
-  if (useIC) {
-    CHECK(useCross2Constraints, "IC constraints should be used with `-cross2`");
-    encodeICConstraints(model, graph, verbose, 0);
+  if (params.useIC) {
+    CHECK(params.useCross2Constraints);
+    encodeICConstraints(model, graph, params.verbose, 0);
   }
-  if (useNIC) {
-    CHECK(useCross2Constraints, "NIC constraints should be used with `-cross2`");
-    encodeICConstraints(model, graph, verbose, 1);
+  if (params.useNIC) {
+    CHECK(params.useCross2Constraints);
+    encodeICConstraints(model, graph, params.verbose, 1);
   }
 
   // Symmetry
-  encodeStackSymmetry(model, graph, verbose);
+  encodeStackSymmetry(model, graph, params.verbose);
 }
 
 /// Extract a result from the SAT encoding for move-based planarity
@@ -1106,8 +1094,8 @@ void fillResultMove(
     const SATModel& model, 
     Solver& solver, 
     const InputGraph& graph,
-    Result& result, 
-    const int verbose) {
+    const Params& params,
+    Result& result) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -1203,10 +1191,8 @@ void fillResultStack(
     const SATModel& model, 
     Solver& solver, 
     const InputGraph& graph,
-    Result& result, 
-    const int verbose, 
-    const bool useCross2Constraints,
-    const bool useCross1Constraints) {
+    const Params& params,
+    Result& result) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -1263,13 +1249,13 @@ void fillResultStack(
       result.isCrossed[e1] = true;
       result.isCrossed[e2] = true;
       // verify corresponding cross-2 variable
-      if (useCross2Constraints) {
+      if (params.useCross2Constraints) {
         CHECK(model.value(solver, model.getCross2Var(e1 + n, e2 + n, true)), "problem cross2Var for edges %d and %d", e1, e2);
       }
     }
   }
   // Verify cross-1 variables
-  if (useCross1Constraints) {
+  if (params.useCross1Constraints) {
     for (int e = 0; e < m; e++) {
       if (result.isCrossed[e]) {
         CHECK(model.value(solver, model.getCross1Var(e + n, true)), "problem cross1Var for edge %d (%d, %d)", e, edges[e].first, edges[e].second);
@@ -1337,41 +1323,28 @@ void fillResultStack(
 }
 
 ///
-Result runSolver(CMDOptions& options, const InputGraph& graph) {
-  const int verbose = options.getInt("-verbose");
-  const bool applyBreakID = options.getBool("-breakID");
-  const bool applySatsuma = options.getBool("-satsuma");
-  const std::string modelFile = options.getStr("-dimacs");
-  const int timeout = options.getInt("-timeout");
-
-  const bool useMovePlanarity = options.getBool("-move-planar");
-  const bool useCross2Constraints = options.getBool("-cross2");
-  const bool useCross1Constraints = options.getBool("-cross1");
-  const bool useIC = options.getBool("-ic");
-  const bool useNIC = options.getBool("-nic");
-
-  CHECK(!graph.isDirected() || useMovePlanarity, "directed edges should be used with move-planarity");
-  CHECK(!useIC || !useNIC);
+Result runSolver(const Params& params, const InputGraph& graph) {
+  const int verbose = params.verbose;
 
   // Init the model
   SATModel model;
-  if (useMovePlanarity)
-    encodeMovePlanar(model, graph, verbose, useCross2Constraints, useCross1Constraints, useIC, useNIC);
+  if (params.useMovePlanarity)
+    encodeMovePlanar(model, graph, params);
   else
-    encodeStackPlanar(model, graph, verbose, useCross2Constraints, useCross1Constraints, useIC, useNIC);
+    encodeStackPlanar(model, graph, params);
 
   // Create a solver
   Solver solver;
   solver.verbosity = verbose;
-  if (timeout > 0) {
-    solver.timeout_ms = 1000 * timeout;
+  if (params.timeout > 0) {
+    solver.timeout_ms = 1000 * params.timeout;
   }
 
   // Init a model
   model.initVars(solver);
 
   // Symmetry-breaking
-  if (applySatsuma) {
+  if (params.applySatsuma) {
     LOG_IF(verbose, "applying Satsuma for %'d variables and %'d constraints", model.varCount(), model.clauseCount());
     model.applySatsuma(verbose, solver);
   }
@@ -1379,15 +1352,15 @@ Result runSolver(CMDOptions& options, const InputGraph& graph) {
   // Init a model
   model.initClauses(solver);
 
-  if (applyBreakID) {
+  if (params.applyBreakID) {
     LOG_IF(verbose, "applying BreakID for %'d variables and %'d constraints", model.varCount(), model.clauseCount());
     model.applyBreakID(verbose, solver);
   }
 
-  if (modelFile != "") {
+  if (params.modelFile != "") {
     LOG_IF(verbose, "encoded %'d variables and %'d constraints", model.varCount(), model.clauseCount());
-    model.toDimacs(modelFile);
-    LOG("SAT model in dimacs format saved to '%s'", modelFile.c_str());
+    model.toDimacs(params.modelFile);
+    LOG("SAT model in dimacs format saved to '%s'", params.modelFile.c_str());
     exit(0);
   }
 
@@ -1405,10 +1378,10 @@ Result runSolver(CMDOptions& options, const InputGraph& graph) {
   Result result;
   if (ret == l_True) {
     result.code = ResultCodeTy::SAT;
-    if (useMovePlanarity)
-      fillResultMove(model, solver, graph, result, verbose);
+    if (params.useMovePlanarity)
+      fillResultMove(model, solver, graph, params, result);
     else
-      fillResultStack(model, solver, graph, result, verbose, useCross2Constraints, useCross1Constraints);
+      fillResultStack(model, solver, graph, params, result);
   } else if (ret == l_False) {
     result.code = ResultCodeTy::UNSAT;
   } else if (ret == l_Undef) {
