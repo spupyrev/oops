@@ -65,19 +65,19 @@ std::string getNodeColor(int nodeType) {
   return "#000000";
 }
 
-void printText(const std::string& filename, const std::string& graphName, const int n, const std::vector<EdgeTy>& edges) {
-  LOG(TextColor::blue, "writing TEXT graph to '%s'", filename.c_str());
+void printDot(const std::string& filename, const std::string& graphName, const InputGraph& graph) {
+  LOG(TextColor::blue, "writing TXT graph to '%s'", filename.c_str());
 
   ofstream out;
   out.open(filename);
   // out.open(filename, std::ios::app);
   out << "graph " << graphName << " {\n";
 
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < graph.n; i++) {
     out << "  " << i << ";\n";
   }
 
-  for (const auto& [u, v] : edges) {
+  for (const auto& [u, v] : graph.edges) {
     out << "  " << u << " -- " << v << ";\n";
   }
 
@@ -85,7 +85,10 @@ void printText(const std::string& filename, const std::string& graphName, const 
   out.close();
 }
 
-void printGML(const string& filename, int n, const vector<EdgeTy>& edges, const std::vector<bool>& direction) {
+void printGml(const std::string& filename, const InputGraph& graph) {
+  const int n = graph.n;
+  const auto& edges = graph.edges;
+
   IOGraph ioGraph;
 
   for (int i = 0; i < n; i++) {
@@ -118,7 +121,7 @@ void printGML(const string& filename, int n, const vector<EdgeTy>& edges, const 
   for (size_t i = 0; i < edges.size(); i++) {
     auto& edge = edges[i];
     IOEdge* ioEdge = nullptr;
-    if (direction.empty() || direction[i]) {
+    if (graph.directions.empty() || graph.directions[i]) {
       ioEdge = ioGraph.addEdge(to_string(edge.first), to_string(edge.second));
     } else {
       ioEdge = ioGraph.addEdge(to_string(edge.second), to_string(edge.first));
@@ -143,12 +146,32 @@ void printGML(const string& filename, int n, const vector<EdgeTy>& edges, const 
   LOG(TextColor::blue, "written GML result to '%s'", filename.c_str());  
 }
 
-void printGML(const string& filename, int n, const vector<EdgeTy>& edges) {
-  std::vector<bool> direction;
-  printGML(filename, n, edges, direction);
+void printInput(const std::string& filename, const std::string& graphName, const InputGraph& graph, const int verbose) {
+  const int n = graph.n;
+  const auto& edges = graph.edges;
+
+  if (verbose >= 3) {
+    for (size_t i = 0; i < edges.size(); i++) {
+      LOG("edge (%d, %d); div = %d", edges[i].first, edges[i].second, n + i);
+    }
+  }
+
+  if (verbose >= 3 && filename != "") {
+    const std::string file = filename.substr(0, filename.find_last_of("."));
+    const std::string extension = filename.substr(filename.find_last_of(".") + 1);
+    if (extension == "dot") {
+      printDot(file + "_in.dot", graphName, graph);
+    } else if (extension == "gml") {
+      printGml(file + "_in.gml", graph);
+    } else {
+      LOG("unsupported output extension '%s'", extension.c_str());
+    }
+  }
 }
 
-void printResultRaw(const int n, const std::vector<EdgeTy>& edges, const Result& result) {
+void printResultTxt(const InputGraph& graph, const Result& result) {
+  const auto& edges = graph.edges;
+
   cout << "  \033[90m" << "order    : " << "\033[0m" << "[";
   for (size_t i = 0; i < result.order.size(); i++) {
     if (result.order[i].empty())
@@ -182,7 +205,7 @@ void printResultRaw(const int n, const std::vector<EdgeTy>& edges, const Result&
   cout << "\n";
 }
 
-void printResultGMLCircle(const std::string& filename, const int n, const std::vector<EdgeTy>& edges, const Result& result) {
+void printResultGmlCircle(const std::string& filename, const int n, const std::vector<EdgeTy>& edges, const Result& result) {
   IOGraph ioGraph;
 
   const double r = 500;
@@ -243,7 +266,7 @@ void printResultGMLCircle(const std::string& filename, const int n, const std::v
   LOG(TextColor::blue, "written GML result to '%s'", filename.c_str());  
 }
 
-void printResultGMLStack(const std::string& filename, const InputGraph& graph, const Result& result) {
+void printResultGmlStack(const std::string& filename, const InputGraph& graph, const Result& result) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -312,34 +335,25 @@ void printResultGMLStack(const std::string& filename, const InputGraph& graph, c
   LOG(TextColor::blue, "written GML result to '%s'", filename.c_str());  
 }
 
-void printInput(const std::string& filename, const std::string& graphName, const InputGraph& graph) {
-  const int n = graph.n;
-  const auto& edges = graph.edges;
-
-  const std::string file = filename.substr(0, filename.find_last_of("."));
+void printOutput(const std::string& filename, const std::string& graphName, const InputGraph& graph, const Result& result, const int verbose) {
   const std::string extension = filename.substr(filename.find_last_of(".") + 1);
-  if (extension == "gml") {
-    printGML(file + "_in.gml", n, edges);
-    return;
-  }
-  if (extension == "cfg") {
-    printText(file + "_in.cfg", graphName, n, edges);
-    return;
-  }
-  ERROR("unknown printInput extension: " + extension);
-}
 
-void printOutput(const std::string& filename, const std::string& graphName, const InputGraph& graph, const Result& result) {
-  const std::string file = filename.substr(0, filename.find_last_of("."));
-  const std::string extension = filename.substr(filename.find_last_of(".") + 1);
-  if (extension == "gml") {
-    // printResultGMLCircle(file + "_out.gml", n, edges, result);
-    printResultGMLStack(file + "_out.gml", graph, result);
-    return;
+  if (verbose >= 2 || extension == "txt") {
+    printResultTxt(graph, result);
   }
-  if (extension == "cfg") {
-    return;
+
+  if (filename != "") {
+    if (extension == "txt") {
+      // TODO
+      // printResultTxt(filename, graph, result);
+    } else if (extension == "dot") {
+      // pass
+    } else if (extension == "gml") {
+      // printResultGmlCircle(filename, n, edges, result);
+      printResultGmlStack(filename, graph, result);
+    } else {
+      ERROR("unsupported output extension " + extension);
+    }
   }
-  ERROR("unknown printOutput extension: " + extension);
 }
 

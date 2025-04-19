@@ -53,7 +53,16 @@ assert_pass "${OP} -verbose=1 -i=gen-complete-bipartite -graphs=1 -n=10"
 assert_pass "${OP} -verbose=1 -i=gen-grid -graphs=2 -n=20"
 
 # write to files
-assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=0 -o=/tmp/test1.gml"
+assert_pass "rm -f /tmp/test.gml"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=5 -o=/tmp/test.gml"
+assert_pass "[ -f /tmp/test.gml ]"
+
+assert_pass "rm -f /tmp/test.gml"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=5 -o=/tmp/test.gml"
+assert_pass "[ -f /tmp/test.gml ]"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=5 -o=txt"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=5 -o=/tmp/test.txt"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=5 -o=/tmp/test.dot"
 
 # test misc options
 assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -invalid-option"

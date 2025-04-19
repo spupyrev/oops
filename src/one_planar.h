@@ -183,6 +183,8 @@ struct Params {
   int verbose = 0;
   // Timeout (in seconds)
   int timeout = 0;
+  // Force generating a solution
+  bool alwaysCreateSolution = false;
 
   // Whether to apply symmetry-breaking constraints
   bool applyBreakID = false;
@@ -197,6 +199,8 @@ struct Params {
   bool useCross1Constraints = false;
   bool useIC = false;
   bool useNIC = false;
+
+  bool forbidCrossings = false;
 
   std::string to_string() const {
     std::ostringstream ss;
@@ -699,5 +703,5 @@ class SATModel {
 };
 
 bool canBeMerged(int u, int v, const int n, const std::vector<EdgeTy>& edges);
-void initCrossablePairs(const InputGraph& graph, const int verbose);
+void initCrossablePairs(const Params& params, const InputGraph& graph);
 Result runSolver(const Params& params, const InputGraph& graph);

@@ -394,8 +394,15 @@ std::vector<std::pair<std::string, AdjListTy>> readS6(
 struct InputGraph;
 struct Result;
 
-void printText(const std::string& filename, const std::string& graphName, const int n, const std::vector<EdgeTy>& edges);
-void printGML(const std::string& filename, int n, const std::vector<EdgeTy>& edges);
-void printInput(const std::string& filename, const std::string& graphName, const InputGraph& graph);
-void printOutput(const std::string& filename, const std::string& graphName, const InputGraph& graph, const Result& result);
-void printResultRaw(const int n, const std::vector<EdgeTy>& edges, const Result& result);
+void printInput(
+    const std::string& filename, 
+    const std::string& graphName, 
+    const InputGraph& graph, 
+    const int verbose);
+
+void printOutput(
+    const std::string& filename, 
+    const std::string& graphName, 
+    const InputGraph& graph, 
+    const Result& result,
+    const int verbose);

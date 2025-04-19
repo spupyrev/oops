@@ -286,18 +286,25 @@ std::vector<std::vector<EdgeTy>> biconnectedComponents(const int n, const std::v
     while (!edge_stack.empty()) {
       const int u = std::min(edge_stack.back().first, edge_stack.back().second);
       const int v = std::max(edge_stack.back().first, edge_stack.back().second);
-      //std::cout << u << "--" << v << " ";
       bicomponents.back().push_back({u, v});
       edge_stack.pop_back();
     }
     if (!bicomponents.back().empty()) {
-      //std::cout << endl;
       bicomponents.push_back({});
     }
   }
 
   CHECK(bicomponents.back().empty());
   bicomponents.pop_back();
+
+  // Verify the result
+  size_t numEdges = 0;
+  for (auto& comp : bicomponents) {
+    CHECK(comp.size() >= 1);
+    numEdges += comp.size();
+  }
+  CHECK(numEdges == edges.size());
+
   return bicomponents;
 }
 

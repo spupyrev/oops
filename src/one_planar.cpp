@@ -1,10 +1,6 @@
 #include "one_planar.h"
 #include "logging.h"
 
-// TODO: make options
-#define SKIP_BY_SIZE 1
-#define FORBID_CROSSINGS 0
-
 using namespace std;
 
 /// Check if a crossing plus the corresponding K4-induced planar edges violate 4*n-8 density
@@ -73,23 +69,26 @@ bool canSwapToReduceCrossings(int x, int y, int a, int b, const InputGraph& grap
       return true;    
     }
   }
+
   // If both edges are present, then we require the smaller pair to be crossing-free
-  if (hasEdgeAY && hasEdgeXB) {
-    remove_value(adjA, y);
-    remove_value(adjX, b);
-    if (equal_unsorted(adjX, adjA)) {
-      // possible crossings: (x, y)--(a, b) and (x, b)--(a, y)
-      const int e1 = graph.findDivIndex(x, y);
-      const int e2 = graph.findDivIndex(a, b);
-      const int e3 = graph.findDivIndex(x, b);
-      const int e4 = graph.findDivIndex(a, y);
-      if (std::minmax(e1, e2) < std::minmax(e3, e4)) {
-        // LOG("disable a crossing for (x=%d, y=%d) and (a=%d, b=%d); adjX = %s; adjA = %s", x, y, a, b, 
-        //   to_string(adjX).c_str(), to_string(adjA).c_str());
-        return true;
-      }
-    }
-  }
+  // TODO: disabled for now to avoid interactions with twin ordering
+  // if (hasEdgeAY && hasEdgeXB) {
+  //   remove_value(adjA, y);
+  //   remove_value(adjX, b);
+  //   if (equal_unsorted(adjX, adjA)) {
+  //     // possible crossings: (x, y)--(a, b) and (x, b)--(a, y)
+  //     const int e1 = graph.findDivIndex(x, y);
+  //     const int e2 = graph.findDivIndex(a, b);
+  //     const int e3 = graph.findDivIndex(x, b);
+  //     const int e4 = graph.findDivIndex(a, y);
+  //     if (std::minmax(e1, e2) < std::minmax(e3, e4)) {
+  //       // LOG("disable a crossing for (x=%d, y=%d) and (a=%d, b=%d); adjX = %s; adjA = %s", x, y, a, b, 
+  //       //   to_string(adjX).c_str(), to_string(adjA).c_str());
+  //       return true;
+  //     }
+  //   }
+  // }
+
   return false;
 }
 
@@ -97,7 +96,7 @@ bool canSwapToReduceCrossings(int x, int y, int a, int b, const InputGraph& grap
 std::vector<std::vector<bool>> crossablePairs;
 
 /// Find all pairs of edges that can be crossed
-void initCrossablePairs(const InputGraph& graph, const int verbose) {
+void initCrossablePairs(const Params& params, const InputGraph& graph) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -105,7 +104,7 @@ void initCrossablePairs(const InputGraph& graph, const int verbose) {
 
   crossablePairs = std::vector<std::vector<bool>>(numVertices, std::vector<bool>(numVertices, false));
 
-  if (FORBID_CROSSINGS) {
+  if (params.forbidCrossings) {
     CHECK(graph.isDirected());
     return;
   }
@@ -256,8 +255,8 @@ void initCrossablePairs(const InputGraph& graph, const int verbose) {
         mergablePairs++;
     }
   }
-  LOG_IF(verbose, "created %d (%.2lf%% out of %d) crossing pairs; "
-                  "filtered out %d (%.2lf%%) due to density, %d (%.2lf%%) due to degree-3, and %d (%.2lf%%) almost twins", 
+  LOG_IF(params.verbose, "created %d (%.2lf%% out of %d) crossing pairs; "
+                         "filtered out %d (%.2lf%%) due to density, %d (%.2lf%%) due to degree-3, and %d (%.2lf%%) almost twins", 
     mergablePairs, 100.0 * mergablePairs / double(possiblePairs), possiblePairs,
     numDensitySkipped, 100.0 * numDensitySkipped / double(possiblePairs),
     numDegree3Skipped, 100.0 * numDegree3Skipped / double(possiblePairs),
@@ -718,9 +717,38 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const int v
       if (graph.hasEdge(u, v))
         continue;
 
-      // vertex u is adjacent with (a, b, c) via edges (ea, eb, ec)
-      ///const int a
-      //HERE!!!
+      // vertex u is adjacent to (a, b, c) via edges (ua, ub, uc)
+      const int a = adj[u][0];
+      const int ua = graph.findDivIndex(u, a);
+      const int b = adj[u][1];
+      const int ub = graph.findDivIndex(u, b);
+      const int c = adj[u][2];
+      const int uc = graph.findDivIndex(u, c);
+      vector<int> perm = identity(3);
+        // vertex v is adjacent to (x, y, z) via edges (vx, vy, vz)
+        const int x = adj[v][perm[0]];
+        const int vx = graph.findDivIndex(v, x);
+        const int y = adj[v][perm[1]];
+        const int vy = graph.findDivIndex(v, y);
+        const int z = adj[v][perm[2]];
+        const int vz = graph.findDivIndex(v, z);
+
+        if (!canBeMerged(ua, vx, n, edges))
+          continue;
+        if (!canBeMerged(ub, vy, n, edges))
+          continue;
+        if (!canBeMerged(uc, vz, n, edges))
+          continue;
+
+        LOG_IF(verbose >= 3, "swap-3 crossing: (%d--%d); (%d--%d); (%d--%d)", ua, vx, ub, vy, uc, vz);
+        model.addClause({
+            model.getCross2Var(ua, vx, false), 
+            model.getCross2Var(ub, vy, false),
+            model.getCross2Var(uc, vz, false)
+        });
+        num3Constraints++;
+      do {
+      } while (std::next_permutation(perm.begin(), perm.end()));
     }
   }
 
@@ -1015,23 +1043,13 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
   }
 
   // custom order
-  // const std::vector<int> corder = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  // for (size_t i = 0; i < corder.size(); i++) {
-  //   for (size_t j = i + 1; j < corder.size(); j++) {
-  //     model.addClause(MClause(model.getRelVar(corder[i], corder[j], true)));
-  //     numExtraConstraints++;
-  //   }
-  // }
-
-  // custom crossings
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(0, 17), graph.findDivIndex(1, 22), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(2, 9), graph.findDivIndex(3, 26), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(4, 13), graph.findDivIndex(5, 18), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(6, 23), graph.findDivIndex(7, 28), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(8, 15), graph.findDivIndex(10, 19), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(11, 24), graph.findDivIndex(12, 29), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(14, 21), graph.findDivIndex(16, 25), true)));
-  // numExtraConstraints++;
+  const std::vector<int> corder = {0, 1, 2, 3, 4, 5};
+  for (size_t i = 0; i < corder.size(); i++) {
+    for (size_t j = i + 1; j < corder.size(); j++) {
+      model.addClause(MClause(model.getRelVar(corder[i], corder[j], true)));
+      numExtraConstraints++;
+    }
+  }
 
   // vertex twins
   const auto& adj = graph.adj;
@@ -1040,12 +1058,10 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
       std::vector<int> adjI = adj[i];
       adjI.push_back(i);
       adjI.push_back(j);
-      sort_unique(adjI);
       std::vector<int> adjJ = adj[j];
       adjJ.push_back(i);
       adjJ.push_back(j);
-      sort_unique(adjJ);
-      if (adjI == adjJ) {
+      if (equal_unsorted(adjI, adjJ)) {
         LOG_IF(verbose >= 3, "identified equal adjacencies for vertices %d and %d: (%s) vs (%s)", i, j, to_string(adj[i]).c_str(), to_string(adj[j]).c_str());
         model.addClause(MClause(model.getRelVar(i, j, true)));
         numExtraConstraints++;

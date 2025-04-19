@@ -16,9 +16,6 @@
 #include <optional>
 #include <regex>
 
-// TODO: make options
-#define SKIP_BY_SIZE 1
-
 using namespace std;
 
 /// Prepare command-line arguments
@@ -26,8 +23,8 @@ void prepareOptions(CMDOptions& options) {
   options.setUsageMessage("Usage: oops [options]");
 
   // IO
-  options.addAllowedOption("-i", "Input file name");
-  options.addAllowedOption("-o", "", "Output file name");
+  options.addAllowedOption("-i", "File name with input graph(s); supported formats are dot/gml/graphml/s6/g6");
+  options.addAllowedOption("-o", "", "File name to output solution; supported formats are txt/dot/gml");
   options.addAllowedOption("-part", "", "The part of the input to process in the form of part_idx/num_parts");
   options.addAllowedOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
   options.addAllowedOption("-max-degree", "-1", "Max vertex degree in the processed graph");
@@ -48,6 +45,8 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-cross1", "false", "Use cross1 constraints");
   options.addAllowedOption("-ic", "false", "Enforce IC constraints");
   options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
+  // Experimental
+  options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
 
   // External SAT solver
   options.addAllowedOption("-dimacs", "", "Output dimacs file");
@@ -224,8 +223,9 @@ void minimizeCrossings(const int n, const std::vector<EdgeTy>& edges, Result& re
 }
 
 /// Check if 1-planarity test can be skipped because of graphs size or density
-bool skipTestingBySize(const int n, const std::vector<EdgeTy>& edges, const int verbose, ResultCodeTy& resultCode) {
-  const int m = (int)edges.size();
+bool skipTestingBySize(const InputGraph& graph, const int verbose, ResultCodeTy& resultCode) {
+  const int n = graph.n;
+  const int m = (int)graph.edges.size();
   // check planarity
   if (n < 5 || m < 9) {
     LOG_IF(verbose, "the graph is planar due to size");
@@ -247,7 +247,7 @@ bool skipTestingBySize(const int n, const std::vector<EdgeTy>& edges, const int 
     return true;
   }
   // density of bipartite
-  if (m > 3 * n - 8 - n % 2 && isBipartite(n, edges)) {
+  if (m > 3 * n - 8 - n % 2 && isBipartite(n, graph.edges)) {
     LOG_IF(verbose, "the graph is not 1-planar due to edge density (%d > %d)", m, 3 * n - 8 - n % 2);
     resultCode = ResultCodeTy::UNSAT;
     return true;
@@ -262,39 +262,24 @@ ResultCodeTy isOnePlanar(
     const bool splitIntoBiconnected, 
     const std::string& graphName) {
   const int verbose = options.getInt("-verbose");
-  const int timeout = options.getInt("-timeout");
-  const bool useIC = options.getBool("-ic");
-  const bool useNIC = options.getBool("-nic");
+  const bool EnableEarlyExit = !graph.isDirected() && !params.useIC && !params.alwaysCreateSolution;
 
   const int n = graph.n;
   const auto& edges = graph.edges;
-  const bool SkipBySize = !graph.isDirected() && SKIP_BY_SIZE && !useNIC && !useIC;
 
   LOG_IF(verbose, "testing 1-planarity of a graph with |V| = %d and |E| = %d", n, edges.size());
   if (verbose) {
     printGraphStats(n, edges, std::vector<bool>());
   }
+
   // print input
-  if (verbose >= 3) {
-    for (size_t i = 0; i < edges.size(); i++) {
-      LOG("edge (%d, %d); div = %d", edges[i].first, edges[i].second, n + i);
-    }
-  }
-  if (verbose >= 1 && options.getStr("-o") != "") {
-    printInput(options.getStr("-o"), graphName, graph);
-  }
+  printInput(options.getStr("-o"), graphName, graph, verbose);
 
   // split into biconnected components
-  if (!graph.isDirected() && splitIntoBiconnected) {
+  if (EnableEarlyExit && splitIntoBiconnected) {
     auto biComponents = biconnectedComponents(n, edges);
     LOG_IF(verbose, "the number of bi-componets: %d", biComponents.size());
     if (biComponents.size() > 1) {
-      size_t numEdges = 0;
-      for (auto& comp : biComponents) {
-        CHECK(comp.size() >= 1);
-        numEdges += comp.size();
-      }
-      CHECK(numEdges == edges.size());
       std::sort(
           biComponents.begin(), 
           biComponents.end(), 
@@ -302,18 +287,11 @@ ResultCodeTy isOnePlanar(
               return l.size() < r.size(); 
       });
       for (auto& compEdges : biComponents) {
-        // skip small components
-        if (SkipBySize) {
-          // planar
-          if (compEdges.size() < 9)
-            continue;
-          // 1-planar
-          if (compEdges.size() < 18)
-            continue;
-        }
         // create a graph for the component
         InputGraph compGraph(compEdges);
-        // start testing for the component
+        CHECK(compGraph.n == 2 || compGraph.minDegree() >= 2, 
+          "the bi-connected component contains low-degree vertices");
+        // start test for the component
         ResultCodeTy res = isOnePlanar(options, params, compGraph, false, graphName);
         if (res != ResultCodeTy::SAT) {
           return res;
@@ -323,22 +301,18 @@ ResultCodeTy isOnePlanar(
     }
   }
 
-  // make sure the input is sane (check degree-1 vertices)
-  const int md = graph.minDegree();
-  CHECK(n == 2 || md >= 2, "the bi-connected graph contains low degree vertices");
-
   // check if planarity test can be skipped
   ResultCodeTy resultCode = ResultCodeTy::ERROR;
-  if (!graph.isDirected() && SkipBySize && skipTestingBySize(n, edges, verbose, resultCode)) {
+  if (EnableEarlyExit && skipTestingBySize(graph, verbose, resultCode)) {
     CHECK(resultCode == ResultCodeTy::SAT || resultCode == ResultCodeTy::UNSAT);
     return resultCode;
   }
 
   // init pairs for edge crossings
-  initCrossablePairs(graph, verbose);
+  initCrossablePairs(params, graph);
 
   // check skewness (max number of crossings)
-  if (!graph.isDirected()) {
+  if (!graph.isDirected() && EnableEarlyExit) {
     const int maxSkewness = options.getInt("-skewness");
     const int skewness = computeSkewness(graph, verbose, maxSkewness);
     if (skewness <= maxSkewness) {
@@ -351,7 +325,11 @@ ResultCodeTy isOnePlanar(
   auto startTimeSAT = chrono::steady_clock::now();
   Result result = runSolver(params, graph);
   auto endTimeSAT = chrono::steady_clock::now();
-  LOG_IF(verbose >= 1, "SAT solving took %s for %s [timeout = %d sec]", ms_to_str(startTimeSAT, endTimeSAT).c_str(), graphName.c_str(), timeout);
+  LOG_IF(verbose >= 1, "SAT solving took %s for %s [timeout = %d sec]", 
+      ms_to_str(startTimeSAT, endTimeSAT).c_str(), 
+      graphName.c_str(), 
+      params.timeout
+  );
 
   if (result.code != ResultCodeTy::SAT) {
     return result.code;
@@ -370,12 +348,7 @@ ResultCodeTy isOnePlanar(
   }
 
   // print output
-  if (verbose >= 1) {
-    printResultRaw(n, edges, result);
-  }
-  if (verbose >= 1 && options.getStr("-o") != "") {
-    printOutput(options.getStr("-o"), graphName, graph, result);
-  }
+  printOutput(options.getStr("-o"), graphName, graph, result, verbose);
 
   return result.code;
 }
@@ -433,7 +406,6 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
     return std::make_unique<GraphListRaw>(readS6(filename, part, graphFilter));
   }
   if (extension == "cfg") {
-    // TODO: replace with lazy list
     const std::string part = options.getStr("-part");
     return std::make_unique<GraphListRaw>(readCfg(filename, part, graphFilter));
   }
@@ -538,6 +510,15 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.useIC = options.getBool("-ic");
   params.useNIC = options.getBool("-nic");
 
+  params.forbidCrossings = options.getBool("-forbid-crossings");
+
+  const std::string outFile = options.getStr("-o");
+  if (outFile != "") {
+    const std::string extension = outFile.substr(outFile.find_last_of(".") + 1);
+    CHECK(extension == "txt" || extension == "gml" || extension == "dot", "unsupported output format: '%s'", extension.c_str());
+    params.alwaysCreateSolution = true;
+  }
+
   //CHECK(!params.directed || params.useMovePlanarity, "directed edges should be used with move-planarity");
   CHECK(!params.useIC || !params.useNIC, "cannot simultanosly use IC and NIC modes");
   CHECK(!params.useCross1Constraints || params.useCross2Constraints, "`-cross1` constraints should be used with `-cross2`");
@@ -581,12 +562,14 @@ void testOnePlanar(CMDOptions& options) {
       genDirections(options, n, edges, directions);
     }
 
-    // make sure it is 1-planar
+    // test planarity
     if (directions.empty() && isPlanar(n, edges, 0)) {
       if (verbose)
         LOG(TextColor::green, "the graph is planar");
       numPlanar++;
     } else {
+      // test 1-planarity
+      CHECK(n >= 5, "the graph is too small");
       InputGraph graph(n, edges, directions);
       ResultCodeTy res = isOnePlanar(options, params, graph, true, graphName);
       if (res == ResultCodeTy::SAT) {
