@@ -266,6 +266,12 @@ public:
   }
   bool writeGmlGraph(std::ostream& out, IOGraph& graph) const;
 
+  bool writeSvgGraph(const std::string& filename, IOGraph& graph) const {
+    auto func = static_cast<bool (GraphParser::*)(std::ostream&, IOGraph&) const>(&GraphParser::writeSvgGraph);
+    return wrapWrite(func, filename, graph);
+  }
+  bool writeSvgGraph(std::ostream& out, IOGraph& graph) const;
+
 private:
   void checkFile(const std::string& filename) const {
     if (filename != "") {

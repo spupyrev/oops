@@ -65,10 +65,36 @@ std::string getNodeColor(int nodeType) {
   return "#000000";
 }
 
-void printDot(const std::string& filename, const std::string& graphName, const InputGraph& graph) {
-  LOG(TextColor::blue, "writing TXT graph to '%s'", filename.c_str());
+void printTutteCoxeter(const InputGraph& graph) {
+  const std::string filename = "tc_minus_edge.cfg";
 
-  ofstream out;
+  for (const auto& [s, t] : graph.edges) {
+    if ((s + 1) % graph.n == t) 
+      continue;
+
+    std::ofstream out;
+    out.open(filename, std::ios::app);
+    out << "graph TC_minus_" << s << "_" << t << " {\n";
+
+    for (int i = 0; i < graph.n; i++) {
+      out << "  " << i << ";\n";
+    }
+
+    for (const auto& [u, v] : graph.edges) {
+      if (u == s && v == t) 
+        continue;
+      out << "  " << u << " -- " << v << ";\n";
+    }
+
+    out << "}\n\n";
+    out.close();
+  }
+
+  LOG(TextColor::blue, "written TC graph to '%s'", filename.c_str());  
+}
+
+void printInputDot(const std::string& filename, const std::string& graphName, const InputGraph& graph) {
+  std::ofstream out;
   out.open(filename);
   // out.open(filename, std::ios::app);
   out << "graph " << graphName << " {\n";
@@ -83,9 +109,11 @@ void printDot(const std::string& filename, const std::string& graphName, const I
 
   out << "}\n";
   out.close();
+
+  LOG(TextColor::blue, "written TXT graph to '%s'", filename.c_str());  
 }
 
-void printGml(const std::string& filename, const InputGraph& graph) {
+void printInputGml(const std::string& filename, const InputGraph& graph) {
   const int n = graph.n;
   const auto& edges = graph.edges;
 
@@ -97,6 +125,8 @@ void printGml(const std::string& filename, const InputGraph& graph) {
     ioGraph.nodes[i].setAttr("h", "20");
     ioGraph.nodes[i].setAttr("fill", getNodeColor(0));
   }
+
+  // TODO: draw on a circle!!!
 
   // linear order of vertices
   const double X_STEP = 60;
@@ -156,15 +186,17 @@ void printInput(const std::string& filename, const std::string& graphName, const
     }
   }
 
+  // printTutteCoxeter(graph);
+
   if (verbose >= 3 && filename != "") {
     const std::string file = filename.substr(0, filename.find_last_of("."));
     const std::string extension = filename.substr(filename.find_last_of(".") + 1);
     if (extension == "dot") {
-      printDot(file + "_in.dot", graphName, graph);
+      printInputDot(file + "_in.dot", graphName, graph);
     } else if (extension == "gml") {
-      printGml(file + "_in.gml", graph);
+      printInputGml(file + "_in.gml", graph);
     } else {
-      LOG("unsupported output extension '%s'", extension.c_str());
+      LOG("unsupported output extension '%s' for pritning input graph", extension.c_str());
     }
   }
 }
@@ -266,14 +298,12 @@ void printResultGmlCircle(const std::string& filename, const int n, const std::v
   LOG(TextColor::blue, "written GML result to '%s'", filename.c_str());  
 }
 
-void printResultGmlStack(const std::string& filename, const InputGraph& graph, const Result& result) {
+void printResultStack(const InputGraph& graph, const Result& result, IOGraph& ioGraph) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
   const int numVertices = n + m;
   const int numSegments = 2 * m;
-
-  IOGraph ioGraph;
 
   const double STEP_X = 50;
   const double STEP_Y = 50;
@@ -289,13 +319,14 @@ void printResultGmlStack(const std::string& filename, const InputGraph& graph, c
       node->setAttr("label", std::to_string(result.order[i][0]));
       node->setAttr("w", "20");
       node->setAttr("h", "20");
+      node->setAttr("fill", getNodeColor(0));
       node->setDoubleAttr("x", curX);
       node->setDoubleAttr("y", 0);
     } else {
       // division vertex
       CHECK(result.order[i].size() <= 2);
       auto node = ioGraph.addNode(std::to_string(i));
-      //node->setAttr("label", "");
+      // node->setAttr("label", "");
       node->setAttr("label", std::to_string(result.order[i][0]));
       node->setAttr("w", "10");
       node->setAttr("h", "10");
@@ -329,10 +360,24 @@ void printResultGmlStack(const std::string& filename, const InputGraph& graph, c
     } else {
     }
   }
+}
+
+void printResultGmlStack(const std::string& filename, const InputGraph& graph, const Result& result) {
+  IOGraph ioGraph;
+  printResultStack(graph, result, ioGraph);
 
   GraphParser parser;
   parser.writeGmlGraph(filename, ioGraph);
   LOG(TextColor::blue, "written GML result to '%s'", filename.c_str());  
+}
+
+void printResultSvgStack(const std::string& filename, const InputGraph& graph, const Result& result) {
+  IOGraph ioGraph;
+  printResultStack(graph, result, ioGraph);
+
+  GraphParser parser;
+  parser.writeSvgGraph(filename, ioGraph);
+  LOG(TextColor::blue, "written SVG result to '%s'", filename.c_str());  
 }
 
 void printOutput(const std::string& filename, const std::string& graphName, const InputGraph& graph, const Result& result, const int verbose) {
@@ -351,6 +396,8 @@ void printOutput(const std::string& filename, const std::string& graphName, cons
     } else if (extension == "gml") {
       // printResultGmlCircle(filename, n, edges, result);
       printResultGmlStack(filename, graph, result);
+    } else if (extension == "svg") {
+      printResultSvgStack(filename, graph, result);
     } else {
       ERROR("unsupported output extension " + extension);
     }

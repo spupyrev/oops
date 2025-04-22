@@ -968,7 +968,7 @@ void encodeMovePlanar(
     SATModel& model, 
     const InputGraph& graph,
     const Params& params) {
-  LOG_IF(params.verbose, "encode %s", params.to_string().c_str()); 
+  LOG_IF(params.verbose, "encoding %s", params.to_string().c_str()); 
   CHECK(params.useCross2Constraints, "move-planarity should be used with -cross2");
 
   // Main encoding
@@ -1077,7 +1077,7 @@ void encodeStackPlanar(
     SATModel& model, 
     const InputGraph& graph,
     const Params& params) {
-  LOG_IF(params.verbose, "encode %s", params.to_string().c_str()); 
+  LOG_IF(params.verbose, "encoding %s", params.to_string().c_str()); 
   CHECK(!graph.isDirected(), "directed edges should be used with move-planarity");
 
   // Main encoding

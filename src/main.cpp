@@ -24,7 +24,7 @@ void prepareOptions(CMDOptions& options) {
 
   // IO
   options.addAllowedOption("-i", "File name with input graph(s); supported formats are dot/gml/graphml/s6/g6");
-  options.addAllowedOption("-o", "", "File name to output solution; supported formats are txt/dot/gml");
+  options.addAllowedOption("-o", "", "File name to output solution; supported formats are txt/dot/gml/svg");
   options.addAllowedOption("-part", "", "The part of the input to process in the form of part_idx/num_parts");
   options.addAllowedOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
   options.addAllowedOption("-max-degree", "-1", "Max vertex degree in the processed graph");
@@ -515,7 +515,8 @@ void initSATParams(CMDOptions& options, Params& params) {
   const std::string outFile = options.getStr("-o");
   if (outFile != "") {
     const std::string extension = outFile.substr(outFile.find_last_of(".") + 1);
-    CHECK(extension == "txt" || extension == "gml" || extension == "dot", "unsupported output format: '%s'", extension.c_str());
+    CHECK(extension == "txt" || extension == "gml" || extension == "dot" || extension == "svg", 
+          "unsupported output format: '%s'", extension.c_str());
     params.alwaysCreateSolution = true;
   }
 
