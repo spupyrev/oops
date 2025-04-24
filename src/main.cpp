@@ -615,8 +615,8 @@ void testOnePlanar(CMDOptions& options) {
     );
     LOG_EVERY_MS(
         180000, 
-        "#planar = %'d; #1-planar = %'d; #non-1-planar = %'d; #unknown = %'d", 
-        numPlanar, num1Planar, numNon1Planar, numUnknown
+        "#planar = %'d; #1-planar = %'d; #non-1-planar = %'d; #unknown = %'d; #skipped = %'d", 
+        numPlanar, num1Planar, numNon1Planar, numUnknown, numSkipped
     );
   }
   CHECK((int)times.size() == numGraphs + 1);
