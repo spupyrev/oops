@@ -47,3 +47,5 @@ int minDegree(const int n, const std::vector<EdgeTy>& edges);
 int maxDegree(const int n, const std::vector<EdgeTy>& edges);
 
 int computeGirth(const int n, const std::vector<EdgeTy>& edges);
+
+bool hasReducibleTriangle(const AdjListTy& adjList);

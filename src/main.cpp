@@ -45,8 +45,6 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-cross1", "false", "Use cross1 constraints");
   options.addAllowedOption("-ic", "false", "Enforce IC constraints");
   options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
-  // Experimental
-  options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
 
   // External SAT solver
   options.addAllowedOption("-dimacs", "", "Output dimacs file");
@@ -55,6 +53,10 @@ void prepareOptions(CMDOptions& options) {
   // Graph generation
   options.addAllowedOption("-graphs", "1", "How many graphs to generate");
   options.addAllowedOption("-n", "20", "The number of vertices in the generated graph");
+
+  // Experimental
+  options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
+  options.addAllowedOption("-skip-reducible-triangles", "false", "[Experimental] Skip reducible triangles");
 }
 
 /// Check if a given graph with specified pairs of crossed edges is planar
@@ -550,6 +552,7 @@ void testOnePlanar(CMDOptions& options) {
   int num1Planar = 0;
   int numNon1Planar = 0;
   int numUnknown = 0;
+  int numSkipped = 0;
   for (int t = 0; t < numGraphs; t++) {
     const int seed = t + startSeed;
     Rand::setSeed(seed);
@@ -563,29 +566,36 @@ void testOnePlanar(CMDOptions& options) {
       genDirections(options, n, edges, directions);
     }
 
-    // test planarity
-    if (directions.empty() && isPlanar(n, edges, 0)) {
+    // only for cubic
+    if (options.getBool("-skip-reducible-triangles") && hasReducibleTriangle(graphAdj)) {
       if (verbose)
-        LOG(TextColor::green, "the graph is planar");
-      numPlanar++;
+        LOG(TextColor::green, "the graph contains reducible triangle");
+      numSkipped++;
     } else {
-      // test 1-planarity
-      CHECK(n >= 5, "the graph is too small");
-      InputGraph graph(n, edges, directions);
-      ResultCodeTy res = isOnePlanar(options, params, graph, true, graphName);
-      if (res == ResultCodeTy::SAT) {
+      // test planarity
+      if (directions.empty() && isPlanar(n, edges, 0)) {
         if (verbose)
-          LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
-        num1Planar++;
-      } else if (res == ResultCodeTy::UNSAT) {
-        if (verbose)
-          LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
-        numNon1Planar++;
-      } else if (res == ResultCodeTy::TIMEOUT) {
-        LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
-        numUnknown++;
+          LOG(TextColor::green, "the graph is planar");
+        numPlanar++;
       } else {
-        ERROR("unreachable");
+        // test 1-planarity
+        CHECK(n >= 5, "the graph is too small");
+        InputGraph graph(n, edges, directions);
+        ResultCodeTy res = isOnePlanar(options, params, graph, true, graphName);
+        if (res == ResultCodeTy::SAT) {
+          if (verbose)
+            LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
+          num1Planar++;
+        } else if (res == ResultCodeTy::UNSAT) {
+          if (verbose)
+            LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
+          numNon1Planar++;
+        } else if (res == ResultCodeTy::TIMEOUT) {
+          LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
+          numUnknown++;
+        } else {
+          ERROR("unreachable");
+        }
       }
     }
 
@@ -614,7 +624,8 @@ void testOnePlanar(CMDOptions& options) {
   LOG("processed all %'d graphs; total runtime is %s; mean processing time is %zu ± %zu ms", 
       numGraphs, ms_to_str(times.front(), times.back()).c_str(),
       uint64_t(average(processingTimes)), uint64_t(confidence_interval(processingTimes)));
-  LOG("#planar = %'d; #1-planar = %'d; #non-1-planar = %'d; #unknown = %'d", numPlanar, num1Planar, numNon1Planar, numUnknown);
+  LOG("#planar = %'d; #1-planar = %'d; #non-1-planar = %'d; #unknown = %'d; #skipped = %'d", 
+      numPlanar, num1Planar, numNon1Planar, numUnknown, numSkipped);
 }
 
 int main(int argc, char* argv[]) {

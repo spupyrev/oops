@@ -536,3 +536,47 @@ int computeGirth(const int n, const std::vector<EdgeTy>& edges) {
 
   return best > 0 ? best : 1;
 }  
+
+bool hasReducibleTriangle(const AdjListTy& adjList) {
+  const int n = (int)adjList.size();
+  auto connected = [&](const int u, const int v) -> bool {
+    CHECK(adjList[u].size() == 3);
+    return adjList[u][0] == v || adjList[u][1] == v || adjList[u][2] == v;
+  };
+  auto remaining = [&](const int u, const int v1, const int v2) -> int {
+    for (int x : adjList[u]) {
+      if (x != v1 && x != v2)
+        return x;
+    }
+    ERROR("error");
+    return -1;
+  };
+
+  for (int i = 0; i < n; i++) {
+    if (adjList[i].size() != 3)
+      continue;
+    for (int j : adjList[i]) {
+      if (adjList[j].size() != 3)
+        continue;
+      // CHECK(connected(i, j));
+      for (int k : adjList[i]) {
+        if (adjList[k].size() != 3)
+          continue;
+        // CHECK(connected(i, k));
+        if (j == k || !connected(j, k))
+          continue;
+
+        const int remI = remaining(i, j, k);
+        // CHECK(connected(i, remI) && remI != j && remI != k);
+        const int remJ = remaining(j, i, k);
+        // CHECK(connected(j, remJ) && remJ != i && remJ != k);
+        const int remK = remaining(k, i, j);
+        // CHECK(connected(k, remK) && remK != i && remK != j);
+
+        if (remI != remJ && remI != remK && remJ != remK)
+          return true;
+      }
+    }
+  }
+  return false;
+}
