@@ -17,6 +17,11 @@ using namespace Simp21;
 
 using EdgeTy = std::pair<int, int>;
 
+/// The object is a representation of the input graph that contains n vertices and m edges.
+///
+/// InputGraph has n "regular" vertices and m "division" vertices. (so every edge is subdivided once)
+/// There are 2*m edge segments; i-th edge is split into (2*i)-th and (2*i+1)-th segments
+/// Regular vertices are in [0, n); division vertices are in [n, n + m)
 struct InputGraph {
   int n = 0;
   // vertices are in [0..n); first < second

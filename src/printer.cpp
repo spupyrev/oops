@@ -298,7 +298,9 @@ void printResultGmlCircle(const std::string& filename, const int n, const std::v
   LOG(TextColor::blue, "written GML result to '%s'", filename.c_str());  
 }
 
-void printResultStack(const InputGraph& graph, const Result& result, IOGraph& ioGraph) {
+void printResultStackArcs(const InputGraph& graph, const Result& result, IOGraph& ioGraph) {
+  CHECK(!result.stack.empty(), "this is implemented for stack-planarity only");
+
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -362,9 +364,109 @@ void printResultStack(const InputGraph& graph, const Result& result, IOGraph& io
   }
 }
 
+void printResultStackBiarcs(const InputGraph& graph, const Result& result, IOGraph& ioGraph) {
+  CHECK(!result.stack.empty(), "this is implemented for stack-planarity only");
+
+  const int n = graph.n;
+  const auto& edges = graph.edges;
+  const int m = (int)edges.size();
+  const int numVertices = n + m;
+
+  const double STEP_X = 50;
+  const double STEP_Y = 50;
+  double curX = 0;
+  std::vector<int> vIndex(numVertices, -1);
+  for (int i = 0; i < (int)result.order.size(); i++) {
+    if (result.order[i].empty())
+      continue;
+    if (result.order[i][0] < n) {
+      // regular vertex
+      CHECK(result.order[i].size() == 1);
+      auto node = ioGraph.addNode(std::to_string(i));
+      node->setAttr("label", std::to_string(result.order[i][0]));
+      node->setAttr("w", "12");
+      node->setAttr("h", "12");
+      node->setAttr("fill", getNodeColor(0));
+      node->setDoubleAttr("x", curX);
+      node->setDoubleAttr("y", 0);
+    } else {
+      // division vertex
+      CHECK(result.order[i].size() <= 2);
+      auto node = ioGraph.addNode(std::to_string(i));
+      node->setAttr("label", "");
+      node->setAttr("w", "2");
+      node->setAttr("h", "2");
+      // node->setAttr("label", std::to_string(result.order[i][0]));
+      // node->setAttr("w", "8");
+      // node->setAttr("h", "8");
+      node->setAttr("fill", getNodeColor(1));
+      node->setDoubleAttr("x", curX);
+      node->setDoubleAttr("y", 0);
+    }
+    curX += STEP_X;
+    for (int v : result.order[i]) {
+      vIndex[v] = i;
+    }
+  }
+
+  // splines
+  for (int i = 0; i < (int)edges.size(); i++) {
+    const auto& [u, v] = edges[i];
+    CHECK(vIndex[u] != -1 && vIndex[v] != -1 && vIndex[u] != vIndex[v]);
+    const int d = graph.findDivIndex(u, v);
+    // LOG("edge %d -> %d -> %d", u, d, v);
+    CHECK(d >= n);
+    const int uX = ioGraph.getNode(std::to_string(vIndex[u]))->getDoubleAttr("x");
+    const int uY = ioGraph.getNode(std::to_string(vIndex[u]))->getDoubleAttr("y");
+    const int vX = ioGraph.getNode(std::to_string(vIndex[v]))->getDoubleAttr("x");
+    const int vY = ioGraph.getNode(std::to_string(vIndex[v]))->getDoubleAttr("y");
+    const int dX = ioGraph.getNode(std::to_string(vIndex[d]))->getDoubleAttr("x");
+    const int dY = ioGraph.getNode(std::to_string(vIndex[d]))->getDoubleAttr("y");
+
+    auto edge = ioGraph.addEdge(to_string(vIndex[u]), to_string(vIndex[v]));
+    edge->setAttr("width", "2");
+    edge->setAttr("fill", getEdgeColor(1));
+    edge->setAttr("type", "biarc");
+    edge->setAttr("arcHeight", to_string(STEP_Y));
+
+    // Format:
+    //  x: "ux ### dx ### vx ###"
+    //  y: "-1/1 ### -1/1" (1 for positive arc, -1 for negative)
+
+    std::string xx;
+    xx += std::to_string(uX);
+    xx += "###";
+    xx += std::to_string(dX);
+    xx += "###";
+    xx += std::to_string(vX);
+    edge->setAttr("x", xx);
+
+    CHECK(uY == 0 && vY == 0 && dY == 0);
+    const int seg1 = 2 * i;
+    CHECK(graph.seg2edge_v2(seg1) == std::make_pair(v, d));
+    const int seg2 = 2 * i + 1;
+    CHECK(graph.seg2edge_v2(seg2) == std::make_pair(u, d));
+    std::string yy;
+    if (result.stack[seg2] == (vIndex[u] < vIndex[d])) {    
+      yy += std::to_string(-1);
+    } else {
+      yy += std::to_string(1);
+    }
+    yy += "###";
+    if (result.stack[seg1] == (vIndex[d] < vIndex[v])) {    
+      yy += std::to_string(-1);
+    } else {
+      yy += std::to_string(1);
+    }
+    edge->setAttr("y", yy);
+
+    // if (i >= 10) break;
+  }
+}
+
 void printResultGmlStack(const std::string& filename, const InputGraph& graph, const Result& result) {
   IOGraph ioGraph;
-  printResultStack(graph, result, ioGraph);
+  printResultStackArcs(graph, result, ioGraph);
 
   GraphParser parser;
   parser.writeGmlGraph(filename, ioGraph);
@@ -373,7 +475,7 @@ void printResultGmlStack(const std::string& filename, const InputGraph& graph, c
 
 void printResultSvgStack(const std::string& filename, const InputGraph& graph, const Result& result) {
   IOGraph ioGraph;
-  printResultStack(graph, result, ioGraph);
+  printResultStackBiarcs(graph, result, ioGraph);
 
   GraphParser parser;
   parser.writeSvgGraph(filename, ioGraph);

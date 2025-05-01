@@ -272,9 +272,7 @@ bool canBeMerged(int u, int v, const int n, const std::vector<EdgeTy>& edges) {
   return crossablePairs[u][v];
 }
 
-/// There are n "regular" vertices and m "division" vertices. (so every edge is subdivided once)
-/// There are 2*m edge segments; i-th edge is split into (2*i)-th and (2*i+1)-th segments
-/// Regular vertices are in [0, n); division vertices are in [n, n + m)
+/// Encode relative position constraints for pairs of vertices
 void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const int verbose) {
   const int n = graph.n;
   const auto& edges = graph.edges;

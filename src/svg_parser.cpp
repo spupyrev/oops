@@ -92,6 +92,24 @@ void drawSemiarc(ostream& out,
       << "/>\n";
 }
 
+void drawBiarc(ostream& out, 
+               double x1, double y1, 
+               double x2, double y2, 
+               double x3, double y3,
+               bool arc1Up, bool arc2Up, 
+               int width, const std::string& stroke) {
+  const double r1 = sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)) / 2;
+  const double r2 = sqrt((x3 - x2) * (x3 - x2) + (y3 - y2) * (y3 - y2)) / 2;
+
+  out << "	<path d='" << "M " << x1 << "," << y1
+      << " A " << r1 << "," << 2 * r1 / 3 << (arc1Up ? " 0 0,1 " : " 0 1,0 ") << x2 << " " << y2
+      << " A " << r2 << "," << 2 * r2 / 3 << (arc2Up ? " 0 0,1 " : " 0 1,0 ") << x3 << " " << y3
+      << "' stroke-width='" << width
+      << "' fill='" << "none"
+      << "' stroke='" << stroke	<< "'"
+      << "/>\n";
+}
+
 void drawText(ostream& out, double x, double y, int fontSize, const string& text) {
   out << "	<text x='" << x << "' y='" << y << "'"
       << "  style='font-family:Verdana;font-size:" << fontSize << "' >" 
@@ -127,21 +145,24 @@ bool GraphParser::writeSvgGraph(ostream& out, IOGraph& graph) const {
 
   const double width = (maxX - minX + 5);
   const double height = (maxY - minY + 5);
-  writeHead(out, minX - width * 0.05, minY - height * 0.05, width * 1.1, height * 1.1);
+  writeHead(out, minX - width * 0.1, minY - height * 0.05, width * 1.2, height * 1.1);
 
   for (size_t i = 0; i < graph.edges.size(); i++) {
     const auto& e = graph.edges[i];
-    auto s = graph.getNode(e.source);
-    auto t = graph.getNode(e.target);
-    double x0 = s->getDoubleAttr("x");
-    double y0 = s->getDoubleAttr("y");
-    double x1 = t->getDoubleAttr("x");
-    double y1 = t->getDoubleAttr("y");
+    CHECK(e.hasAttr("x") && e.hasAttr("y"));
 
-    if (e.getAttr("arcRatio") == "1")
-      drawSemiarc(out, x0, y0, x1, y1, e.getDoubleAttr("width"), e.getAttr("fill"));
-    else
-      drawSemiarc(out, x1, y1, x0, y0, e.getDoubleAttr("width"), e.getAttr("fill"));
+    auto xx = SplitNotNullInt(e.getAttr("x"), "###");
+    auto yy = SplitNotNullInt(e.getAttr("y"), "###");
+    CHECK(xx.size() == 3 && yy.size() == 2);
+    CHECK(yy[0] == 1 || yy[0] == -1);
+    CHECK(yy[1] == 1 || yy[1] == -1);
+    const bool arc1Up = yy[0] == 1;
+    const bool arc2Up = yy[1] == 1;
+
+    // white background
+    drawBiarc(out, xx[0], 0, xx[1], 0, xx[2], 0, arc1Up, arc2Up, 6, "#FFFFFF");
+    // the edge itself
+    drawBiarc(out, xx[0], 0, xx[1], 0, xx[2], 0, arc1Up, arc2Up, e.getDoubleAttr("width"), e.getAttr("fill"));
   }
 
   for (size_t i = 0; i < graph.nodes.size(); i++) {
