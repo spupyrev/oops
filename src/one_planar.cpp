@@ -967,7 +967,7 @@ void encodeMovePlanar(
     const InputGraph& graph,
     const Params& params) {
   LOG_IF(params.verbose, "encoding %s", params.to_string().c_str()); 
-  CHECK(params.useCross2Constraints, "move-planarity should be used with -cross2");
+  CHECK(params.useSATConstraints, "move-planarity should be used with -cross2");
 
   // Main encoding
   encodeRelativeVariables(model, graph, params.verbose);
@@ -976,16 +976,16 @@ void encodeMovePlanar(
   encodeMoveConstraints(model, graph, params.verbose);
 
   // Optional encoding
-  if (params.useCross1Constraints) {
-    CHECK(params.useCross2Constraints);
+  if (params.useUNSATConstraints) {
+    CHECK(params.useSATConstraints);
     encodeCross1Constraints(model, graph, params.verbose);
   }
   if (params.useIC) {
-    CHECK(params.useCross2Constraints);
+    CHECK(params.useSATConstraints);
     encodeICConstraints(model, graph, params.verbose, 0);
   }
   if (params.useNIC) {
-    CHECK(params.useCross2Constraints);
+    CHECK(params.useSATConstraints);
     encodeICConstraints(model, graph, params.verbose, 1);
   }
 
@@ -1083,19 +1083,19 @@ void encodeStackPlanar(
   encodeStackConstraints(model, graph, params.verbose);
 
   // Optional encoding
-  if (params.useCross2Constraints) {
+  if (params.useSATConstraints) {
     encodeCross2Variables(model, graph, params.verbose);
   }
-  if (params.useCross1Constraints) {
-    CHECK(params.useCross2Constraints);
+  if (params.useUNSATConstraints) {
+    CHECK(params.useSATConstraints);
     encodeCross1Constraints(model, graph, params.verbose);
   }
   if (params.useIC) {
-    CHECK(params.useCross2Constraints);
+    CHECK(params.useSATConstraints);
     encodeICConstraints(model, graph, params.verbose, 0);
   }
   if (params.useNIC) {
-    CHECK(params.useCross2Constraints);
+    CHECK(params.useSATConstraints);
     encodeICConstraints(model, graph, params.verbose, 1);
   }
 
@@ -1263,13 +1263,13 @@ void fillResultStack(
       result.isCrossed[e1] = true;
       result.isCrossed[e2] = true;
       // verify corresponding cross-2 variable
-      if (params.useCross2Constraints) {
+      if (params.useSATConstraints) {
         CHECK(model.value(solver, model.getCross2Var(e1 + n, e2 + n, true)), "problem cross2Var for edges %d and %d", e1, e2);
       }
     }
   }
   // Verify cross-1 variables
-  if (params.useCross1Constraints) {
+  if (params.useUNSATConstraints) {
     for (int e = 0; e < m; e++) {
       if (result.isCrossed[e]) {
         CHECK(model.value(solver, model.getCross1Var(e + n, true)), "problem cross1Var for edge %d (%d, %d)", e, edges[e].first, edges[e].second);

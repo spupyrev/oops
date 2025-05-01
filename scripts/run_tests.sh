@@ -66,16 +66,16 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=5 -o=/tmp/test.dot"
 
 # test misc options
 assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -invalid-option"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2"
-assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross1"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2 -cross1"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2 -cross1 -ic -timeout=2"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross2 -cross1 -nic -timeout=1"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -sat"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -sat=0"
+# assert_fail "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -unsat"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -sat -unsat"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -sat -unsat -ic -timeout=2"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -sat -unsat -nic -timeout=1"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -satsuma"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -breakID"
-assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -cross1 -cross2 -satsuma"
-assert_fail "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -move-planar"
-assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -move-planar -cross2"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -unsat -sat -satsuma"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -move-planar"
 
 sparsify
 

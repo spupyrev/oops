@@ -39,10 +39,10 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-skewness", "1", "Maximum value of skewness");
   options.addAllowedOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
   options.addAllowedOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
-  options.addAllowedOption("-timeout", "0", "Maximim time (in seconds) to solve SAT");
+  options.addAllowedOption("-timeout", "0", "Maximum time (in seconds) to solve SAT");
   options.addAllowedOption("-sparsify", "false", "Try to eliminate crossings in the resulting solution");
-  options.addAllowedOption("-cross2", "false", "Use cross2 constraints");
-  options.addAllowedOption("-cross1", "false", "Use cross1 constraints");
+  options.addAllowedOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
+  options.addAllowedOption("-unsat", "false", "Add auxiliary constraints to speedup finding non-1-planar instances");
   options.addAllowedOption("-ic", "false", "Enforce IC constraints");
   options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
 
@@ -506,11 +506,24 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.modelFile = options.getStr("-dimacs");
   params.resultFile = options.getStr("-dimacs");
 
-  params.useMovePlanarity = options.getBool("-move-planar");
-  params.useCross2Constraints = options.getBool("-cross2");
-  params.useCross1Constraints = options.getBool("-cross1");
-  params.useIC = options.getBool("-ic");
-  params.useNIC = options.getBool("-nic");
+  params.useSATConstraints = options.getBool("-sat");
+  if (options.getBool("-unsat")) {
+    params.useUNSATConstraints = true;
+    params.useSATConstraints = true;
+  }
+  if (options.getBool("-ic")) {
+    params.useIC = true;
+    params.useSATConstraints = true;
+  }
+  if (options.getBool("-nic")) {
+    params.useNIC = true;
+    params.useSATConstraints = true;
+  }
+
+  if (options.getBool("-move-planar")) {
+    params.useMovePlanarity = true;
+    params.useSATConstraints = true;
+  }
 
   params.forbidCrossings = options.getBool("-forbid-crossings");
 
@@ -524,9 +537,9 @@ void initSATParams(CMDOptions& options, Params& params) {
 
   //CHECK(!params.directed || params.useMovePlanarity, "directed edges should be used with move-planarity");
   CHECK(!params.useIC || !params.useNIC, "cannot simultanosly use IC and NIC modes");
-  CHECK(!params.useCross1Constraints || params.useCross2Constraints, "`-cross1` constraints should be used with `-cross2`");
-  CHECK(!params.useIC || params.useCross2Constraints, "`-useIC` constraints should be used with `-cross2`");
-  CHECK(!params.useNIC || params.useCross2Constraints, "`-useNIC` constraints should be used with `-cross2`");
+  CHECK(!params.useUNSATConstraints || params.useSATConstraints, "`-unsat` constraints should be used with `-sat`");
+  CHECK(!params.useIC || params.useSATConstraints, "`-useIC` constraints should be used with `-sat`");
+  CHECK(!params.useNIC || params.useSATConstraints, "`-useNIC` constraints should be used with `-sat`");
 }
 
 /// Gen a random 1-planar graph and verify the 1-planar SAT model

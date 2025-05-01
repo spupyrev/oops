@@ -200,8 +200,8 @@ struct Params {
   std::string resultFile = "";
 
   bool useMovePlanarity = false;
-  bool useCross2Constraints = false;
-  bool useCross1Constraints = false;
+  bool useSATConstraints = false;
+  bool useUNSATConstraints = false;
   bool useIC = false;
   bool useNIC = false;
 
@@ -215,8 +215,8 @@ struct Params {
       ss << "stack-planar ";
 
     ss << "[";
-    ss << "cross2=" << int(useCross2Constraints);
-    ss << "; cross1=" << int(useCross1Constraints);
+    ss << "sat=" << int(useSATConstraints);
+    ss << "; unsat=" << int(useUNSATConstraints);
     ss << "; IC=" << int(useIC);
     ss << "; NIC=" << int(useNIC);
     ss << "]";
