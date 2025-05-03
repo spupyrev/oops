@@ -930,14 +930,6 @@ void encodeMoveSymmetry(SATModel& model, const InputGraph& graph, const int verb
   model.addClause(MClause(model.getMoveVar(0, 0, false)));
   numExtraConstraints++;
 
-  // force identity order
-  // for (int i = 0; i < n; i++) {
-  //   for (int j = i + 1; j < n; j++) {
-  //     model.addClause(MClause(model.getRelVar(i, j, true)));
-  //     numExtraConstraints++;
-  //   }
-  // }
-
   // vertex twins
   const auto& adj = graph.adj;
   for (int i = 0; i < n; i++) {
@@ -1040,14 +1032,20 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
     numExtraConstraints++;
   }
 
-  // custom order
-  const std::vector<int> corder = {0, 1, 2, 3, 4, 5};
-  for (size_t i = 0; i < corder.size(); i++) {
-    for (size_t j = i + 1; j < corder.size(); j++) {
-      model.addClause(MClause(model.getRelVar(corder[i], corder[j], true)));
-      numExtraConstraints++;
-    }
-  }
+  /////////////////////////////////////////////////////////////////////////////////
+  // // TMP: custom constraints
+  // for (int i = 0; i < numVertices; i++) {
+  //   if (6 != i)
+  //     model.addClause(MClause(model.getRelVar(6, i, true)));
+  //   numExtraConstraints++;
+  // }
+  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(4, 10), graph.findDivIndex(5, 9), true)));
+  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(1, 7), graph.findDivIndex(2, 6), true)));
+  // LOG(TextColor::red, "encoding contains custom constraints!!!");
+  // for (int i = 0; i < m; i++) {
+  //   LOG("edge (%d, %d): %d", edges[i].first, edges[i].second, graph.findDivIndex(edges[i].first, edges[i].second));
+  // }
+  /////////////////////////////////////////////////////////////////////////////////
 
   // vertex twins
   const auto& adj = graph.adj;
@@ -1378,14 +1376,27 @@ Result runSolver(const Params& params, const InputGraph& graph) {
     exit(0);
   }
 
-  solver.simplify();
-  LOG_IF(verbose, "solving SAT model with %'d variables and %'d clauses...", solver.nVars(), solver.nClauses());
-
   lbool ret;
-  if (!solver.okay()) {
-    ret = l_False;
+  if (params.resultFile != "") {
+    LOG("parsing SAT model with %'d variables and %'d clauses from '%s'", model.varCount(), model.clauseCount(), params.resultFile.c_str());
+    auto externalResult = model.fromDimacs(params.resultFile);
+
+    if (externalResult == "SATISFIABLE") {
+      ret = l_True;
+    } else if (externalResult == "UNSATISFIABLE") {
+      ret = l_False;
+    } else {
+      ret = l_Undef;
+    }
   } else {
-    ret = solver.solve();
+    solver.simplify();
+    LOG_IF(verbose, "solving SAT model with %'d variables and %'d clauses...", solver.nVars(), solver.nClauses());
+
+    if (!solver.okay()) {
+      ret = l_False;
+    } else {
+      ret = solver.solve();
+    }
   }
   CHECK(ret == l_True || ret == l_False || ret == l_Undef, "an error within SAT solver");
 

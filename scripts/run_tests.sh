@@ -77,7 +77,7 @@ assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -breakID"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -unsat -sat -satsuma"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -move-planar"
 
-sparsify
+# test sparsify
 
 # timeout
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=5"
@@ -89,6 +89,10 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -dimacs=/tmp/test8.dimacs
 assert_pass "[ -f /tmp/test8.dimacs ]"
 
 # dimacs-result e2e
-#assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -dimacs-result=/tmp/test8.dimacs"
+assert_pass "rm -f /tmp/test9.dimacs"
+assert_fail "[ -f /tmp/test9.dimacs ]"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test9.dot -dimacs=/tmp/test9.dimacs"
+assert_pass "diff /tmp/test9.dimacs data/test9.dimacs"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test9.dot -dimacs-result=${DATA_DIR}/test9.dimacs_result"
 
 echo "✅ ALL TESTS PASSED"

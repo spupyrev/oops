@@ -35,6 +35,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-seed", "0", "Random seed");
 
   // Solver options
+  
   options.addAllowedOption("-move-planar", "false", "Use `move-planar` SAT encoding instead of `stack` encoding");
   options.addAllowedOption("-skewness", "1", "Maximum value of skewness");
   options.addAllowedOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
@@ -504,12 +505,13 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.applyBreakID = options.getBool("-breakID");
   params.applySatsuma = options.getBool("-satsuma");
   params.modelFile = options.getStr("-dimacs");
-  params.resultFile = options.getStr("-dimacs");
+  params.resultFile = options.getStr("-dimacs-result");
 
   params.useSATConstraints = options.getBool("-sat");
   if (options.getBool("-unsat")) {
     params.useUNSATConstraints = true;
     params.useSATConstraints = true;
+    params.applySatsuma = true;
   }
   if (options.getBool("-ic")) {
     params.useIC = true;

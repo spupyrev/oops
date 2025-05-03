@@ -349,17 +349,16 @@ void printResultStackArcs(const InputGraph& graph, const Result& result, IOGraph
 
     auto edge = ioGraph.addEdge(to_string(vIndex[e_first]), to_string(vIndex[e_second]));
     edge->setAttr("width", "2");
-    if (!result.stack.empty()) {
-      edge->setAttr("fill", result.stack[seg] ? getEdgeColor(0) : getEdgeColor(1));
-      edge->setAttr("type", "arc");
-      edge->setAttr("arcType", "fixedRatio");
-      edge->setAttr("arcHeight", to_string(STEP_Y));
-      if (result.stack[seg] == (vIndex[e_first] < vIndex[e_second])) {
-        edge->setAttr("arcRatio", "1");
-      } else {
-        edge->setAttr("arcRatio", "-1");
-      }
+    CHECK(!result.stack.empty());
+
+    edge->setAttr("fill", result.stack[seg] ? getEdgeColor(0) : getEdgeColor(1));
+    edge->setAttr("type", "arc");
+    edge->setAttr("arcType", "fixedRatio");
+    edge->setAttr("arcHeight", to_string(STEP_Y));
+    if (result.stack[seg] == (vIndex[e_first] < vIndex[e_second])) {
+      edge->setAttr("arcRatio", "1");
     } else {
+      edge->setAttr("arcRatio", "-1");
     }
   }
 }

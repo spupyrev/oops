@@ -156,8 +156,8 @@ bool GraphParser::writeSvgGraph(ostream& out, IOGraph& graph) const {
     CHECK(xx.size() == 3 && yy.size() == 2);
     CHECK(yy[0] == 1 || yy[0] == -1);
     CHECK(yy[1] == 1 || yy[1] == -1);
-    const bool arc1Up = yy[0] == 1;
-    const bool arc2Up = yy[1] == 1;
+    const bool arc1Up = yy[0] == -1;
+    const bool arc2Up = yy[1] == -1;
 
     // white background
     drawBiarc(out, xx[0], 0, xx[1], 0, xx[2], 0, arc1Up, arc2Up, 6, "#FFFFFF");
