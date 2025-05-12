@@ -33,7 +33,7 @@ class CMDOptions {
     for (int i = 1; i < argc; i++) {
       std::string s(argv[i]);
 
-      if (s == "/?"  || s == "-?" || s == "--help" || s == "-help") {
+      if (s == "/?"  || s == "-?" || s == "--help" || s == "-help" || s == "--h" || s == "-h") {
         usage(argv[0]);
         throw 0;
       }
@@ -230,7 +230,11 @@ private:
       }
 
       std::cout << "\n";
-      std::cout << "  " << allowedOptions.find(opt)->second << "\n";
+      std::cout << "  " << allowedOptions.find(opt)->second;
+      if (defaultValues.count(opt)) {
+        std::cout << " (default: " << defaultValues.find(opt)->second << ")";
+      }
+      std::cout << "\n";
     }
   }
 };

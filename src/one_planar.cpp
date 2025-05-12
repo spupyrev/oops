@@ -1336,11 +1336,12 @@ void fillResultStack(
 
 ///
 Result runSolver(const Params& params, const InputGraph& graph) {
+  CHECK(params.solverType == SolverType::STACK || params.solverType == SolverType::MOVE);
   const int verbose = params.verbose;
 
   // Init the model
   SATModel model;
-  if (params.useMovePlanarity)
+  if (params.solverType == SolverType::MOVE)
     encodeMovePlanar(model, graph, params);
   else
     encodeStackPlanar(model, graph, params);
@@ -1403,7 +1404,7 @@ Result runSolver(const Params& params, const InputGraph& graph) {
   Result result;
   if (ret == l_True) {
     result.code = ResultCodeTy::SAT;
-    if (params.useMovePlanarity)
+    if (params.solverType == SolverType::MOVE)
       fillResultMove(model, solver, graph, params, result);
     else
       fillResultStack(model, solver, graph, params, result);

@@ -176,6 +176,7 @@ struct InputGraph {
 };
 
 /// SAT solver parameters
+enum SolverType { STACK, MOVE, BRUTE_FORCE };
 struct Params {
   Params() = default;
 
@@ -199,7 +200,7 @@ struct Params {
   std::string modelFile = "";
   std::string resultFile = "";
 
-  bool useMovePlanarity = false;
+  SolverType solverType = SolverType::STACK;
   bool useSATConstraints = false;
   bool useUNSATConstraints = false;
   bool useIC = false;
@@ -209,10 +210,12 @@ struct Params {
 
   std::string to_string() const {
     std::ostringstream ss;
-    if (useMovePlanarity)
+    if (solverType == SolverType::STACK)
+      ss << "stack-planar ";
+    else if (solverType == SolverType::MOVE)
       ss << "move-planar ";
     else
-      ss << "stack-planar ";
+      ss << "brute-force ";
 
     ss << "[";
     ss << "sat=" << int(useSATConstraints);
@@ -228,7 +231,8 @@ struct Params {
 enum class ResultCodeTy { SAT, UNSAT, TIMEOUT, ERROR };
 
 struct Result {
-  ResultCodeTy code;
+  Result() : code(ResultCodeTy::ERROR) {}
+  Result(ResultCodeTy code_) : code(code_) {}
 
   std::string getCodeDesc() const {
     if (code == ResultCodeTy::SAT)
@@ -241,12 +245,15 @@ struct Result {
       return "ERROR";
   }
 
-  // the order of the original and division (dummy) vertices
-  std::vector<std::vector<int>> order;
+  // result code
+  ResultCodeTy code;
   // pairs of crossed edges
   std::vector<std::pair<int, int>> crossings;
   // whether the i-th edges is crossed
   std::vector<bool> isCrossed;
+  
+  // the order of the original and division (dummy) vertices
+  std::vector<std::vector<int>> order;
   // whether i-th segment on stack 0 or 1
   std::vector<bool> stack;
 };
@@ -710,3 +717,8 @@ class SATModel {
 bool canBeMerged(int u, int v, const int n, const std::vector<EdgeTy>& edges);
 void initCrossablePairs(const Params& params, const InputGraph& graph);
 Result runSolver(const Params& params, const InputGraph& graph);
+
+void minimizeCrossings(const InputGraph& graph, Result& result, int verbose);
+bool isPlanarWithCrossings(const InputGraph& graph, const std::vector<std::pair<int, int>>& crossings);
+int computeSkewness(const InputGraph& graph, const int verbose, const int max_skewnees);
+Result bruteForce(const Params& params, const InputGraph& graph);

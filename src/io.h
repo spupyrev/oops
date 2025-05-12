@@ -405,6 +405,7 @@ void printInput(
     const std::string& graphName, 
     const InputGraph& graph, 
     const int verbose);
+void printInputDot(const std::string& filename, const std::string& graphName, const InputGraph& graph, bool append);
 
 void printOutput(
     const std::string& filename, 

@@ -93,10 +93,12 @@ void printTutteCoxeter(const InputGraph& graph) {
   LOG(TextColor::blue, "written TC graph to '%s'", filename.c_str());  
 }
 
-void printInputDot(const std::string& filename, const std::string& graphName, const InputGraph& graph) {
+void printInputDot(const std::string& filename, const std::string& graphName, const InputGraph& graph, bool append=false) {
   std::ofstream out;
-  out.open(filename);
-  // out.open(filename, std::ios::app);
+  if (append)
+    out.open(filename, std::ios::app);
+  else
+    out.open(filename);
   out << "graph " << graphName << " {\n";
 
   for (int i = 0; i < graph.n; i++) {

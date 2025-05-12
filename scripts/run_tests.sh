@@ -75,12 +75,25 @@ assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -sat -unsat -nic -timeout
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -satsuma"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -breakID"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -unsat -sat -satsuma"
-assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -move-planar"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=move"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=stack"
+
+# brute-force
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=brute-force"
+assert_fail "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=brute-force -ic"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/small_cn_sat.cfg -solver=brute-force -skewness=0 2> /tmp/last.log"
+assert_pass "grep -Fq '1-planar = 31' /tmp/last.log"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/small_cn_unsat.cfg -solver=brute-force -skewness=0 2> /tmp/last.log"
+assert_pass "grep -Fq 'non-1-planar = 3' /tmp/last.log"
 
 # test sparsify
 
+
 # timeout
-assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=5"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=3 2> /tmp/last.log"
+assert_pass "grep -Fq '#unknown = 1' /tmp/last.log"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=3 -solver=brute-force 2> /tmp/last.log"
+assert_pass "grep -Fq '#unknown = 1' /tmp/last.log"
 
 # dimacs
 assert_pass "rm -f /tmp/test8.dimacs"

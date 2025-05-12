@@ -20,7 +20,7 @@ using namespace std;
 
 /// Prepare command-line arguments
 void prepareOptions(CMDOptions& options) {
-  options.setUsageMessage("Usage: oops [options]");
+  options.setUsageMessage("Usage: oops -i=[input_graph] [options]");
 
   // IO
   options.addAllowedOption("-i", "File name with input graph(s); supported formats are dot/gml/graphml/s6/g6");
@@ -31,12 +31,14 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-directed", "false", "Whether the input graph is directed");
 
   // Debug
-  options.addAllowedOption("-verbose", "1", "Output debug info");
+  options.addAllowedOption("-verbose", "1", "Verbosity level");
   options.addAllowedOption("-seed", "0", "Random seed");
 
   // Solver options
-  
-  options.addAllowedOption("-move-planar", "false", "Use `move-planar` SAT encoding instead of `stack` encoding");
+  options.addAllowedOption("-solver", "stack", "Type of the solver to use");
+  options.addAllowedValue("-solver", "stack");
+  options.addAllowedValue("-solver", "move");
+  options.addAllowedValue("-solver", "brute-force");
   options.addAllowedOption("-skewness", "1", "Maximum value of skewness");
   options.addAllowedOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
   options.addAllowedOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
@@ -58,171 +60,6 @@ void prepareOptions(CMDOptions& options) {
   // Experimental
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
   options.addAllowedOption("-skip-reducible-triangles", "false", "[Experimental] Skip reducible triangles");
-}
-
-/// Check if a given graph with specified pairs of crossed edges is planar
-bool isPlanarWithCrossings(const int n, const std::vector<EdgeTy>& edges, const std::vector<std::pair<int, int>>& crossings) {
-  const int m = (int)edges.size();
-  std::vector<bool> isCrossed(m, false);
-  for (const auto& [e1, e2] : crossings) {
-    CHECK(0 <= e1 && e1 < m);
-    CHECK(0 <= e2 && e2 < m);
-    CHECK(e1 != e2);
-    CHECK(!isCrossed[e1] && !isCrossed[e2]);
-    isCrossed[e1] = true;
-    isCrossed[e2] = true;
-  }
-
-  std::vector<EdgeTy> planarEdges;
-  planarEdges.reserve(edges.size() + 4 * crossings.size());
-  for (size_t i = 0; i < edges.size(); i++) {
-    if (!isCrossed[i]) {
-      planarEdges.push_back(edges[i]);
-    }
-  }
-
-  int nPlanar = n;
-  for (const auto& [e1, e2] : crossings) {
-    planarEdges.push_back({edges[e1].first, nPlanar});
-    planarEdges.push_back({edges[e1].second, nPlanar});
-    planarEdges.push_back({edges[e2].first, nPlanar});
-    planarEdges.push_back({edges[e2].second, nPlanar});
-    nPlanar++;
-  }
-
-  return isPlanar(nPlanar, planarEdges, 1);
-}
-
-bool isSkewnessOne(const int n, const std::vector<EdgeTy>& edges, const int verbose) {
-  const int m = (int)edges.size();
-  for (int e1 = 0; e1 < m; e1++) {
-    for (int e2 = e1 + 1; e2 < m; e2++) {
-      if (!canBeMerged(e1 + n, e2 + n, n, edges))
-        continue;
-      
-      const std::vector<std::pair<int, int>> crossings = {{e1, e2}};
-      if (isPlanarWithCrossings(n, edges, crossings)) {
-        LOG_IF(verbose, "graph skewness is 1 with crossed edges (%d, %d) -- (%d, %d)", edges[e1].first, edges[e1].second, edges[e2].first, edges[e2].second);
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-bool isSkewnessTwo(const int n, const std::vector<EdgeTy>& edges, const int verbose) {
-  const int m = (int)edges.size();
-  for (int e1 = 0; e1 < m; e1++) {
-    for (int e2 = e1 + 1; e2 < m; e2++) {
-      if (!canBeMerged(e1 + n, e2 + n, n, edges))
-        continue;
-      for (int e3 = e1 + 1; e3 < m; e3++) {
-        for (int e4 = e3 + 1; e4 < m; e4++) {
-          if (e2 == e3 || e2 == e4)
-            continue;
-          if (!canBeMerged(e3 + n, e4 + n, n, edges))
-            continue;
-          const std::vector<std::pair<int, int>> crossings = {{e1, e2}, {e3, e4}};
-          if (isPlanarWithCrossings(n, edges, crossings)) {
-            LOG_IF(verbose, "graph skewness is 2 with crossed pairs (%d, %d), (%d, %d)", e1, e2, e3, e4);
-            return true;
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
-
-bool isSkewnessThree(const int n, const std::vector<EdgeTy>& edges, const int verbose) {
-  const int m = (int)edges.size();
-  // 1st pair
-  for (int e1 = 0; e1 < m; e1++) {
-    for (int e2 = e1 + 1; e2 < m; e2++) {
-      if (!canBeMerged(e1 + n, e2 + n, n, edges))
-        continue;
-      // 2nd pair
-      for (int e3 = e1 + 1; e3 < m; e3++) {
-        for (int e4 = e3 + 1; e4 < m; e4++) {
-          if (e2 == e3 || e2 == e4)
-            continue;
-          if (!canBeMerged(e3 + n, e4 + n, n, edges))
-            continue;
-          // 3rd pair
-          for (int e5 = e3 + 1; e5 < m; e5++) {
-            for (int e6 = e5 + 1; e6 < m; e6++) {
-              if (e2 == e5 || e2 == e6 || e4 == e5 || e4 == e6)
-                continue;
-              if (!canBeMerged(e5 + n, e6 + n, n, edges))
-                continue;
-              const std::vector<std::pair<int, int>> crossings = {{e1, e2}, {e3, e4}, {e5, e6}};
-              if (isPlanarWithCrossings(n, edges, crossings)) {
-                LOG_IF(verbose, "graph skewness is 3 with crossed pairs (%d, %d), (%d, %d), (%d, %d)", e1, e2, e3, e4, e5, e6);
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
-
-int computeSkewness(const InputGraph& graph, const int verbose, const int max_skewnees) {
-  CHECK(!graph.isDirected());
-  const int n = graph.n;
-  const auto& edges = graph.edges;
-
-  if (max_skewnees == 0)
-    return max_skewnees + 1;
-
-  // Check 1-skewness
-  if (isSkewnessOne(n, edges, verbose))
-    return 1;
-  if (max_skewnees == 1)
-    return max_skewnees + 1;
-
-  // Check 2-skewness
-  if (isSkewnessTwo(n, edges, verbose))
-    return 2;
-  if (max_skewnees == 2)
-    return max_skewnees + 1;
-
-  // Check 3-skewness
-  if (isSkewnessThree(n, edges, verbose))
-    return 3;
-  if (max_skewnees == 3)
-    return max_skewnees + 1;
-
-  return max_skewnees + 1;
-}
-
-/// Adjust the result by removing unnecessary crossings
-void minimizeCrossings(const int n, const std::vector<EdgeTy>& edges, Result& result, int verbose) {
-  const int orgNumCrossings = (int)result.crossings.size();
-  std::vector<std::pair<int, int>> reqCrossings = result.crossings;
-  for (size_t i = 0; i < result.crossings.size(); i++) {
-    auto cr = result.crossings[i];
-    CHECK(std::find(reqCrossings.begin(), reqCrossings.end(), cr) != reqCrossings.end());
-    auto copyCrossings = reqCrossings;
-    remove_value(copyCrossings, cr);
-    CHECK(copyCrossings.size() + 1 == reqCrossings.size());
-    if (isPlanarWithCrossings(n, edges, copyCrossings)) {
-      reqCrossings = copyCrossings;
-    }
-  }
-  // Nothing is done
-  if (reqCrossings.size() == result.crossings.size())
-    return;
-  result.crossings = reqCrossings;
-  result.isCrossed.assign(edges.size(), false);
-  for (const auto& [e1, e2] : result.crossings) {
-    result.isCrossed[e1] = true;
-    result.isCrossed[e2] = true;
-  }
-  const int newNumCrossings = (int)result.crossings.size();
-  LOG_IF(verbose, "reduced the number of crossings from %d to %d", orgNumCrossings, newNumCrossings);
 }
 
 /// Check if 1-planarity test can be skipped because of graphs size or density
@@ -314,8 +151,14 @@ ResultCodeTy isOnePlanar(
   // init pairs for edge crossings
   initCrossablePairs(params, graph);
 
+  if (EnableEarlyExit && params.solverType == SolverType::BRUTE_FORCE) {
+    CHECK(EnableEarlyExit, "cannot combine specified parameters with brute-force");
+    Result result = bruteForce(params, graph);
+    return result.code;
+  }
+
   // check skewness (max number of crossings)
-  if (!graph.isDirected() && EnableEarlyExit) {
+  if (EnableEarlyExit) {
     const int maxSkewness = options.getInt("-skewness");
     const int skewness = computeSkewness(graph, verbose, maxSkewness);
     if (skewness <= maxSkewness) {
@@ -339,15 +182,15 @@ ResultCodeTy isOnePlanar(
   }
 
   // Verify that the result is planar (after subdivision of crossings)
-  if (!isPlanarWithCrossings(n, edges, result.crossings)) {
+  if (!isPlanarWithCrossings(graph, result.crossings)) {
     LOG(TextColor::red, "the constructed embedding is not 1-planar");
     ERROR(false);
   }
 
-  // Try to remove crossings whenever possible
+  // Try to remove crossings, if possible
   const bool sparsify = options.getBool("-sparsify");
   if (sparsify) {
-    minimizeCrossings(n, edges, result, verbose);
+    minimizeCrossings(graph, result, verbose);
   }
 
   // print output
@@ -522,9 +365,14 @@ void initSATParams(CMDOptions& options, Params& params) {
     params.useSATConstraints = true;
   }
 
-  if (options.getBool("-move-planar")) {
-    params.useMovePlanarity = true;
+  if (options.getStr("-solver") == "move") {
+    params.solverType = SolverType::MOVE;
     params.useSATConstraints = true;
+  } else if (options.getStr("-solver") == "brute-force") {
+    params.solverType = SolverType::BRUTE_FORCE;
+  } else {
+    CHECK(options.getStr("-solver") == "stack");
+    params.solverType = SolverType::STACK;
   }
 
   params.forbidCrossings = options.getBool("-forbid-crossings");
