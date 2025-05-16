@@ -340,7 +340,8 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const int
 }
 
 void encodeICConstraints(SATModel& model, const InputGraph& graph, const int verbose, const int C);
-void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const int verbose);
+void encodePairedSwapConstraints(SATModel& model, const InputGraph& graph, const int verbose);
+void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int verbose);
 void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const int verbose);
 
@@ -400,13 +401,8 @@ void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int v
   }
 
   if (!graph.isDirected()) {
-    // TODO: always enable for UNSAT?
     encodeICConstraints(model, graph, verbose, 2);
-
-    // TODO: always enable for UNSAT?
-    encodeSwapConstraints(model, graph, verbose);
-
-    // TODO: always enable for UNSAT?
+    encodePairedSwapConstraints(model, graph, verbose);
     encodeK4Constraints(model, graph, verbose);
   }
 }
@@ -629,7 +625,7 @@ void encodeICConstraints(SATModel& model, const InputGraph& graph, const int ver
 }
 
 /// Disable pairs of crossings that can be eliminated by swapping pairs of vertices
-void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodePairedSwapConstraints(SATModel& model, const InputGraph& graph, const int verbose) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const auto& adj = graph.adj;
@@ -702,7 +698,7 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const int v
     }
   }
 
-  LOG_IF(verbose, "added %3d swap constraints", numConstraints);
+  LOG_IF(verbose, "added %3d 2-swap constraints", numConstraints);
 
   int num3Constraints = 0;
   // forbid crossings between every pair of edges for two degree-3 vertices
@@ -1095,6 +1091,10 @@ void encodeStackPlanar(
   if (params.useNIC) {
     CHECK(params.useSATConstraints);
     encodeICConstraints(model, graph, params.verbose, 1);
+  }
+  if (params.swapConstraints != "") {
+    CHECK(params.useSATConstraints);
+    encodeSwapConstraints(model, graph, params);
   }
 
   // Symmetry

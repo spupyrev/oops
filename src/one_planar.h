@@ -207,6 +207,7 @@ struct Params {
   bool useNIC = false;
 
   bool forbidCrossings = false;
+  std::string swapConstraints = "";
 
   std::string to_string() const {
     std::ostringstream ss;
@@ -251,7 +252,7 @@ struct Result {
   std::vector<std::pair<int, int>> crossings;
   // whether the i-th edges is crossed
   std::vector<bool> isCrossed;
-  
+
   // the order of the original and division (dummy) vertices
   std::vector<std::vector<int>> order;
   // whether i-th segment on stack 0 or 1

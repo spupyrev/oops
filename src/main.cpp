@@ -60,6 +60,7 @@ void prepareOptions(CMDOptions& options) {
   // Experimental
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
   options.addAllowedOption("-skip-reducible-triangles", "false", "[Experimental] Skip reducible triangles");
+  options.addAllowedOption("-swap-constraints", "", "[Experimental] Add swap constraints: num_pairs/num_reorder");
 }
 
 /// Check if 1-planarity test can be skipped because of graphs size or density
@@ -376,6 +377,7 @@ void initSATParams(CMDOptions& options, Params& params) {
   }
 
   params.forbidCrossings = options.getBool("-forbid-crossings");
+  params.swapConstraints = options.getStr("-swap-constraints");
 
   const std::string outFile = options.getStr("-o");
   if (outFile != "") {

@@ -128,12 +128,16 @@ void remove_value(std::vector<T>& vec, const T& element) {
   vec.erase(std::remove(vec.begin(), vec.end(), element), vec.end());
 }
 
-inline bool contains(const std::vector<int>& vec, int element) {
+inline bool contains(const std::vector<int>& vec, const int element) {
   return std::find(vec.begin(), vec.end(), element) != vec.end();
 }
 
 inline bool contains(const std::vector<std::string>& vec, const char* element) {
   return std::find(vec.begin(), vec.end(), std::string(element)) != vec.end();
+}
+
+inline bool contains(const std::vector<std::pair<int, int>>& vec, const std::pair<int, int>& element) {
+  return std::find(vec.begin(), vec.end(), element) != vec.end();
 }
 
 template <typename T>
