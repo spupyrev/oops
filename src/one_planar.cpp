@@ -684,7 +684,9 @@ void encodePairedSwapConstraints(SATModel& model, const InputGraph& graph, const
                 continue;
 
               if (std::minmax(ae, be) < std::minmax(ve, ue)) {
-                //LOG("swap crossing0: x = %d; y = %d; a = %d; b = %d; u = %d; v = %d", x, y, a, b, u, v);
+                LOG_IF(verbose >= 3, "swap-2 crossing");
+                LOG_IF(verbose >= 3, "  (%d, %d) -- (%d, %d)", min(x, b), max(x, b), min(y, a), max(y, a));
+                LOG_IF(verbose >= 3, "  (%d, %d) -- (%d, %d)", min(x, v), max(x, v), min(y, u), max(y, u));
                 model.addClause({
                     model.getCross2Var(ae, be, false), 
                     model.getCross2Var(ve, ue, false)
