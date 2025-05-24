@@ -11,11 +11,12 @@ struct SwapFinder {
       verbose(verbose)
     {}
 
-  std::vector<std::vector<std::pair<int, int>>> search(int maxNumCrossings, int numSwaps) {
+  std::vector<std::vector<std::pair<int, int>>> search(int maxNumCrossings, int maxNumSwaps) {
     isCrossed = std::vector<bool>(graph.edges.size(), false);
     takenCrossings.clear();
     foundConstraints.clear();
     cost = std::vector<std::vector<int>>(graph.n, std::vector<int>(graph.n, -1));
+    numSwaps = maxNumSwaps;
 
     searchRec(0, maxNumCrossings);
 
@@ -24,6 +25,10 @@ struct SwapFinder {
 
 private:
   void searchRec(size_t curIdx, int remainingCrossings) {
+    // hmm
+    // if (foundConstraints.size() >= 1000000)
+    //   return;
+
     if (remainingCrossings >= 0) {
       if (!takenCrossings.empty() && canSwap()) {
         foundConstraints.push_back(takenCrossings);
@@ -125,13 +130,36 @@ private:
       }
     }
 
-    // check if swapping takenVertices[i1] and takenVertices[i2] is beneficial 
+    // check if swapping takenVertices[i1] and takenVertices[i2] is beneficial
+    CHECK(numSwaps >= 2);
     for (size_t i1 = 0; i1 < takenVertices.size(); i1++) {
       for (size_t i2 = i1 + 1; i2 < takenVertices.size(); i2++) {
         if (adj[takenVertices[i1]].size() != adj[takenVertices[i2]].size())
           continue;
-        if (canSwap(takenVertices[i1], takenVertices[i2], takenVertices))
+        if (canSwap2(takenVertices[i1], takenVertices[i2], takenVertices))
           return true;
+      }
+    }
+
+    if (numSwaps >= 3) {
+      // swap takenVertices[i1] -> takenVertices[i2] -> takenVertices[i3]
+      for (size_t i1 = 0; i1 < takenVertices.size(); i1++) {
+        for (size_t i2 = i1 + 1; i2 < takenVertices.size(); i2++) {
+          for (size_t i3 = i1 + 1; i3 < takenVertices.size(); i3++) {
+            if (i2 == i3)
+              continue;
+            if (adj[takenVertices[i1]].size() != adj[takenVertices[i2]].size())
+              continue;
+            if (adj[takenVertices[i1]].size() != adj[takenVertices[i3]].size())
+              continue;
+            if (adj[takenVertices[i2]].size() != adj[takenVertices[i3]].size())
+              continue;
+            if (canSwap3(takenVertices[i1], takenVertices[i2], takenVertices[i3], takenVertices)) {
+              LOG("yay!");
+              return true;
+            }
+          }
+        }
       }
     }
 
@@ -139,11 +167,10 @@ private:
   }
 
   // check if S and T can be swapped
-  bool canSwap(const int S, const int T, const std::vector<int>& takenVertices) const {
+  bool canSwap2(const int S, const int T, const std::vector<int>& takenVertices) const {
     const bool Debug = false;
 
     // collect new edges
-    //std::vector<std::pair<int, int>> newEdges;
     newEdges.clear();
     for (const int v : takenVertices) {
       for (const int u : graph.adj[v]) {
@@ -157,12 +184,91 @@ private:
         if (cost[u1][v1] == -1)
           return false;
 
+        if (cost[u1][v1] == 1) {
+          newEdges.push_back({u1, v1});
+        }
+      }
+    }
 
-        if (cost[u1][v1] == 1)        
-        newEdges.push_back({u1, v1});
+    if (newEdges.empty()) {
+      LOG_IF(Debug, "yay-1, swapped %d and %d", S, T);
+      return true;
+    }
+
+    sort_unique(newEdges);
+    // if (newEdges.empty()) {
+    //   LOG("S = %d; T = %d", S, T);
+    //   LOG("takenVertices = %s", to_string(takenVertices).c_str());
+    //   LOG("|takenCrossings| = %d", takenCrossings.size());
+    //   for (const auto& [x, y] : takenCrossings) {
+    //     LOG("  (%d, %d)--(%d, %d)", graph.edges[x].first, graph.edges[x].second, graph.edges[y].first, graph.edges[y].second);
+    //   }
+    // }
+
+    if (canSwapX(takenVertices)) {
+      LOG_IF(Debug, "yay-2, swapped %d and %d", S, T);
+      return true;
+    }
+
+    return false;
+  }
+
+  bool canSwap3(const int V1, const int V2, const int V3, const std::vector<int>& takenVertices) const {
+    const bool Debug = false;
+
+    // collect new edges
+    newEdges.clear();
+    for (const int v : takenVertices) {
+      for (const int u : graph.adj[v]) {
+        CHECK(u != v);
+        int s = v;
+        if (s == V1)
+          s = V2;
+        else if (s == V2)
+          s = V3;
+        else if (s == V3)
+          s = V1;
+
+        int t = u;
+        if (t == V1)
+          t = V2;
+        else if (t == V2)
+          t = V3;
+        else if (t == V3)
+          t = V1;
+        // const int s = v != S && v != T ? v : (v == S ? T : S);
+        // const int t = u != S && u != T ? u : (u == S ? T : S);
+
+        const int u1 = std::min(s, t);
+        const int v1 = std::max(s, t);
+        // stop early
+        if (cost[u1][v1] == -1)
+          return false;
+
+        if (cost[u1][v1] == 1) {
+          newEdges.push_back({u1, v1});
+        }
       }
     }
     sort_unique(newEdges);
+
+    if (newEdges.empty()) {
+      LOG_IF(Debug, "yay, swapped %d -> %d -> %d", V1, V2, V3);
+      return true;
+    }
+
+    if (canSwapX(takenVertices)) {
+      LOG_IF(Debug, "yay, swapped %d -> %d -> %d", V1, V2, V3);
+      return true;
+    }
+
+    return false;
+  }
+
+  bool canSwapX(const std::vector<int>& takenVertices) const {
+    // assumes new edges are collected and sorted
+    CHECK(!newEdges.empty());
+    const bool Debug = false;
 
     // count crossings
     const int oldCrossings = (int)takenCrossings.size();
@@ -181,6 +287,7 @@ private:
       if (cost[u][v] == 0) {
         LOG_IF(Debug, " droppped 1: (%d, %d)", u, v);
         processedNewEdge[i] = true;
+        CHECK(false, "should be processed earlier");
         continue;
       }
 
@@ -210,6 +317,7 @@ private:
       if (cost[u][v] == 2) {
         LOG_IF(Debug, " droppped 3: (%d, %d)", u, v);
         processedNewEdge[i] = true;
+        CHECK(false, "should be processed earlier");
         continue;
       }
 
@@ -223,9 +331,6 @@ private:
       return false;
     }
 
-    // yay!
-    LOG_IF(Debug, "swapped %d and %d", S, T);
-    LOG_IF(Debug, "========================== yay; newCrossings = %d; oldCrossings = %d", newCrossings, oldCrossings);
     return true;
   }
 
@@ -250,6 +355,7 @@ private:
   std::vector<bool> isCrossed;
   std::vector<std::pair<int, int>> takenCrossings;
   std::vector<std::vector<std::pair<int, int>>> foundConstraints;
+  int numSwaps;
 
   mutable std::vector<std::vector<int>> cost;
   mutable std::vector<std::pair<int, int>> newEdges;
@@ -263,7 +369,7 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
   const int numPairs = sc[0];
   const int numSwaps = sc[1];
   CHECK(numPairs >= 1 && numSwaps >= 2, "incorrect format for swap-constraints");
-  CHECK(numSwaps == 2, "numSwaps=%d is not implemeted yet", numSwaps);
+  CHECK(numSwaps <= 3, "numSwaps=%d is not implemeted yet", numSwaps);
   LOG_IF(params.verbose, "encoding swap constraints for %d pairs and %d swaps", numPairs, numSwaps);
 
   const int n = graph.n;
@@ -291,6 +397,6 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
     model.addClause(clause);
   }
   for (size_t i = 0; i < numConstraints.size(); i++) {
-    LOG_IF(params.verbose && numConstraints[i] > 0, "  found %d %d-swap constraints", numConstraints[i], i);
+    LOG_IF(params.verbose && numConstraints[i] > 0, "  found %'d %d-swap constraints", numConstraints[i], i);
   }
 }

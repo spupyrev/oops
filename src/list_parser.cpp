@@ -442,7 +442,7 @@ GraphListG6::GraphListG6(
     const auto& [n, edges] = parse(line);
     if (!graphFilter(n, edges)) {
       graphIdx++;
-      std::cerr << "skipped graph filter ::read\n";
+      // std::cerr << "skipped graph filter ::read\n";
       continue;
     }
 

@@ -25,10 +25,14 @@ void prepareOptions(CMDOptions& options) {
   // IO
   options.addAllowedOption("-i", "File name with input graph(s); supported formats are dot/gml/graphml/s6/g6");
   options.addAllowedOption("-o", "", "File name to output solution; supported formats are txt/dot/gml/svg");
+  options.addAllowedOption("-directed", "false", "Whether the input graph is directed");
+
+  // Filters
   options.addAllowedOption("-part", "", "The part of the input to process in the form of part_idx/num_parts");
   options.addAllowedOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
+  options.addAllowedOption("-min-n", "-1", "The minimum number of vertices in the processed graph");
   options.addAllowedOption("-max-degree", "-1", "Max vertex degree in the processed graph");
-  options.addAllowedOption("-directed", "false", "Whether the input graph is directed");
+  options.addAllowedOption("-skip-planar", "false", "Whether to skip planar input instances");
 
   // Debug
   options.addAllowedOption("-verbose", "1", "Verbosity level");
@@ -233,11 +237,17 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
   const std::string extension = filename.substr(filename.find_last_of(".") + 1);
 
   const int maxN = options.getInt("-max-n");
+  const int minN = options.getInt("-min-n");
   const int maxD = options.getInt("-max-degree");
-  auto graphFilter = [maxN,maxD](const int n, const std::vector<EdgeTy>& edges) -> bool {
+  const bool skipPlanar = options.getBool("-skip-planar");
+  auto graphFilter = [maxN,minN,maxD,skipPlanar](const int n, const std::vector<EdgeTy>& edges) -> bool {
+    if (minN != -1 && n < minN)
+      return false;
     if (maxN != -1 && n > maxN)
       return false;
     if (maxD != -1 && maxDegree(n, edges) > maxD)
+      return false;
+    if (skipPlanar && isPlanar(n, edges, 0))
       return false;
     return true;
   };
@@ -399,6 +409,7 @@ void testOnePlanar(CMDOptions& options) {
   const int startSeed = options.getInt("-seed");
   const int verbose = options.getInt("-verbose");
   const bool directed = options.getBool("-directed");
+  const bool skipPlanar = options.getBool("-skip-planar");
 
   Params params;
   initSATParams(options, params);
@@ -431,6 +442,8 @@ void testOnePlanar(CMDOptions& options) {
       genDirections(options, n, edges, directions);
     }
 
+    ResultCodeTy res = ResultCodeTy::ERROR;
+
     // only for cubic
     if (options.getBool("-skip-reducible-triangles") && hasReducibleTriangle(graphAdj)) {
       if (verbose)
@@ -438,7 +451,7 @@ void testOnePlanar(CMDOptions& options) {
       numSkipped++;
     } else {
       // test planarity
-      if (directions.empty() && isPlanar(n, edges, 0)) {
+      if (!skipPlanar && directions.empty() && isPlanar(n, edges, 0)) {
         if (verbose)
           LOG(TextColor::green, "the graph is planar");
         numPlanar++;
@@ -446,7 +459,8 @@ void testOnePlanar(CMDOptions& options) {
         // test 1-planarity
         CHECK(n >= 5, "the graph is too small");
         InputGraph graph(n, edges, directions);
-        ResultCodeTy res = isOnePlanar(options, params, graph, true, graphName);
+        res = isOnePlanar(options, params, graph, true, graphName);
+        //res = ResultCodeTy::TIMEOUT;
         if (res == ResultCodeTy::SAT) {
           if (verbose)
             LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
@@ -456,7 +470,8 @@ void testOnePlanar(CMDOptions& options) {
             LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
           numNon1Planar++;
         } else if (res == ResultCodeTy::TIMEOUT) {
-          LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
+          if (verbose)
+            LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
           numUnknown++;
         } else {
           ERROR("unreachable");
@@ -466,6 +481,13 @@ void testOnePlanar(CMDOptions& options) {
 
     times.push_back(chrono::steady_clock::now());
     processingTimes.push_back(chrono::duration_cast<chrono::milliseconds>(times[t + 1] - times[t]).count());
+
+    // // !!!TMP!!!
+    // if (verbose >= 0) {
+    //   CHECK(res != ResultCodeTy::ERROR);
+    //   LOG("processed graph %d (%s) in %d ms; res: %d", t, graphName.c_str(), processingTimes.back(), res);
+    // }
+
     LOG_IF(verbose, "processed graph %d (%s) in %s\n", t, graphName.c_str(), ms_to_str(processingTimes.back()).c_str());
     if (t + 1 >= numGraphs) continue;
 

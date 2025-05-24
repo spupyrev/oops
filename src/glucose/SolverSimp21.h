@@ -18,9 +18,6 @@ enum clause_Type { LONG = 0, REMOVED, MIDSZ, SMALL };
 
 namespace Simp21 {
 
-//=================================================================================================
-// Solver -- the main class:
-
 class Solver {
 private:
   template <typename T> class MyQueue {
