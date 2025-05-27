@@ -178,73 +178,6 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
     }
   }
 
-
-  // //////////////////////////////////////////////////////////
-  // // Count distances
-  // const int INF = 123456789;
-  // std::vector<std::vector<int>> dist(n, std::vector<int>(n, INF));
-  // for (int i = 0; i < n; i++) {
-  //   dist[i][i] = 0;
-  // }
-  // for (const auto& [u, v] : edges) {
-  //   dist[u][v] = 1;
-  //   dist[v][u] = 1;
-  // }
-  // for (int k = 0; k < n; k++) {
-  //   for (int i = 0; i < n; i++) {
-  //     for (int j = 0; j < n; j++) {
-  //       if (dist[i][j] > dist[i][k] + dist[k][j])
-  //         dist[i][j] = dist[i][k] + dist[k][j];
-  //     }
-  //   }
-  // }
-  // int num0 = 0;
-  // int num1 = 0;
-  // int num2 = 0;
-  // int num3 = 0;
-  // int num4 = 0;
-  // int numSP = 0;
-  // for (int e1 = 0; e1 < m; e1++) {
-  //   for (int e2 = e1 + 1; e2 < m; e2++) {
-  //     const int u1 = edges[e1].first;
-  //     const int v1 = edges[e1].second;
-  //     const int u2 = edges[e2].first;
-  //     const int v2 = edges[e2].second;
-  //     const int d = std::min(
-  //       std::min(dist[u1][u2], dist[u1][v2]), 
-  //       std::min(dist[v1][u2], dist[v1][v2])
-  //     );
-  //     const int D = std::max(
-  //       std::max(dist[u1][u2], dist[u1][v2]), 
-  //       std::max(dist[v1][u2], dist[v1][v2])
-  //     );
-  //     if (d == 0)
-  //       num0++;
-  //     if (d == 1)
-  //       num1++;
-  //     if (d == 2)
-  //       num2++;
-  //     if (d == 3)
-  //       num3++;
-  //     if (d == 4)
-  //       num4++;
-  //     if (d > 0 && d + 2 == D) {
-  //       numSP++;
-  //       // crossablePairs[e1 + n][e2 + n] = false;
-  //       // crossablePairs[e2 + n][e1 + n] = false;
-  //     }
-  //   }
-  // }
-  // // LOG("num0 = %d", num0);
-  // // LOG("num1 = %d", num1);
-  // // LOG("num2 = %d", num2);
-  // // LOG("num3 = %d", num3);
-  // // LOG("num4 = %d", num4);
-  // LOG_IF(verbose, "numSP = %d", numSP);
-
-  // //////////////////////////////////////////////////////////
-
-
   // Count pairs
   int mergablePairs = 0;
   int possiblePairs = 0;
@@ -1043,6 +976,8 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
   // for (int i = 0; i < m; i++) {
   //   LOG("edge (%d, %d): %d", edges[i].first, edges[i].second, graph.findDivIndex(edges[i].first, edges[i].second));
   // }
+  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(1, 3), graph.findDivIndex(2, 4), true)));
+  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(0, 4), graph.findDivIndex(3, 5), true)));
   /////////////////////////////////////////////////////////////////////////////////
 
   // vertex twins

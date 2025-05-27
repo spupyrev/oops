@@ -451,7 +451,7 @@ void testOnePlanar(CMDOptions& options) {
       numSkipped++;
     } else {
       // test planarity
-      if (!skipPlanar && directions.empty() && isPlanar(n, edges, 0)) {
+      if (false && !skipPlanar && directions.empty() && isPlanar(n, edges, 0)) {
         if (verbose)
           LOG(TextColor::green, "the graph is planar");
         numPlanar++;
