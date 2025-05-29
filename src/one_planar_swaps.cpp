@@ -25,7 +25,7 @@ struct SwapFinder {
 
 private:
   void searchRec(size_t curIdx, int remainingCrossings) {
-    // hmm
+    // Debug only
     // if (foundConstraints.size() >= 1000000)
     //   return;
 
@@ -196,14 +196,6 @@ private:
     }
 
     sort_unique(newEdges);
-    // if (newEdges.empty()) {
-    //   LOG("S = %d; T = %d", S, T);
-    //   LOG("takenVertices = %s", to_string(takenVertices).c_str());
-    //   LOG("|takenCrossings| = %d", takenCrossings.size());
-    //   for (const auto& [x, y] : takenCrossings) {
-    //     LOG("  (%d, %d)--(%d, %d)", graph.edges[x].first, graph.edges[x].second, graph.edges[y].first, graph.edges[y].second);
-    //   }
-    // }
 
     if (canSwapX(takenVertices)) {
       LOG_IF(Debug, "yay-2, swapped %d and %d", S, T);
@@ -236,8 +228,6 @@ private:
           t = V3;
         else if (t == V3)
           t = V1;
-        // const int s = v != S && v != T ? v : (v == S ? T : S);
-        // const int t = u != S && u != T ? u : (u == S ? T : S);
 
         const int u1 = std::min(s, t);
         const int v1 = std::max(s, t);
@@ -399,4 +389,134 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
   for (size_t i = 0; i < numConstraints.size(); i++) {
     LOG_IF(params.verbose && numConstraints[i] > 0, "  found %'d %d-swap constraints", numConstraints[i], i);
   }
+}
+
+/// Disable pairs of crossings that can be eliminated by swapping pairs of vertices
+void encodeSwapConstraintsNaive(SATModel& model, const InputGraph& graph, const int verbose) {
+  const int n = graph.n;
+  const auto& edges = graph.edges;
+  const auto& adj = graph.adj;
+
+  int numConstraints = 0;
+  // try to eliminate crossings (x, b)--(y, a) and (x, v)--(y, u) by exchanging x and y
+  for (int x = 0; x < n; x++) {
+    for (int y = x + 1; y < n; y++) {
+      for (size_t ib = 0; ib < adj[x].size(); ib++) {
+        for (size_t iv = 0; iv < adj[x].size(); iv++) {
+          if (ib == iv) continue;
+          const int b = adj[x][ib];
+          const int v = adj[x][iv];
+          if (b == y || v == y) continue;
+          CHECK(b != v);
+
+          const int be = graph.findDivIndex(b, x);
+          const int ve = graph.findDivIndex(v, x);
+          for (size_t ia = 0; ia < adj[y].size(); ia++) {
+            for (size_t iu = 0; iu < adj[y].size(); iu++) {
+              if (ia == iu) continue;
+              const int a = adj[y][ia];
+              const int u = adj[y][iu];
+              if (a == x || u == x) continue;
+              CHECK(a != u);
+
+              const int ae = graph.findDivIndex(a, y);
+              const int ue = graph.findDivIndex(u, y);
+
+              if (b == a || b == u || v == u || v == a)
+                continue;
+
+              CHECK(be != ae && ve != ue);
+              if (!canBeMerged(be, ae, n, edges))
+                continue;
+              if (!canBeMerged(ve, ue, n, edges))
+                continue;
+              CHECK(b != a && b != u && v != u && v != a);
+
+              // vertices that can be reached from x w/o violating 1-planarity
+              std::vector<int> reachX = adj[x];
+              CHECK(contains(reachX, b) && contains(reachX, b));
+              reachX.push_back(x);
+              reachX.push_back(y);
+              reachX.push_back(a);
+              reachX.push_back(u);
+              // vertices that can be reached from y w/o violating 1-planarity
+              std::vector<int> reachY = adj[y];
+              CHECK(contains(reachY, a) && contains(reachY, u));
+              reachY.push_back(y);
+              reachY.push_back(x);
+              reachY.push_back(b);
+              reachY.push_back(v);
+
+              if (!equal_unsorted(reachX, reachY))
+                continue;
+
+              if (std::minmax(ae, be) < std::minmax(ve, ue)) {
+                // TODO: this isn't always correct, since we do not necessarily reduce the number of crossings
+                LOG_IF(verbose >= 3, "swap-2 crossing (x = %d; y = %d)", x, y);
+                LOG_IF(verbose >= 3, "  (%d, %d) -- (%d, %d)", min(x, b), max(x, b), min(y, a), max(y, a));
+                LOG_IF(verbose >= 3, "  (%d, %d) -- (%d, %d)", min(x, v), max(x, v), min(y, u), max(y, u));
+
+                model.addClause({
+                    model.getCross2Var(ae, be, false), 
+                    model.getCross2Var(ve, ue, false)
+                });
+                numConstraints++;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  LOG_IF(verbose, "added %3d 2-swap constraints", numConstraints);
+
+  int num3Constraints = 0;
+  // forbid crossings between every pair of edges for two degree-3 vertices
+  for (int u = 0; u < n; u++) {
+    if (graph.degree(u) != 3) 
+      continue;
+    for (int v = u + 1; v < n; v++) {
+      if (graph.degree(v) != 3) 
+        continue;
+      if (graph.hasEdge(u, v))
+        continue;
+
+      // vertex u is adjacent to (a, b, c) via edges (ua, ub, uc)
+      const int a = adj[u][0];
+      const int ua = graph.findDivIndex(u, a);
+      const int b = adj[u][1];
+      const int ub = graph.findDivIndex(u, b);
+      const int c = adj[u][2];
+      const int uc = graph.findDivIndex(u, c);
+      vector<int> perm = identity(3);
+
+      do {
+        // vertex v is adjacent to (x, y, z) via edges (vx, vy, vz)
+        const int x = adj[v][perm[0]];
+        const int vx = graph.findDivIndex(v, x);
+        const int y = adj[v][perm[1]];
+        const int vy = graph.findDivIndex(v, y);
+        const int z = adj[v][perm[2]];
+        const int vz = graph.findDivIndex(v, z);
+
+        if (!canBeMerged(ua, vx, n, edges))
+          continue;
+        if (!canBeMerged(ub, vy, n, edges))
+          continue;
+        if (!canBeMerged(uc, vz, n, edges))
+          continue;
+
+        LOG_IF(verbose >= 3, "swap-3 crossing: (%d--%d); (%d--%d); (%d--%d)", ua, vx, ub, vy, uc, vz);
+        model.addClause({
+            model.getCross2Var(ua, vx, false), 
+            model.getCross2Var(ub, vy, false),
+            model.getCross2Var(uc, vz, false)
+        });
+        num3Constraints++;
+      } while (std::next_permutation(perm.begin(), perm.end()));
+    }
+  }
+
+  LOG_IF(verbose, "added %3d 3-swap constraints", num3Constraints);
 }
