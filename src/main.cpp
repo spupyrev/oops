@@ -361,11 +361,16 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.modelFile = options.getStr("-dimacs");
   params.resultFile = options.getStr("-dimacs-result");
 
+  params.forbidCrossings = options.getBool("-forbid-crossings");
+  params.swapConstraints = options.getStr("-swap-constraints");
+
   params.useSATConstraints = options.getBool("-sat");
   if (options.getBool("-unsat")) {
     params.useUNSATConstraints = true;
     params.useSATConstraints = true;
     params.applySatsuma = true;
+    if (params.swapConstraints == "")
+      params.swapConstraints = "2/2";
   }
   if (options.getBool("-ic")) {
     params.useIC = true;
@@ -385,9 +390,6 @@ void initSATParams(CMDOptions& options, Params& params) {
     CHECK(options.getStr("-solver") == "stack");
     params.solverType = SolverType::STACK;
   }
-
-  params.forbidCrossings = options.getBool("-forbid-crossings");
-  params.swapConstraints = options.getStr("-swap-constraints");
 
   const std::string outFile = options.getStr("-o");
   if (outFile != "") {
@@ -451,7 +453,7 @@ void testOnePlanar(CMDOptions& options) {
       numSkipped++;
     } else {
       // test planarity
-      if (false && !skipPlanar && directions.empty() && isPlanar(n, edges, 0)) {
+      if (!skipPlanar && directions.empty() && isPlanar(n, edges, 0)) {
         if (verbose)
           LOG(TextColor::green, "the graph is planar");
         numPlanar++;
@@ -460,7 +462,6 @@ void testOnePlanar(CMDOptions& options) {
         CHECK(n >= 5, "the graph is too small");
         InputGraph graph(n, edges, directions);
         res = isOnePlanar(options, params, graph, true, graphName);
-        //res = ResultCodeTy::TIMEOUT;
         if (res == ResultCodeTy::SAT) {
           if (verbose)
             LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
