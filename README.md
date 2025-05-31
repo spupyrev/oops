@@ -23,7 +23,7 @@ Your machine needs to have a C++ compiler with C++17 support. We use GNU Make to
     The tool accepts graphs in the [DOT](https://en.wikipedia.org/wiki/DOT_(graph_description_language)), [GML](https://en.wikipedia.org/wiki/Graph_Modelling_Language), and [g6/s6](https://users.cecs.anu.edu.au/~bdm/data/formats.html) list formats. The output is either in the 
     textual (a list of planar and crossing edges) or visual form (using GML or SVG formats).
 
-For the list of supported options use:
+    For the list of supported options use:
 
         ./oops -help
 	
@@ -31,11 +31,11 @@ For the list of supported options use:
 
         ./oops -i=data/test4.dot -dimacs=test4.dimacs
 
-Use the SAT solver to test embeddability of the graph:          
+    Use the SAT solver to test embeddability of the graph:          
 
         painless test4.dimacs > result.dimacs
 
-Finally, print the resulting layout:        
+    Finally, print the resulting layout:        
 
         ./oops -i=graphs/test4.dot -dimacs-result=result.dimacs
 
