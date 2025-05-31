@@ -836,6 +836,30 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
 
   /////////////////////////////////////////////////////////////////////////////////
   // // TMP: custom constraints
+  auto addOrder = [&](const std::vector<int>& order) {
+    for (size_t i = 0; i < order.size(); i++) {
+      for (size_t j = i + 1; j < order.size(); j++) {
+        model.addClause(MClause(model.getRelVar(order[i], order[j], true)));
+      }
+    }
+  };
+  // n = 16
+  // addOrder({0, 1, 2, 3});
+  // addOrder({15, 14, 13, 12});
+  // addOrder({4, 5, 6, 7});
+  // addOrder({11, 10, 9, 8});
+  // addOrder({0, 1, 2, 3, 15, 14, 13, 12, 4, 5, 6, 7, 11, 10, 9, 8});
+
+  // n = 24
+  // addOrder({0, 1, 2, 3});
+  // addOrder({23, 22, 21, 20});
+  // addOrder({4, 5, 6, 7});
+  // addOrder({19, 18, 17, 16});
+  // addOrder({8, 9, 10, 11});
+  // addOrder({15, 14, 13, 12});
+
+  //addOrder({0, 1, 2, 3, 23, 22, 21, 20, 4, 5, 6, 7, 19, 18, 17, 16, 8, 9, 10, 11, 15, 14, 13, 12});
+
   // for (int i = 0; i < numVertices; i++) {
   //   if (6 != i)
   //     model.addClause(MClause(model.getRelVar(6, i, true)));
