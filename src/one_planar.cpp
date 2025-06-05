@@ -70,25 +70,6 @@ bool canSwapToReduceCrossings(int x, int y, int a, int b, const InputGraph& grap
     }
   }
 
-  // If both edges are present, then we require the smaller pair to be crossing-free
-  // TODO: disabled for now to avoid interactions with twin ordering
-  // if (hasEdgeAY && hasEdgeXB) {
-  //   remove_value(adjA, y);
-  //   remove_value(adjX, b);
-  //   if (equal_unsorted(adjX, adjA)) {
-  //     // possible crossings: (x, y)--(a, b) and (x, b)--(a, y)
-  //     const int e1 = graph.findDivIndex(x, y);
-  //     const int e2 = graph.findDivIndex(a, b);
-  //     const int e3 = graph.findDivIndex(x, b);
-  //     const int e4 = graph.findDivIndex(a, y);
-  //     if (std::minmax(e1, e2) < std::minmax(e3, e4)) {
-  //       // LOG("disable a crossing for (x=%d, y=%d) and (a=%d, b=%d); adjX = %s; adjA = %s", x, y, a, b, 
-  //       //   to_string(adjX).c_str(), to_string(adjA).c_str());
-  //       return true;
-  //     }
-  //   }
-  // }
-
   return false;
 }
 
@@ -761,7 +742,7 @@ void encodeMovePlanar(
     const InputGraph& graph,
     const Params& params) {
   LOG_IF(params.verbose, "encoding %s", params.to_string().c_str()); 
-  CHECK(params.useSATConstraints, "move-planarity should be used with -cross2");
+  CHECK(params.useSATConstraints, "move-planarity should be used with -sat=1");
 
   // Main encoding
   encodeRelativeVariables(model, graph, params.verbose);
@@ -836,29 +817,89 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
 
   /////////////////////////////////////////////////////////////////////////////////
   // // TMP: custom constraints
-  auto addOrder = [&](const std::vector<int>& order) {
-    for (size_t i = 0; i < order.size(); i++) {
-      for (size_t j = i + 1; j < order.size(); j++) {
-        model.addClause(MClause(model.getRelVar(order[i], order[j], true)));
-      }
-    }
-  };
+  // auto addOrder = [&](const std::vector<int>& order) {
+  //   for (size_t i = 0; i < order.size(); i++) {
+  //     for (size_t j = i + 1; j < order.size(); j++) {
+  //       model.addClause(MClause(model.getRelVar(order[i], order[j], true)));
+  //     }
+  //   }
+  // };
+  // auto addGroup = [&](const std::vector<int>& group) {
+  //   for (int x = 0; x < n; x++) {
+  //     if (contains(group, x)) 
+  //       continue;
+
+  //     for (size_t i = 0; i < group.size(); i++) {
+  //       for (size_t j = 0; j < group.size(); j++) {
+  //         if (i == j)
+  //           continue;
+  //         // forbid group[i] < x < group[j]
+  //         model.addClause(MClause({model.getRelVar(group[i], x, true), model.getRelVar(x, group[j], true)}));
+  //       }
+  //     }
+  //   }
+  // };
   // n = 16
   // addOrder({0, 1, 2, 3});
   // addOrder({15, 14, 13, 12});
   // addOrder({4, 5, 6, 7});
   // addOrder({11, 10, 9, 8});
-  // addOrder({0, 1, 2, 3, 15, 14, 13, 12, 4, 5, 6, 7, 11, 10, 9, 8});
+  //addOrder({0, 1, 2, 3,  7, 6, 5, 4,  12, 13, 14, 15,  11, 10, 9, 8});
+  //addOrder({0, 1, 2, 3,  15, 14, 13, 12,  4, 5, 6, 7,    11, 10, 9, 8});
 
   // n = 24
-  // addOrder({0, 1, 2, 3});
-  // addOrder({23, 22, 21, 20});
-  // addOrder({4, 5, 6, 7});
-  // addOrder({19, 18, 17, 16});
-  // addOrder({8, 9, 10, 11});
-  // addOrder({15, 14, 13, 12});
+  // addOrder({0, 1, 2, 3});     A
+  // addOrder({4, 5, 6, 7});     B
+  // addOrder({8, 9, 10, 11});   C
+  // addOrder({15, 14, 13, 12}); D
+  // addOrder({19, 18, 17, 16}); E
+  // addOrder({23, 22, 21, 20}); F
+  //addGroup({0, 1, 2, 3});
+  //addOrder({0, 1, 2, 3,  23, 22, 21, 20,  4, 5, 6, 7,  19, 18, 17, 16,  8, 9, 10, 11,  15, 14, 13, 12});
 
-  //addOrder({0, 1, 2, 3, 23, 22, 21, 20, 4, 5, 6, 7, 19, 18, 17, 16, 8, 9, 10, 11, 15, 14, 13, 12});
+  // n = 32
+  // // addOrder({0, 1, 2, 3});     A
+  // // addOrder({4, 5, 6, 7});     B
+  // // addOrder({8, 9, 10, 11});   C
+  // // addOrder({15, 14, 13, 12}); D
+  // // addOrder({19, 18, 17, 16}); E
+  // // addOrder({23, 22, 21, 20}); F
+  // // addOrder({24, 25, 26, 27}); G
+  // // addOrder({28, 29, 30, 31}); H
+  // addGroup({0, 1, 2, 3});
+  // //addOrder({0, 2, 3, 1});
+
+  // addGroup({4, 5, 6, 7});
+  // addOrder({4, 6, 5, 7});
+
+  // addGroup({8, 9, 10, 11});
+  // //addOrder({8, 10, 11, 9});
+
+  // addGroup({15, 14, 13, 12});
+  // //addOrder({4, 6, 7, 5});
+
+  // addGroup({19, 18, 17, 16});
+  // addGroup({23, 22, 21, 20});
+  // addGroup({24, 25, 26, 27});
+  // addGroup({28, 29, 30, 31});
+
+  // //addOrder({0, 4, 8, 15, 19, 23, 24, 28});
+  // addOrder({0, 28, 4, 24, 8, 23, 15, 19});
+
+  // n = 40
+  // addGroup({0, 1, 2, 3});     // A
+  // addGroup({4, 5, 6, 7});     // B
+  // addGroup({8, 9, 10, 11});   // C
+  // addGroup({12, 13, 14, 15}); // D
+  // addGroup({16, 17, 18, 19}); // E
+  // addGroup({20, 21, 22, 23}); // F
+  // addGroup({24, 25, 26, 27}); // G
+  // addGroup({28, 29, 30, 31}); // H
+  // addGroup({32, 33, 34, 35}); // I
+  // addGroup({36, 37, 38, 39}); // J
+
+  // addOrder({0, 2, 3, 1});
+  // addOrder({0, 36, 4, 32, 8, 28, 12, 24, 16, 20});
 
   // for (int i = 0; i < numVertices; i++) {
   //   if (6 != i)

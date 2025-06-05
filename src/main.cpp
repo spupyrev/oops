@@ -483,11 +483,11 @@ void testOnePlanar(CMDOptions& options) {
     times.push_back(chrono::steady_clock::now());
     processingTimes.push_back(chrono::duration_cast<chrono::milliseconds>(times[t + 1] - times[t]).count());
 
-    // // !!!TMP!!!
-    // if (verbose >= 0) {
-    //   CHECK(res != ResultCodeTy::ERROR);
-    //   LOG("processed graph %d (%s) in %d ms; res: %d", t, graphName.c_str(), processingTimes.back(), res);
-    // }
+    // !!!TMP!!!
+    if (verbose >= 0) {
+      CHECK(res != ResultCodeTy::ERROR);
+      LOG("processed graph %d (%s) in %d ms; res: %d", t, graphName.c_str(), processingTimes.back(), res);
+    }
 
     LOG_IF(verbose, "processed graph %d (%s) in %s\n", t, graphName.c_str(), ms_to_str(processingTimes.back()).c_str());
     if (t + 1 >= numGraphs) continue;

@@ -20,12 +20,13 @@ CONSOLE_WIDTH = 140
 NUM_THREADS = min(max(3 * multiprocessing.cpu_count() // 4, 1), 10)
 PARALLEL_RUN = True
 
-NUM_THREADS = 8
+NUM_THREADS = 6
 #PARALLEL_RUN = False
 
 N=10
 
-CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/ge18c.g6 -part=%(thread_id)d/%(num_threads)d"
+CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub30-gir7.g6 -timeout=180 -solver=stack -part=%(thread_id)d/%(num_threads)d"
+# CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/ge18c.g6 -part=%(thread_id)d/%(num_threads)d"
 # CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub22-gir6.g6 -cross2 -part=%(thread_id)d/%(num_threads)d"
 ################################################################################
 
