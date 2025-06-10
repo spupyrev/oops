@@ -39,6 +39,28 @@ Your machine needs to have a C++ compiler with C++17 support. We use GNU Make to
 
         ./oops -i=graphs/test4.dot -dimacs-result=result.dimacs
 
+## Examples
+Find a 1-planar embedding of the [Grötzsch](https://en.wikipedia.org/wiki/Gr%C3%B6tzsch_graph) graph and visualize the result:
+
+        ./oops -i=data/test9.dot -o=test9.svg
+
+This results in the following output:
+
+Test multiple instances for 1-planarity. Note an optional flag, `-unsat`, strengthening the encoding for non-1-planar instances, and
+`-timeout` flag for specifying the runtime limit (in seconds) for execution.
+
+        ./oops -i=data/sat.cfg
+        ./oops -i=data/unsat.cfg -unsat=1 -timeout=60
+
+Use an alternative encoding scheme or a different solver:
+
+        ./oops -i=data/reg4.gml -solver=move
+        ./oops -i=data/test6.graphml -solver=brute-force
+
+Test IC/NIC-planarity of a graph:
+
+        ./oops -i=data/test6.graphml -ic
+        ./oops -i=data/test6.graphml -nic
 
 
 License
