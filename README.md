@@ -45,6 +45,7 @@ Find a 1-planar embedding of the [Grötzsch](https://en.wikipedia.org/wiki/Gr%C3
         ./oops -i=data/test9.dot -o=test9.svg
 
 This results in the following output:
+![My Image](images/test9.png)
 
 Test multiple instances for 1-planarity. Note an optional flag, `-unsat`, strengthening the encoding for non-1-planar instances, and
 `-timeout` flag for specifying the runtime limit (in seconds) for execution.
