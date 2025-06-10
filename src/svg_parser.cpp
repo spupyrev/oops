@@ -18,6 +18,8 @@ void writeHead(ostream& out, int minX, int minY, int width, int height) {
   out << "	xmlns = 'http://www.w3.org/2000/svg'\n";
   out << "	xmlns:xlink = 'http://www.w3.org/1999/xlink'\n";
   out << "	xmlns:ev = 'http://www.w3.org/2001/xml-events'>\n";
+
+  out << "  <rect x='" << minX << "' y='" << minY << "' width='" << width << "' height='" << height << "' fill=\"white\" />\n";
 }
 
 void writeTail(ostream& out) {
@@ -144,8 +146,8 @@ bool GraphParser::writeSvgGraph(ostream& out, IOGraph& graph) const {
   }
 
   const double width = (maxX - minX + 5);
-  const double height = (maxY - minY + 5);
-  writeHead(out, minX - width * 0.1, minY - height * 0.05, width * 1.2, height * 1.1);
+  const double height = std::max(maxY - minY + 5, width * 0.35);
+  writeHead(out, minX - width * 0.1, -height, width * 1.2, 2.0 * height);
 
   for (size_t i = 0; i < graph.edges.size(); i++) {
     const auto& e = graph.edges[i];
