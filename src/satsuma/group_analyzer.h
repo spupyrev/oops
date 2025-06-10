@@ -2224,7 +2224,7 @@ public:
       return left.second < right.second;
     });
 
-    for(const auto [lit, occ] : literal_occurence) {
+    for(const auto& [lit, occ] : literal_occurence) {
       if(occ >= 1) // if literal does not occur at all, no need to add it
         sbp.add_to_global_order(lit);
     }

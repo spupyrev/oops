@@ -11,15 +11,11 @@ MROOT = $(PWD)/src
 
 PWD       = $(shell pwd)
 ## run in parallel
-#MAKEFLAGS += -j
+# MAKEFLAGS += -j
 
 CSRCS      = $(wildcard $(MROOT)/*.cpp)
 CHDRS      = $(wildcard $(MROOT)/*.h)
 DSRCS      = $(foreach dir, $(DEPDIR), $(filter-out $(MROOT)/$(dir)/main*.cpp, $(wildcard $(MROOT)/$(dir)/*.cpp)))
-
-# $(warning CSRCS is $(CSRCS))
-# $(warning DSRCS is $(DSRCS))
-# $(warning CHDRS is $(CHDRS))
 
 
 COBJS      = $(CSRCS:.cpp=.o) $(DSRCS:.cpp=.o)
@@ -28,13 +24,14 @@ PCOBJS     = $(addsuffix p,  $(COBJS))
 DCOBJS     = $(addsuffix d,  $(COBJS))
 RCOBJS     = $(addsuffix r,  $(COBJS))
 
-# TODO: drop this
-LLVM_HOME = /home/spupyrev/dev/llvm/build/bin
-
-#CXX       = g++
-CXX       = ${LLVM_HOME}/clang++
-CFLAGS    ?= -Wall -Wno-deprecated-declarations -Wsign-compare -std=c++17 -fno-omit-frame-pointer
-LFLAGS    ?= -Wall -fuse-ld=lld --ld-path=${LLVM_HOME}/ld.lld
+# Use clang, if installed
+# CXX       = ${LLVM_HOME}/clang++
+# CFLAGS    ?= -Wall -Wno-deprecated-declarations -Wsign-compare -std=c++17 -fno-omit-frame-pointer
+# LFLAGS    ?= -Wall -fuse-ld=lld --ld-path=${LLVM_HOME}/ld.lld
+# Otherwise, fallback to gcc
+CXX       = g++
+CFLAGS    ?= -Wall -Wno-deprecated-declarations -Wsign-compare -std=c++17
+LFLAGS    ?= -Wall
 
 ## standard flags
 CFLAGS    += -I$(MROOT)
@@ -99,15 +96,3 @@ depend.mk: $(CSRCS) $(CHDRS)
 		  cat $(MROOT)/$${dir}/depend.mk >> depend.mk; \
 	      fi; \
 	  done
-
-# ## Make dependencies
-# depend.mk: $(CSRCS) $(CHDRS)
-# 	@echo Making dependencies
-# 	@$(CXX) $(CFLAGS) -I$(MROOT) \
-# 	   $(CSRCS) -MM | sed 's|\(.*\):|$(PWD)/\1 $(PWD)/\1r $(PWD)/\1d $(PWD)/\1p:|' > depend.mk
-# 	@for dir in $(DEPDIR); do \
-# 	      if [ -r $(MROOT)/$${dir}/depend.mk ]; then \
-# 		  echo Depends on: $${dir}; \
-# 		  cat $(MROOT)/$${dir}/depend.mk >> depend.mk; \
-# 	      fi; \
-# 	  done
