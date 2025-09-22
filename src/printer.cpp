@@ -65,34 +65,6 @@ std::string getNodeColor(int nodeType) {
   return "#000000";
 }
 
-void printTutteCoxeter(const InputGraph& graph) {
-  const std::string filename = "tc_minus_edge.cfg";
-
-  for (const auto& [s, t] : graph.edges) {
-    if ((s + 1) % graph.n == t) 
-      continue;
-
-    std::ofstream out;
-    out.open(filename, std::ios::app);
-    out << "graph TC_minus_" << s << "_" << t << " {\n";
-
-    for (int i = 0; i < graph.n; i++) {
-      out << "  " << i << ";\n";
-    }
-
-    for (const auto& [u, v] : graph.edges) {
-      if (u == s && v == t) 
-        continue;
-      out << "  " << u << " -- " << v << ";\n";
-    }
-
-    out << "}\n\n";
-    out.close();
-  }
-
-  LOG(TextColor::blue, "written TC graph to '%s'", filename.c_str());  
-}
-
 void printInputDot(const std::string& filename, const std::string& graphName, const InputGraph& graph, bool append=false) {
   std::ofstream out;
   if (append)
@@ -188,13 +160,13 @@ void printInput(const std::string& filename, const std::string& graphName, const
     }
   }
 
-  // printTutteCoxeter(graph);
-
   if (verbose >= 3 && filename != "") {
     const std::string file = filename.substr(0, filename.find_last_of("."));
     const std::string extension = filename.substr(filename.find_last_of(".") + 1);
     if (extension == "dot") {
-      printInputDot(file + "_in.dot", graphName, graph);
+      printInputDot(file + "_in.dot", graphName, graph, /* append */ false);
+    } else if (extension == "cfg") {
+      printInputDot(file + "_in.cfg", graphName, graph, /* append */ true);
     } else if (extension == "gml") {
       printInputGml(file + "_in.gml", graph);
     } else {
@@ -460,8 +432,6 @@ void printResultStackBiarcs(const InputGraph& graph, const Result& result, IOGra
       yy += std::to_string(1);
     }
     edge->setAttr("y", yy);
-
-    // if (i >= 10) break;
   }
 }
 

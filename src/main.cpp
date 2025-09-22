@@ -37,6 +37,7 @@ void prepareOptions(CMDOptions& options) {
   // Debug
   options.addAllowedOption("-verbose", "1", "Verbosity level");
   options.addAllowedOption("-seed", "0", "Random seed");
+  options.addAllowedOption("-skip-solve", "false", "Whether to skip a solver");
 
   // Solver options
   options.addAllowedOption("-solver", "stack", "Type of the solver to use");
@@ -119,6 +120,11 @@ ResultCodeTy isOnePlanar(
 
   // print input
   printInput(options.getStr("-o"), graphName, graph, verbose);
+
+  // skip solution
+  if (options.getBool("-skip-solve")) {
+    return ResultCodeTy::TIMEOUT;
+  }
 
   // split into biconnected components
   if (EnableEarlyExit && splitIntoBiconnected) {
@@ -394,7 +400,7 @@ void initSATParams(CMDOptions& options, Params& params) {
   const std::string outFile = options.getStr("-o");
   if (outFile != "") {
     const std::string extension = outFile.substr(outFile.find_last_of(".") + 1);
-    CHECK(extension == "txt" || extension == "gml" || extension == "dot" || extension == "svg", 
+    CHECK(extension == "txt" || extension == "gml" || extension == "dot" || extension == "svg" || extension == "cfg", 
           "unsupported output format: '%s'", extension.c_str());
     params.alwaysCreateSolution = true;
   }
