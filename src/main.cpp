@@ -64,7 +64,7 @@ void prepareOptions(CMDOptions& options) {
 
   // Experimental
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
-  options.addAllowedOption("-skip-reducible-triangles", "false", "[Experimental] Skip reducible triangles");
+  options.addAllowedOption("-skip-reducible-subgraphs", "false", "[Experimental] Skip reducible subgraphs");
   options.addAllowedOption("-swap-constraints", "", "[Experimental] Add swap constraints: num_pairs/num_reorder");
 }
 
@@ -453,9 +453,9 @@ void testOnePlanar(CMDOptions& options) {
     ResultCodeTy res = ResultCodeTy::ERROR;
 
     // only for cubic
-    if (options.getBool("-skip-reducible-triangles") && hasReducibleTriangle(graphAdj)) {
+    if (options.getBool("-skip-reducible-subgraphs") && hasReducibleSubgraph(graphAdj)) {
       if (verbose)
-        LOG(TextColor::green, "the graph contains reducible triangle");
+        LOG(TextColor::green, "the graph contains a reducible subgraph");
       numSkipped++;
     } else {
       // test planarity
