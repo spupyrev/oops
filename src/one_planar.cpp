@@ -178,12 +178,16 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
   );
 }
 
-/// Return true iff the two vertices can be merged
+/// Return true iff the two (division) vertices can be merged
 bool canBeMerged(int u, int v, const int n, const std::vector<EdgeTy>& edges) {
   CHECK(u != v);
   CHECK(u >= n && v >= n);
   CHECK((int)crossablePairs.size() == n + (int)edges.size());
   return crossablePairs[u][v];
+}
+
+bool canBeMerged(int u, int v, const InputGraph& graph) {
+  return canBeMerged(u, v, graph.n, graph.edges);
 }
 
 /// Encode relative position constraints for pairs of vertices
@@ -253,11 +257,6 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const int
   }
 }
 
-void encodeICConstraints(SATModel& model, const InputGraph& graph, const int verbose, const int C);
-void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Params& params);
-void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int verbose);
-void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const int verbose);
-
 /// Add pairwise crossing (merge) variables
 void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int verbose) {
   const int n = graph.n;
@@ -314,8 +313,8 @@ void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int v
   }
 
   if (!graph.isDirected()) {
-    encodeICConstraints(model, graph, verbose, 2);
     encodeK4Constraints(model, graph, verbose);
+    encodeICConstraints(model, graph, verbose, 2);
   }
 }
 
@@ -839,81 +838,6 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
   //     }
   //   }
   // };
-  // n = 16
-  // addOrder({0, 1, 2, 3});
-  // addOrder({15, 14, 13, 12});
-  // addOrder({4, 5, 6, 7});
-  // addOrder({11, 10, 9, 8});
-  //addOrder({0, 1, 2, 3,  7, 6, 5, 4,  12, 13, 14, 15,  11, 10, 9, 8});
-  //addOrder({0, 1, 2, 3,  15, 14, 13, 12,  4, 5, 6, 7,    11, 10, 9, 8});
-
-  // n = 24
-  // addOrder({0, 1, 2, 3});     A
-  // addOrder({4, 5, 6, 7});     B
-  // addOrder({8, 9, 10, 11});   C
-  // addOrder({15, 14, 13, 12}); D
-  // addOrder({19, 18, 17, 16}); E
-  // addOrder({23, 22, 21, 20}); F
-  //addGroup({0, 1, 2, 3});
-  //addOrder({0, 1, 2, 3,  23, 22, 21, 20,  4, 5, 6, 7,  19, 18, 17, 16,  8, 9, 10, 11,  15, 14, 13, 12});
-
-  // n = 32
-  // // addOrder({0, 1, 2, 3});     A
-  // // addOrder({4, 5, 6, 7});     B
-  // // addOrder({8, 9, 10, 11});   C
-  // // addOrder({15, 14, 13, 12}); D
-  // // addOrder({19, 18, 17, 16}); E
-  // // addOrder({23, 22, 21, 20}); F
-  // // addOrder({24, 25, 26, 27}); G
-  // // addOrder({28, 29, 30, 31}); H
-  // addGroup({0, 1, 2, 3});
-  // //addOrder({0, 2, 3, 1});
-
-  // addGroup({4, 5, 6, 7});
-  // addOrder({4, 6, 5, 7});
-
-  // addGroup({8, 9, 10, 11});
-  // //addOrder({8, 10, 11, 9});
-
-  // addGroup({15, 14, 13, 12});
-  // //addOrder({4, 6, 7, 5});
-
-  // addGroup({19, 18, 17, 16});
-  // addGroup({23, 22, 21, 20});
-  // addGroup({24, 25, 26, 27});
-  // addGroup({28, 29, 30, 31});
-
-  // //addOrder({0, 4, 8, 15, 19, 23, 24, 28});
-  // addOrder({0, 28, 4, 24, 8, 23, 15, 19});
-
-  // n = 40
-  // addGroup({0, 1, 2, 3});     // A
-  // addGroup({4, 5, 6, 7});     // B
-  // addGroup({8, 9, 10, 11});   // C
-  // addGroup({12, 13, 14, 15}); // D
-  // addGroup({16, 17, 18, 19}); // E
-  // addGroup({20, 21, 22, 23}); // F
-  // addGroup({24, 25, 26, 27}); // G
-  // addGroup({28, 29, 30, 31}); // H
-  // addGroup({32, 33, 34, 35}); // I
-  // addGroup({36, 37, 38, 39}); // J
-
-  // addOrder({0, 2, 3, 1});
-  // addOrder({0, 36, 4, 32, 8, 28, 12, 24, 16, 20});
-
-  // for (int i = 0; i < numVertices; i++) {
-  //   if (6 != i)
-  //     model.addClause(MClause(model.getRelVar(6, i, true)));
-  //   numExtraConstraints++;
-  // }
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(4, 10), graph.findDivIndex(5, 9), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(1, 7), graph.findDivIndex(2, 6), true)));
-  // LOG(TextColor::red, "encoding contains custom constraints!!!");
-  // for (int i = 0; i < m; i++) {
-  //   LOG("edge (%d, %d): %d", edges[i].first, edges[i].second, graph.findDivIndex(edges[i].first, edges[i].second));
-  // }
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(1, 3), graph.findDivIndex(2, 4), true)));
-  // model.addClause(MClause(model.getCross2Var(graph.findDivIndex(0, 4), graph.findDivIndex(3, 5), true)));
   /////////////////////////////////////////////////////////////////////////////////
 
   // vertex twins
@@ -968,6 +892,15 @@ void encodeStackPlanar(
   if (params.swapConstraints != "") {
     CHECK(params.useSATConstraints);
     encodeSwapConstraints(model, graph, params);
+  }
+  if (params.partialConstraints != "") {
+    CHECK(params.useSATConstraints);
+    encodePartialConstraints(model, graph, params);
+  }
+
+  // FIXME: a better condition
+  if (params.useUNSATConstraints) {
+    encodeSepCyclesConstraints(model, graph, params);
   }
 
   // Symmetry
@@ -1207,7 +1140,7 @@ void fillResultStack(
   }
 }
 
-///
+/// Run a SAT solver for a given graph
 Result runSolver(const Params& params, const InputGraph& graph) {
   CHECK(params.solverType == SolverType::STACK || params.solverType == SolverType::MOVE);
   const int verbose = params.verbose;

@@ -16,7 +16,7 @@ std::vector<int> bfs(const int n, const std::vector<EdgeTy>& edges, const std::v
 std::vector<int> dfs(const std::vector<std::vector<bool>>& adj, int seed);
 
 /// Check if the graph is connected
-bool isConnected(int n, const std::vector<EdgeTy>& edges);
+bool isConnected(const int n, const std::vector<EdgeTy>& edges);
 
 /// Check if the graph remains connected after removing some vertices
 bool isConnected(const std::vector<int>& vList, const std::vector<std::vector<int>>& adj, std::set<int>& removed);
@@ -25,10 +25,10 @@ bool isConnected(const std::vector<int>& vList, const std::vector<std::vector<in
 std::vector<std::vector<EdgeTy>> biconnectedComponents(const int n, const std::vector<EdgeTy>& edges);
 
 /// Check if the graph is 2-(vertex)-connected
-bool is2Connected(int n, const std::vector<EdgeTy>& edges);
+bool is2Connected(const int n, const std::vector<EdgeTy>& edges);
 
 /// Check if the graph is bipartite
-bool isBipartite(int n, const std::vector<EdgeTy>& edges);
+bool isBipartite(const int n, const std::vector<EdgeTy>& edges);
 
 /// Check if the graph is a (possibly disconnected) tree (forest)
 bool isTree(const int n, const std::vector<EdgeTy>& edges);
@@ -46,6 +46,10 @@ int minDegree(const int n, const std::vector<EdgeTy>& edges);
 
 int maxDegree(const int n, const std::vector<EdgeTy>& edges);
 
+/// The girth of the graph, that is, the length of the shortest cycle
 int computeGirth(const int n, const std::vector<EdgeTy>& edges);
 
 bool hasReducibleSubgraph(const AdjListTy& adjList);
+
+/// Count the number of edge-disjoint paths between s and t that avoid "removed" vertices
+int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, const std::vector<int>& removed);

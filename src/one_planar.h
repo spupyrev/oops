@@ -17,6 +17,11 @@ using namespace Simp21;
 
 using EdgeTy = std::pair<int, int>;
 
+inline EdgeTy make_edge(const int u, const int v) {
+  CHECK(u != v);
+  return EdgeTy(std::min(u, v), std::max(u, v));
+}
+
 /// The object is a representation of the input graph that contains n vertices and m edges.
 ///
 /// InputGraph has n "regular" vertices and m "division" vertices. (so every edge is subdivided once)
@@ -208,6 +213,7 @@ struct Params {
 
   bool forbidCrossings = false;
   std::string swapConstraints = "";
+  std::string partialConstraints = "";
 
   std::string to_string() const {
     std::ostringstream ss;
@@ -716,6 +722,7 @@ class SATModel {
 };
 
 bool canBeMerged(int u, int v, const int n, const std::vector<EdgeTy>& edges);
+bool canBeMerged(int u, int v, const InputGraph& graph);
 void initCrossablePairs(const Params& params, const InputGraph& graph);
 Result runSolver(const Params& params, const InputGraph& graph);
 
@@ -723,3 +730,10 @@ void minimizeCrossings(const InputGraph& graph, Result& result, int verbose);
 bool isPlanarWithCrossings(const InputGraph& graph, const std::vector<std::pair<int, int>>& crossings);
 int computeSkewness(const InputGraph& graph, const int verbose, const int max_skewnees);
 Result bruteForce(const Params& params, const InputGraph& graph);
+
+void encodeICConstraints(SATModel& model, const InputGraph& graph, const int verbose, const int C);
+void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Params& params);
+void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int verbose);
+void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const int verbose);
+void encodePartialConstraints(SATModel& model, const InputGraph& graph, const Params& params);
+void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const Params& params);

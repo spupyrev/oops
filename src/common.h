@@ -147,6 +147,19 @@ void sort_unique(std::vector<T>& vec) {
 }
 
 template <typename T>
+size_t unique_size(const std::initializer_list<T>& vec) {
+  std::vector<T> temp = vec;
+  std::sort(temp.begin(), temp.end());
+  auto it = std::unique(temp.begin(), temp.end());
+  return std::distance(temp.begin(), it);
+}
+
+template <typename T>
+bool all_unique(const std::initializer_list<T>& vec) {
+  return unique_size(vec) == vec.size();
+}
+
+template <typename T>
 bool equal_unsorted(const std::vector<T>& vec1, const std::vector<T>& vec2) {
   for (size_t i = 0; i < vec1.size(); i++) {
     if (std::find(vec2.begin(), vec2.end(), vec1[i]) == vec2.end())

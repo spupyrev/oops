@@ -584,3 +584,46 @@ bool hasReducibleSubgraph(const AdjListTy& adjList) {
   }
   return false;
 }
+
+bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<bool>& used) {
+	used[now] = true;
+	if (now == t) 
+    return true;
+  const int n = (int)g.size();
+	for (int i = 0; i < n; i++)
+		if (!used[i] && g[now][i] >= 1 && dfs_maxflow(i, t, g, used)) {
+			g[now][i] -= 1;
+			g[i][now] += 1;
+			return true;
+		}
+
+	return false;
+}
+
+int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, const std::vector<int>& removed) {
+  const int n = (int)adjList.size();
+  // create a graph for max flow
+  std::vector<std::vector<int>> g(n, std::vector<int>(n));
+  for (int i = 0; i < n; i++) {
+    for (int x : adjList[i]) {
+      g[i][x] = 1;
+      g[x][i] = 1;
+    }
+  }
+
+  // find the max flow
+  int maxflow = 0;
+  std::vector<bool> used(n, false);
+  while (true) {
+    for (int x : removed) {
+      CHECK(x != s && x != t);
+      used[x] = true;
+    }
+    if (!dfs_maxflow(s, t, g, used)) 
+      break;
+    maxflow++;
+    std::fill(used.begin(), used.end(), false);
+  }
+
+  return maxflow;
+}

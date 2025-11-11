@@ -114,9 +114,9 @@ ResultCodeTy isOnePlanar(
   const auto& edges = graph.edges;
 
   LOG_IF(verbose, "testing 1-planarity of a graph with |V| = %d and |E| = %d", n, edges.size());
-  if (verbose) {
-    printGraphStats(n, edges, std::vector<bool>());
-  }
+  // if (verbose) {
+  //   printGraphStats(n, edges, std::vector<bool>());
+  // }
 
   // print input
   printInput(options.getStr("-o"), graphName, graph, verbose);
@@ -157,6 +157,10 @@ ResultCodeTy isOnePlanar(
   if (EnableEarlyExit && skipTestingBySize(graph, verbose, resultCode)) {
     CHECK(resultCode == ResultCodeTy::SAT || resultCode == ResultCodeTy::UNSAT);
     return resultCode;
+  }
+
+  if (verbose) {
+    printGraphStats(n, edges, std::vector<bool>());
   }
 
   // init pairs for edge crossings
@@ -377,6 +381,8 @@ void initSATParams(CMDOptions& options, Params& params) {
     params.applySatsuma = true;
     if (params.swapConstraints == "")
       params.swapConstraints = "2/2";
+    if (params.partialConstraints == "")
+      params.partialConstraints = "3";
   }
   if (options.getBool("-ic")) {
     params.useIC = true;
@@ -477,7 +483,7 @@ void testOnePlanar(CMDOptions& options) {
             LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
           numNon1Planar++;
         } else if (res == ResultCodeTy::TIMEOUT) {
-          if (verbose)
+          if (verbose >= 0)
             LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
           numUnknown++;
         } else {

@@ -12,7 +12,8 @@ struct SwapFinder {
     {}
 
   std::vector<std::vector<std::pair<int, int>>> search(int maxNumCrossings, int maxNumSwaps) {
-    isCrossed = std::vector<bool>(graph.edges.size(), false);
+    isFreeEdge = std::vector<std::vector<int>>(graph.n, std::vector<int>(graph.n, 0));
+    isCrossedEdge = std::vector<std::vector<int>>(graph.n, std::vector<int>(graph.n, 0));
     takenCrossings.clear();
     foundConstraints.clear();
     cost = std::vector<std::vector<int>>(graph.n, std::vector<int>(graph.n, -1));
@@ -25,10 +26,6 @@ struct SwapFinder {
 
 private:
   void searchRec(size_t curIdx, int remainingCrossings) {
-    // Debug only
-    // if (foundConstraints.size() >= 1000000)
-    //   return;
-
     if (remainingCrossings >= 0) {
       if (!takenCrossings.empty() && canSwap()) {
         foundConstraints.push_back(takenCrossings);
@@ -50,21 +47,52 @@ private:
       return;
     }
 
-    // try to get current
+    // try to get the current
     const int e1 = possibleCrossings[curIdx].first;
     const int e2 = possibleCrossings[curIdx].second;
-    if (!isCrossed[e1] && !isCrossed[e2]) {
-      isCrossed[e1] = true;
-      isCrossed[e2] = true;
-      takenCrossings.push_back(possibleCrossings[curIdx]);
-      searchRec(curIdx + 1, remainingCrossings - 1);
-      isCrossed[e1] = false;
-      isCrossed[e2] = false;
-      takenCrossings.pop_back();
+    const auto& [u1, v1] = graph.edges[e1];
+    const auto& [u2, v2] = graph.edges[e2];
+    // circular order: u1--u2--v1--v2
+
+    if (isCrossedEdge[u1][v1] == 0 && isCrossedEdge[u2][v2] == 0) {
+      if (isFreeEdge[u1][v1] == 0 && isFreeEdge[u2][v2] == 0) {
+        if (isCrossedEdge[u1][u2] == 0 && isCrossedEdge[u2][v1] == 0 && isCrossedEdge[v1][v2] == 0 && isCrossedEdge[v2][u1] == 0) {
+          // register the crossings
+          addCrossedEdge(u1, v1, 1);
+          addCrossedEdge(u2, v2, 1);
+
+          addFreeEdge(u1, u2, 1);
+          addFreeEdge(u2, v1, 1);
+          addFreeEdge(v1, v2, 1);
+          addFreeEdge(v2, u1, 1);
+          takenCrossings.push_back(possibleCrossings[curIdx]);
+          // recurse
+          searchRec(curIdx + 1, remainingCrossings - 1);
+          // rollback
+          addCrossedEdge(u1, v1, -1);
+          addCrossedEdge(u2, v2, -1);
+
+          addFreeEdge(u1, u2, -1);
+          addFreeEdge(u2, v1, -1);
+          addFreeEdge(v1, v2, -1);
+          addFreeEdge(v2, u1, -1);
+          takenCrossings.pop_back();
+        }
+      }
     }
 
-    // skip current
+    // skip the current
     searchRec(curIdx + 1, remainingCrossings);
+  }
+
+  void addFreeEdge(const int u, const int v, const int delta) {
+    isFreeEdge[u][v] += delta; 
+    isFreeEdge[v][u] += delta;
+  }
+
+  void addCrossedEdge(const int u, const int v, const int delta) {
+    isCrossedEdge[u][v] += delta; 
+    isCrossedEdge[v][u] += delta;
   }
 
   // check if takenCrossings can be reordered
@@ -342,15 +370,17 @@ private:
   const std::vector<std::pair<int, int>>& possibleCrossings;
   const int verbose;
 
-  std::vector<bool> isCrossed;
   std::vector<std::pair<int, int>> takenCrossings;
   std::vector<std::vector<std::pair<int, int>>> foundConstraints;
+  std::vector<std::vector<int>> isFreeEdge;
+  std::vector<std::vector<int>> isCrossedEdge;
   int numSwaps;
 
   mutable std::vector<std::vector<int>> cost;
   mutable std::vector<std::pair<int, int>> newEdges;
 };
 
+/// Disable pairs/triplse of crossings that can be eliminated by swapping some vertices
 void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Params& params) {
   CHECK(!graph.isDirected());
 
@@ -360,7 +390,6 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
   const int numSwaps = sc[1];
   CHECK(numPairs >= 1 && numSwaps >= 2, "incorrect format for swap-constraints");
   CHECK(numSwaps <= 3, "numSwaps=%d is not implemeted yet", numSwaps);
-  LOG_IF(params.verbose, "encoding swap constraints for %d pairs and %d swaps", numPairs, numSwaps);
 
   const int n = graph.n;
   const int m = (int)graph.edges.size();
@@ -372,9 +401,15 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
       possibleCrossings.push_back({e1, e2});
     }
   }
+  if (possibleCrossings.size() > 4096) {
+    LOG_IF(params.verbose, "skipped swap constraints due to too many possible_crossings (%d)", possibleCrossings.size());
+    return;
+  }
+  LOG_IF(params.verbose, "encoding swap constraints for %d pairs and %d swaps; |possible_crossings| = %d", numPairs, numSwaps, possibleCrossings.size());
 
   SwapFinder finder(graph, possibleCrossings, params.verbose);
   auto constraints = finder.search(numPairs, numSwaps);
+  LOG_IF(params.verbose && constraints.empty(), "  no swap constraints");
 
   std::vector<int> numConstraints(numPairs + 1, 0);
   for (const auto& constraint: constraints) {
@@ -391,7 +426,7 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
   }
 }
 
-/// Disable pairs of crossings that can be eliminated by swapping pairs of vertices
+/// Deprecated
 void encodeSwapConstraintsNaive(SATModel& model, const InputGraph& graph, const int verbose) {
   const int n = graph.n;
   const auto& edges = graph.edges;
