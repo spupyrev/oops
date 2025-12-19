@@ -3,7 +3,7 @@
 
 using namespace std;
 
-/// TODO
+/// TODO: merge with similar impl
 struct SwapFinder {
   SwapFinder(const InputGraph& graph, const std::vector<std::pair<int, int>>& possibleCrossings, const int verbose) 
     : graph(graph),

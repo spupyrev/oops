@@ -85,6 +85,11 @@ class CMDOptions {
   }
 
   bool getBool(const std::string& optionName) const {
+    if (!hasOption(optionName)) {
+      // check default value
+      return defaultValues.at(optionName) == "true" || defaultValues.at(optionName) == "1";
+    }
+    // if specified, everything is true except "false" or "0"
     return getOption(optionName) != "false" && getOption(optionName) != "0";
   }
 
@@ -134,8 +139,6 @@ private:
 
     std::string value = (equalIndex == std::string::npos ? "" : s.substr(equalIndex + 1));
     
-    // std::cerr << "parsing option (" << name << ", " << value << ")\n"; 
-
     if (!options.count(name) || (defaultValues.count(name) && options[name] == defaultValues[name])) {
       options[name] = value;
     }

@@ -6,6 +6,7 @@
 #include <set>
 
 void printGraphStats(const int n, const std::vector<EdgeTy>& edges, const std::vector<bool>& direction);
+void printGraphStats(std::ostream& out, const int n, const std::vector<EdgeTy>& edges, const std::vector<bool>& direction);
 
 bool isPlanar(const int n, const std::vector<std::pair<int, int>>& edges, int verbose);
 
@@ -46,10 +47,14 @@ int minDegree(const int n, const std::vector<EdgeTy>& edges);
 
 int maxDegree(const int n, const std::vector<EdgeTy>& edges);
 
+std::string sortedDegrees(const int n, const std::vector<EdgeTy>& edges);
+
 /// The girth of the graph, that is, the length of the shortest cycle
 int computeGirth(const int n, const std::vector<EdgeTy>& edges);
 
 bool hasReducibleSubgraph(const AdjListTy& adjList);
 
-/// Count the number of edge-disjoint paths between s and t that avoid "removed" vertices
-int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, const std::vector<int>& removed);
+/// Count the number of edge-disjoint paths between s and t that avoid "removed" vertices and edges
+int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
+                           const std::vector<int>& removedVertices, 
+                           const std::vector<EdgeTy>& removedEdges);

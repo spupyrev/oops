@@ -38,6 +38,11 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-verbose", "1", "Verbosity level");
   options.addAllowedOption("-seed", "0", "Random seed");
   options.addAllowedOption("-skip-solve", "false", "Whether to skip a solver");
+  options.addAllowedOption("-stop-on", "", "Stop the execution when a graph of the specified type is encountered");
+  options.addAllowedValue("-stop-on", "planar");
+  options.addAllowedValue("-stop-on", "1-planar");
+  options.addAllowedValue("-stop-on", "non-1-planar");
+  options.addAllowedOption("-always-create-solution", "false", "Force creating a solution");
 
   // Solver options
   options.addAllowedOption("-solver", "stack", "Type of the solver to use");
@@ -66,6 +71,8 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
   options.addAllowedOption("-skip-reducible-subgraphs", "false", "[Experimental] Skip reducible subgraphs");
   options.addAllowedOption("-swap-constraints", "", "[Experimental] Add swap constraints: num_pairs/num_reorder");
+  options.addAllowedOption("-sep-cycles", "false", "[Experimental] Add constraints based on separating cycles");
+  options.addAllowedOption("-custom", "", "Custom option");
 }
 
 /// Check if 1-planarity test can be skipped because of graphs size or density
@@ -373,6 +380,8 @@ void initSATParams(CMDOptions& options, Params& params) {
 
   params.forbidCrossings = options.getBool("-forbid-crossings");
   params.swapConstraints = options.getStr("-swap-constraints");
+  params.sepCycleConstraints = options.getBool("-sep-cycles");
+  params.custom = options.getStr("-custom");
 
   params.useSATConstraints = options.getBool("-sat");
   if (options.getBool("-unsat")) {
@@ -383,6 +392,7 @@ void initSATParams(CMDOptions& options, Params& params) {
       params.swapConstraints = "2/2";
     if (params.partialConstraints == "")
       params.partialConstraints = "3";
+    params.sepCycleConstraints = true;
   }
   if (options.getBool("-ic")) {
     params.useIC = true;
@@ -411,6 +421,10 @@ void initSATParams(CMDOptions& options, Params& params) {
     params.alwaysCreateSolution = true;
   }
 
+  if (options.getBool("-always-create-solution")) {
+    params.alwaysCreateSolution = true;
+  }
+
   //CHECK(!params.directed || params.useMovePlanarity, "directed edges should be used with move-planarity");
   CHECK(!params.useIC || !params.useNIC, "cannot simultanosly use IC and NIC modes");
   CHECK(!params.useUNSATConstraints || params.useSATConstraints, "`-unsat` constraints should be used with `-sat`");
@@ -424,6 +438,7 @@ void testOnePlanar(CMDOptions& options) {
   const int verbose = options.getInt("-verbose");
   const bool directed = options.getBool("-directed");
   const bool skipPlanar = options.getBool("-skip-planar");
+  const std::string stopOn = options.getStr("-stop-on");
 
   Params params;
   initSATParams(options, params);
@@ -457,6 +472,7 @@ void testOnePlanar(CMDOptions& options) {
     }
 
     ResultCodeTy res = ResultCodeTy::ERROR;
+    bool needStop = false;
 
     // only for cubic
     if (options.getBool("-skip-reducible-subgraphs") && hasReducibleSubgraph(graphAdj)) {
@@ -466,22 +482,25 @@ void testOnePlanar(CMDOptions& options) {
     } else {
       // test planarity
       if (!skipPlanar && directions.empty() && isPlanar(n, edges, 0)) {
-        if (verbose)
-          LOG(TextColor::green, "the graph is planar");
+        if (verbose || stopOn == "planar")
+          LOG(TextColor::green, "graph '%s' (index %d) is planar", graphName.c_str(), t);
         numPlanar++;
+        if (stopOn == "planar") needStop = true;
       } else {
         // test 1-planarity
         CHECK(n >= 5, "the graph is too small");
         InputGraph graph(n, edges, directions);
         res = isOnePlanar(options, params, graph, true, graphName);
         if (res == ResultCodeTy::SAT) {
-          if (verbose)
+          if (verbose || stopOn == "1-planar")
             LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
           num1Planar++;
+          if (stopOn == "1-planar") needStop = true;
         } else if (res == ResultCodeTy::UNSAT) {
-          if (verbose)
+          if (verbose || stopOn == "non-1-planar")
             LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
           numNon1Planar++;
+          if (stopOn == "non-1-planar") needStop = true;
         } else if (res == ResultCodeTy::TIMEOUT) {
           if (verbose >= 0)
             LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
@@ -496,6 +515,7 @@ void testOnePlanar(CMDOptions& options) {
     processingTimes.push_back(chrono::duration_cast<chrono::milliseconds>(times[t + 1] - times[t]).count());
 
     LOG_IF(verbose, "processed graph %d (%s) in %s\n", t, graphName.c_str(), ms_to_str(processingTimes.back()).c_str());
+    if (needStop) break;
     if (t + 1 >= numGraphs) continue;
 
     const int prevIndex = t >= 1000 ? t - 1000 : 0;
@@ -513,10 +533,10 @@ void testOnePlanar(CMDOptions& options) {
         numPlanar, num1Planar, numNon1Planar, numUnknown, numSkipped
     );
   }
-  CHECK((int)times.size() == numGraphs + 1);
+  CHECK((int)times.size() == numGraphs + 1 || stopOn != "");
 
-  LOG("processed all %'d graphs; total runtime is %s; mean processing time is %zu ± %zu ms", 
-      numGraphs, ms_to_str(times.front(), times.back()).c_str(),
+  LOG("processed %'d graphs; total runtime is %s; mean processing time is %zu ± %zu ms", 
+      times.size() - 1, ms_to_str(times.front(), times.back()).c_str(),
       uint64_t(average(processingTimes)), uint64_t(confidence_interval(processingTimes)));
   LOG("#planar = %'d; #1-planar = %'d; #non-1-planar = %'d; #unknown = %'d; #skipped = %'d", 
       numPlanar, num1Planar, numNon1Planar, numUnknown, numSkipped);

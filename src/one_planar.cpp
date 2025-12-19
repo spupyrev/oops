@@ -897,9 +897,8 @@ void encodeStackPlanar(
     CHECK(params.useSATConstraints);
     encodePartialConstraints(model, graph, params);
   }
-
-  // FIXME: a better condition
-  if (params.useUNSATConstraints) {
+  if (params.sepCycleConstraints) {
+    CHECK(params.useSATConstraints);
     encodeSepCyclesConstraints(model, graph, params);
   }
 

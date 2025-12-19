@@ -214,6 +214,9 @@ struct Params {
   bool forbidCrossings = false;
   std::string swapConstraints = "";
   std::string partialConstraints = "";
+  bool sepCycleConstraints = false;
+
+  std::string custom = "";
 
   std::string to_string() const {
     std::ostringstream ss;

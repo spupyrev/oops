@@ -39,16 +39,15 @@ void printGraphStats(ostream& out, const int n, const std::vector<EdgeTy>& edges
 
   const int minDeg = minDegree(n, edges);
   const int maxDeg = maxDegree(n, edges);
-  const bool bipartite = isBipartite(n, edges);
-  const bool tree = isTree(n, edges);
-  const int girth = computeGirth(n, edges);
 
   out << "|V| = " << n;
   out << "   |E| = " << edges.size();
   out << "   " << minDeg << " <= deg <= " << maxDeg;
-  out << "   bipartite = " << bipartite;
-  out << "   tree = " << tree;
-  out << "   girth = " << girth;
+  out << "   bipartite = " << isBipartite(n, edges);
+  out << "   tree = " << isTree(n, edges);
+  out << "   girth = " << computeGirth(n, edges);
+  // out << "   planar = " << isPlanar(n, edges, false);
+  // out << "   degrees = " << sortedDegrees(n, edges);
   if (!direction.empty()) {
     out << "   |sources| = " << numSources;
     out << "   |sinks| = " << numSinks;
@@ -483,6 +482,20 @@ int maxDegree(const int n, const std::vector<EdgeTy>& edges) {
   return *std::max_element(degree.begin(), degree.end());
 }
 
+std::string sortedDegrees(const int n, const std::vector<EdgeTy>& edges) {
+  std::vector<int> degree(n, 0);
+  for (auto& [u, v] : edges) {
+    degree[u]++;
+    degree[v]++;
+  }
+  std::sort(degree.begin(), degree.end());
+  std::stringstream ss;
+  for (int deg : degree) {
+    ss << "," << deg;
+  }
+  return ss.str();
+}
+
 int computeGirth(const int n, const std::vector<EdgeTy>& edges) {
   Adjacency adj(n);
   adj.from_edges(edges);
@@ -600,7 +613,9 @@ bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<b
 	return false;
 }
 
-int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, const std::vector<int>& removed) {
+int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
+                           const std::vector<int>& removedVertices, 
+                           const std::vector<EdgeTy>& removedEdges) {
   const int n = (int)adjList.size();
   // create a graph for max flow
   std::vector<std::vector<int>> g(n, std::vector<int>(n));
@@ -610,12 +625,17 @@ int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, c
       g[x][i] = 1;
     }
   }
+  // disable forbidden edges
+  for (const auto& edge : removedEdges) {
+    g[edge.first][edge.second] = 0;
+    g[edge.second][edge.first] = 0;
+  }
 
   // find the max flow
   int maxflow = 0;
   std::vector<bool> used(n, false);
   while (true) {
-    for (int x : removed) {
+    for (int x : removedVertices) {
       CHECK(x != s && x != t);
       used[x] = true;
     }
