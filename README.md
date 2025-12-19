@@ -1,5 +1,19 @@
 # OOPS
-This repository contains the source code of a solver for 1-planarity.
+This repository contains the source code of a solver for 1-planarity. Please cite the work with
+
+    @Inproceedings{oops,
+      author =  {Pupyrev, Sergey},
+      title = {{OOPS: Optimized One-Planarity Solver via SAT}},
+      booktitle = {33rd International Symposium on Graph Drawing and Network Visualization (GD 2025)},
+      pages = {14:1--14:19},
+      series =  {Leibniz International Proceedings in Informatics (LIPIcs)},
+      year =  {2025},
+      volume =  {357},
+      editor =  {Dujmovi\'{c}, Vida and Montecchiani, Fabrizio},
+      publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+      address = {Dagstuhl, Germany},
+      doi =   {10.4230/LIPIcs.GD.2025.14},
+    }
 
 OOPS (Optimized One-Planarity Solver) is a practical heuristic for recognizing 
 1-planar graphs and several of their important subclasses. A graph
