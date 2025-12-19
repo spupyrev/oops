@@ -344,8 +344,6 @@ struct SepCycleTraversal {
 
     for (int e1 = 0; e1 < m; e1++) {
       for (int e2 = e1 + 1; e2 < m; e2++) {
-        // if (e1 == e2)
-        //   continue;
         if (!canBeMerged(e1 + n, e2 + n, n, graph.edges))
           continue;
         possibleCrossings.push_back({e1, e2});
@@ -488,7 +486,7 @@ private:
     /// A path may contain as many kite/cross edges as possible but only one free edge
     /// If a path contains one crossed edge, then disjoint paths cannot use the second one
 
-    // For now, check a cycle (x -- c -- y)
+    // First, check a cycle (x -- c -- y)
     for (int c = 0; c < n; c++) {
       if (contains({x, y, u, v}, c))
         continue;
@@ -572,11 +570,11 @@ void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const 
   SepCycleTraversal sct(graph, params);
   if (sct.init()) {
     auto clauses = sct.build2Clauses();
-    LOG_IF(verbose, "  found %d sep-cycle constraints", clauses.size());
+    LOG_IF(verbose, "  found %'d sep-cycle constraints", clauses.size());
     auto reducedClauses = makeUnique(clauses);
-    LOG_IF(verbose, "  reduced sep-cycle clauses from %d to %d", clauses.size(), reducedClauses.size());
+    LOG_IF(verbose >= 2, "  reduced sep-cycle clauses from %d to %d", clauses.size(), reducedClauses.size());
     encode2Clauses(model, reducedClauses);
-    LOG_IF(verbose, "  added %'d separating-cycle clauses", reducedClauses.size());
+    LOG_IF(verbose, "  added %'d unique separating-cycle clauses", reducedClauses.size());
 
     // CHECK(params.custom != "");
     // const int clauseIndex = to_int(params.custom);

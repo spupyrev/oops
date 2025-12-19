@@ -367,11 +367,15 @@ void printResultStackBiarcs(const InputGraph& graph, const Result& result, IOGra
       CHECK(result.order[i].size() <= 2);
       auto node = ioGraph.addNode(std::to_string(i));
       node->setAttr("label", "");
-      node->setAttr("w", "2");
-      node->setAttr("h", "2");
-      // node->setAttr("label", std::to_string(result.order[i][0]));
-      // node->setAttr("w", "8");
-      // node->setAttr("h", "8");
+      if (result.order[i].size() == 2) {
+        // real crossing
+        node->setAttr("w", "4");
+        node->setAttr("h", "4");
+      } else {
+        // dummy
+        node->setAttr("w", "0");
+        node->setAttr("h", "0");
+      }
       node->setAttr("fill", getNodeColor(1));
       node->setDoubleAttr("x", curX);
       node->setDoubleAttr("y", 0);
