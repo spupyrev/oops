@@ -7,54 +7,58 @@
 using namespace std;
 
 /// TODO: merge with similar impl
-struct PartialFinder {
-  PartialFinder(const InputGraph& graph, const std::vector<std::pair<int, int>>& possibleCrossings, const int verbose)
-    : graph(graph),
-      possibleCrossings(possibleCrossings),
-      verbose(verbose)
+struct PartialTraversal {
+  PartialTraversal(const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
+    : graph(graph), n(graph.n), m((int)graph.edges.size()), verbose(params.verbose), forbiddenTuples(tuples)
     {}
 
-  std::vector<std::vector<std::pair<int, int>>> search(int maxNumCrossings) {
+  bool init(int numPairs) {
+    for (int e1 = 0; e1 < m; e1++) {
+      for (int e2 = e1 + 1; e2 < m; e2++) {
+        if (!canBeMerged(e1 + n, e2 + n, n, graph.edges))
+          continue;
+        possibleCrossings.push_back({e1, e2});
+      }
+    }
+    if (possibleCrossings.size() > 4096) {
+      LOG_IF(verbose, "skipped partial constraints due to too many possible_crossings (%d)", possibleCrossings.size());
+      return false;
+    }
+    LOG_IF(verbose, "partial constraints for %d pairs; |possible_crossings| = %d", numPairs, possibleCrossings.size());
+
     takenCrossings.clear();
-    foundConstraints.clear();
     isFreeEdge = std::vector<std::vector<int>>(graph.n, std::vector<int>(graph.n, 0));
     isCrossedEdge = std::vector<std::vector<int>>(graph.n, std::vector<int>(graph.n, 0));
     takenVertexDegree = std::vector<int>(graph.n, 0);
     index = std::vector<int>(graph.n, 0);
 
-    searchRec(0, maxNumCrossings);
+    return true;
+  }
 
-    return foundConstraints;
+  std::pair<int, int> search(int numPairs) {
+    searchRec(0, numPairs);
+    return {numConstraints2, numConstraints3};
   }
 
 private:
   void searchRec(size_t curIdx, int remainingCrossings) {
     if (remainingCrossings >= 0) {
       if (!takenCrossings.empty() && !isPartialPlanar()) {
-        foundConstraints.push_back(takenCrossings);
-        LOG_IF(verbose && foundConstraints.size() % 5000 == 0, "  found %d partial constraints so far...", foundConstraints.size());
-        // print
-        LOG_IF(verbose >= 2, "found %d-th partial constraint:", foundConstraints.size());
-        for (const auto& [e1, e2] : takenCrossings) {
-          LOG_IF(verbose >= 2, "  (%d, %d) -- (%d, %d);   e1=%d, e2=%d",
-                 graph.edges[e1].first, graph.edges[e1].second, graph.edges[e2].first, graph.edges[e2].second, e1, e2);
-        }
+        processConstraint();
         return;
       }
     }
-    if (remainingCrossings == 0) {
+    if (remainingCrossings == 0)
       return;
-    }
     CHECK(possibleCrossings.size() >= curIdx);
-    if (curIdx == possibleCrossings.size()) {
+    if (curIdx == possibleCrossings.size())
       return;
-    }
 
     // try to get the current
     const int e1 = possibleCrossings[curIdx].first;
     const int e2 = possibleCrossings[curIdx].second;
-    const auto& [u1, v1] = graph.edges[e1];
-    const auto& [u2, v2] = graph.edges[e2];
+    const auto [u1, v1] = graph.edges[e1];
+    const auto [u2, v2] = graph.edges[e2];
     // circular order: u1--u2--v1--v2
 
     if (isCrossedEdge[u1][v1] == 0 && isCrossedEdge[u2][v2] == 0) {
@@ -104,6 +108,32 @@ private:
     searchRec(curIdx + 1, remainingCrossings);
   }
 
+  void processConstraint() {
+    CHECK(takenCrossings.size() == 2 || takenCrossings.size() == 3);
+    bool added = false;
+    if (takenCrossings.size() == 2) {
+      const CrossingPair crossPair(m, takenCrossings[0].first, takenCrossings[0].second, 
+                                      takenCrossings[1].first, takenCrossings[1].second);
+      if (!forbiddenTuples.contains(crossPair)) {
+        forbiddenTuples.insert(crossPair);
+        numConstraints2++;
+        added = true;
+      }
+    } else {
+      const CrossingTriple crossTriple(m, takenCrossings[0].first, takenCrossings[0].second, 
+                                          takenCrossings[1].first, takenCrossings[1].second,
+                                          takenCrossings[2].first, takenCrossings[2].second);
+      if (!forbiddenTuples.contains(crossTriple)) {
+        forbiddenTuples.insert(crossTriple);
+        numConstraints3++;
+        added = true;
+      }
+    }
+
+    LOG_IF(verbose && added && (numConstraints2 + numConstraints3) % 5000 == 0, 
+           "  found %d partial constraints so far...", numConstraints2 + numConstraints3);
+  }
+
   void addFreeEdge(const int u, const int v, const int delta) {
     isFreeEdge[u][v] += delta;
     isFreeEdge[v][u] += delta;
@@ -114,7 +144,7 @@ private:
     isCrossedEdge[v][u] += delta;
   }
 
-  // check if takenCrossings can be extended to a planar graph
+  /// Check if takenCrossings can be extended to a planar graph
   bool isPartialPlanar() const {
     CHECK(takenCrossings.size() >= 1);
     const int n = graph.n;
@@ -136,8 +166,8 @@ private:
     }
     takenEdges.clear();
     for (const auto& [e1, e2] : takenCrossings) {
-      const auto& [u1, v1] = graph.edges[e1];
-      const auto& [u2, v2] = graph.edges[e2];
+      const auto [u1, v1] = graph.edges[e1];
+      const auto [u2, v2] = graph.edges[e2];
       CHECK(index[u1] != -1 && index[v1] != -1 && index[u2] != -1 && index[v2] != -1);
       const int d = N;
       N++;
@@ -163,11 +193,15 @@ public:
 
 private:
   const InputGraph& graph;
-  const std::vector<std::pair<int, int>>& possibleCrossings;
+  const int n;
+  const int m;
   const int verbose;
+  ForbiddenTuples& forbiddenTuples;
+  std::vector<std::pair<int, int>> possibleCrossings;
 
   std::vector<std::pair<int, int>> takenCrossings;
-  std::vector<std::vector<std::pair<int, int>>> foundConstraints;
+  size_t numConstraints2 = 0;
+  size_t numConstraints3 = 0;
   std::vector<std::vector<int>> isFreeEdge;
   std::vector<std::vector<int>> isCrossedEdge;
   std::vector<int> takenVertexDegree;
@@ -178,43 +212,20 @@ private:
 
 /// Add constraints based on partial planarity
 void encodePartialConstraints(SATModel& model, const InputGraph& graph, const Params& params) {
+  // TODO: need this??
   CHECK(!graph.isDirected());
 
+  const int verbose = params.verbose;
   const int numPairs = to_int(params.partialConstraints);
   CHECK(2 <= numPairs && numPairs <= 3, "incorrect value of partialConstraints");
 
-  const int n = graph.n;
-  const int m = (int)graph.edges.size();
-  std::vector<std::pair<int, int>> possibleCrossings;
-  for (int e1 = 0; e1 < m; e1++) {
-    for (int e2 = e1 + 1; e2 < m; e2++) {
-      if (!canBeMerged(e1 + n, e2 + n, n, graph.edges))
-        continue;
-      possibleCrossings.push_back({e1, e2});
-    }
-  }
-  if (possibleCrossings.size() > 4096) {
-    LOG_IF(params.verbose, "skipped partial constraints due to too many possible_crossings (%d)", possibleCrossings.size());
+  PartialTraversal finder(graph, params, model.getForbiddenTuples());
+  if (!finder.init(numPairs)) {
     return;
   }
-  LOG_IF(params.verbose, "encoding partial constraints for %d pairs; |possible_crossings| = %d", numPairs, possibleCrossings.size());
 
-  PartialFinder finder(graph, possibleCrossings, params.verbose);
-  auto constraints = finder.search(numPairs);
-  LOG_IF(params.verbose && constraints.empty(), "  no partial constraints; checked planar: %d", finder.numCheckedPlanar);
-  LOG_IF(params.verbose && !constraints.empty(), "  found %d partial constraints; checked planar: %d", constraints.size(), finder.numCheckedPlanar);
-
-  std::vector<int> numConstraints(numPairs + 1, 0);
-  for (const auto& constraint: constraints) {
-    CHECK((int)constraint.size() <= numPairs);
-    numConstraints[constraint.size()]++;
-    MClause clause;
-    for (const auto& [e1, e2] : constraint) {
-      clause.addVar(model.getCross2Var(e1 + n, e2 + n, false));
-    }
-    model.addClause(clause);
-  }
-  for (size_t i = 0; i < numConstraints.size(); i++) {
-    LOG_IF(params.verbose >= 2 && numConstraints[i] > 0, "    %'d %d-partial constraints", numConstraints[i], i);
-  }
+  const auto [numClauses2, numClauses3] = finder.search(numPairs);
+  LOG_IF(verbose && numClauses2 + numClauses3 == 0, "  no partial constraints; checked planar: %d", finder.numCheckedPlanar);
+  LOG_IF(verbose && numClauses2 > 0, "  found %'9d 2-clauses", numClauses2);
+  LOG_IF(verbose && numClauses3 > 0, "  found %'9d 3-clauses", numClauses3);
 }

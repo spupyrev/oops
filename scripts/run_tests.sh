@@ -88,8 +88,14 @@ assert_pass "grep -Fq '1-planar = 31' /tmp/last.log"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/small_cn_unsat.cfg -solver=brute-force -skewness=0 2> /tmp/last.log"
 assert_pass "grep -Fq 'non-1-planar = 3' /tmp/last.log"
 
-# test sparsify
+# unsat constraints
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/small_cn_sat.cfg -sat=1 -unsat=1 -skewness=0 2> /tmp/last.log"
+assert_pass "grep -Fq '1-planar = 31' /tmp/last.log"
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/small_cn_sat.cfg -sat=1 -unsat=1 -sep-cycles=3 -swap-constraints=3/3 -skewness=0 -max-n=16 2> /tmp/last.log"
+assert_pass "grep -Fq '1-planar = 15' /tmp/last.log"
+assert_pass "grep -Fq 'non-1-planar = 0' /tmp/last.log"
 
+# test sparsify
 
 # timeout
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=3 2> /tmp/last.log"

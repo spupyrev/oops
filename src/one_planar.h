@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "logging.h"
+#include "forbidden_crossings.h"
 #include "glucose/SolverSimp21.h"
 #include "breakid/sat_symmetry.h"
 #include "satsuma/sat_symmetry.h"
@@ -357,6 +358,9 @@ class SATModel {
 
   // solution (provided by an external solver)
   std::unordered_map<int, bool> externalVars;
+
+  // added 2- and 3-clauses
+  ForbiddenTuples forbiddenTuples;
 
  public:
   SATModel() {
@@ -717,12 +721,16 @@ class SATModel {
     return (solver.model[var] == l_True ? positive : !positive);
   }
 
-  size_t varCount() {
+  size_t varCount() const {
     return vars.size();
   }
 
-  size_t clauseCount() {
+  size_t clauseCount() const {
     return clauses.size();
+  }
+
+  ForbiddenTuples& getForbiddenTuples() {
+    return forbiddenTuples;
   }
 };
 

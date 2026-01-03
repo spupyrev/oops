@@ -2,98 +2,12 @@
 #include "logging.h"
 #include "one_planar.h"
 
-#include <utility>
-
-struct CrossingPair {
-  int e1;
-  int e2;
-  int p1;
-  int p2;
-  int64_t key;
-
-  explicit CrossingPair(int m, int e1_, int e2_, int p1_, int p2_)
-      : e1(e1_), e2(e2_), p1(p1_), p2(p2_) {
-    // Normalize ordering so that (e1,e2) < (p1,p2) lexicographically
-    CHECK(0 <= e1 && e1 < e2 && e2 < m);
-    CHECK(0 <= p1 && p1 < p2 && p2 < m);
-    if (std::make_pair(e1, e2) >= std::make_pair(p1, p2)) {
-      std::swap(e1, p1);
-      std::swap(e2, p2);
-    }
-    CHECK(std::make_pair(e1, e2) < std::make_pair(p1, p2));
-
-    // Construct the key
-    key = (int64_t)e1 * (int64_t)m * (int64_t)m * (int64_t)m +
-          (int64_t)e2 * (int64_t)m * (int64_t)m +
-          (int64_t)p1 * (int64_t)m +
-          (int64_t)p2;
-  }
-
-  void encode(SATModel& model, const InputGraph& graph) const {
-    const int divE1 = e1 + graph.n;
-    const int divE2 = e2 + graph.n;
-    CHECK(canBeMerged(divE1, divE2, graph));
-    const int divP1 = p1 + graph.n;
-    const int divP2 = p2 + graph.n;
-    CHECK(canBeMerged(divP1, divP2, graph));
-
-    model.addClause({
-        model.getCross2Var(divE1, divE2, false),
-        model.getCross2Var(divP1, divP2, false)
-    });
-  }
-};
-
-struct CrossingTriple {
-  int a1, a2;
-  int b1, b2;
-  int c1, c2;
-  int64_t key;
-
-  explicit CrossingTriple(int m,
-                          int x1, int x2,
-                          int y1, int y2,
-                          int z1, int z2)
-      : a1(x1), a2(x2), b1(y1), b2(y2), c1(z1), c2(z2) {
-    // normalize each pair
-    CHECK(0 <= a1 && a1 < a2 && a2 < m);
-    CHECK(0 <= b1 && b1 < b2 && b2 < m);
-    CHECK(0 <= c1 && c1 < c2 && c2 < m);
-
-    // normalize order of the three pairs lexicographically: (a1,a2) < (b1,b2) < (c1,c2)
-    auto P = [](int u1, int u2) { return std::make_pair(u1, u2); };
-    if (P(a1, a2) > P(b1, b2)) { std::swap(a1, b1); std::swap(a2, b2); }
-    if (P(b1, b2) > P(c1, c2)) { std::swap(b1, c1); std::swap(b2, c2); }
-    if (P(a1, a2) > P(b1, b2)) { std::swap(a1, b1); std::swap(a2, b2); }
-    CHECK(P(a1, a2) < P(b1, b2) && P(b1, b2) < P(c1, c2));
-
-    // pack 6 edge-indices base-m
-    key = (((((int64_t)a1 * m + a2) * m + b1) * m + b2) * m + c1) * m + c2;
-  }
-
-  void encode(SATModel& model, const InputGraph& graph) const {
-    const int divA1 = a1 + graph.n;
-    const int divA2 = a2 + graph.n;
-    CHECK(canBeMerged(divA1, divA2, graph));
-    const int divB1 = b1 + graph.n;
-    const int divB2 = b2 + graph.n;
-    CHECK(canBeMerged(divB1, divB2, graph));
-    const int divC1 = c1 + graph.n;
-    const int divC2 = c2 + graph.n;
-    CHECK(canBeMerged(divC1, divC2, graph));
-
-    model.addClause({
-        model.getCross2Var(divA1, divA2, false),
-        model.getCross2Var(divB1, divB2, false),
-        model.getCross2Var(divC1, divC2, false),
-    });
-  }
-};
+//#include <utility>
 
 /// TODO: merge with similar impl
 struct SepCycleTraversal {
-  SepCycleTraversal(const InputGraph& graph, const Params& params)
-    : graph(graph), n(graph.n), m((int)graph.edges.size()), verbose(params.verbose)
+  SepCycleTraversal(const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
+    : graph(graph), n(graph.n), m((int)graph.edges.size()), verbose(params.verbose), forbiddenTuples(tuples)
     {}
 
   bool init(int numPairs) {
@@ -104,9 +18,13 @@ struct SepCycleTraversal {
         possibleCrossings.push_back({e1, e2});
       }
     }
-    LOG_IF(verbose, "encoding new-sep constraints for %d pairs; |possible_crossings| = %d", 
+
+    if (possibleCrossings.size() > 4096) {
+      LOG_IF(verbose, "skipped sep-cycles constraints due to too many possible_crossings (%d)", possibleCrossings.size());
+      return false;
+    }
+    LOG_IF(verbose, "sep-cycles constraints for %d pairs; |possible_crossings| = %d", 
            numPairs, possibleCrossings.size());
-    // TODO: maybe skip if possibleCrossings is large?
 
     isEdge = std::vector<std::vector<bool>> (n, std::vector<bool>(n, false));
     adjList = std::vector<std::vector<int>>(n, std::vector<int>());
@@ -124,15 +42,15 @@ struct SepCycleTraversal {
   }
 
   /// Find pairs of crossings that cannot happen in a 1-planar drawing
-  std::vector<CrossingPair> build2Clauses() {
-    std::vector<CrossingPair> clauses2;
+  size_t build2Clauses() {
+    size_t numClauses2 = 0;
 
     // the main crossing
     for (size_t idx_uv = 0; idx_uv < possibleCrossings.size(); idx_uv++) {
       const int e1 = possibleCrossings[idx_uv].first;
       const int e2 = possibleCrossings[idx_uv].second;
-      const auto& [u, v] = graph.edges[e1];
-      const auto& [x, y] = graph.edges[e2];
+      const auto [u, v] = graph.edges[e1];
+      const auto [x, y] = graph.edges[e2];
       CHECK(u < v && x < y);
       CHECK(all_unique({x, y, u, v}));
 
@@ -146,13 +64,13 @@ struct SepCycleTraversal {
         if (idx_uv == cr0)
           continue;
         // circular order: u1--u2--v1--v2
-        const auto& [u1, v1] = graph.edges[e1_cr0];
-        const auto& [u2, v2] = graph.edges[e2_cr0];
+        const auto [u1, v1] = graph.edges[e1_cr0];
+        const auto [u2, v2] = graph.edges[e2_cr0];
         CHECK(u1 < v1 && u2 < v2);
 
         // stop early, if the crossing pair is already processed
         const CrossingPair crossPair(m, e1, e2, e1_cr0, e2_cr0);
-        if (isForbiddenCrossingPair(crossPair))
+        if (forbiddenTuples.contains(crossPair))
           continue;
 
         // check that the selected crossings are compatibe
@@ -166,8 +84,8 @@ struct SepCycleTraversal {
         std::vector<std::pair<int, int>> takenCrossings = {{e1, e2}, {e1_cr0, e2_cr0}};
         if (findSepCycle(x, y, u, v, takenCrossings) || findSepCycle(u, v, x, y, takenCrossings)) {
           // save the 2-clause
-          clauses2.push_back(crossPair);
-          addForbiddenCrossingPair(crossPair);
+          numClauses2++;
+          forbiddenTuples.insert(crossPair);
         }
 
         unmarkCrossing(u1, v1, u2, v2);
@@ -176,11 +94,11 @@ struct SepCycleTraversal {
       unmarkCrossing(u, v, x, y);
     }
 
-    return clauses2;
+    return numClauses2;
   }
 
   /// Find triples of crossings that cannot happen in a 1-planar drawing
-  std::vector<CrossingTriple> build3Clauses() {
+  size_t build3Clauses() {
     for (const auto& [u, v] : graph.edges) {
       CHECK(isEdge[u][v]);
     }
@@ -191,14 +109,14 @@ struct SepCycleTraversal {
       }
     }
 
-    std::vector<CrossingTriple> clauses3;
+    size_t numClauses3 = 0;
 
     // the main crossing
     for (size_t idx_uv = 0; idx_uv < possibleCrossings.size(); idx_uv++) {
       const int e1 = possibleCrossings[idx_uv].first;
       const int e2 = possibleCrossings[idx_uv].second;
-      const auto& [u, v] = graph.edges[e1];
-      const auto& [x, y] = graph.edges[e2];
+      const auto [u, v] = graph.edges[e1];
+      const auto [x, y] = graph.edges[e2];
       CHECK(u < v && x < y);
       CHECK(all_unique({x, y, u, v}));
 
@@ -206,17 +124,17 @@ struct SepCycleTraversal {
 
       // secondary crossing-A
       for (size_t cr0 = 0; cr0 < possibleCrossings.size(); cr0++) {
-        const int e1_cr0 = possibleCrossings[cr0].first;
-        const int e2_cr0 = possibleCrossings[cr0].second;
         if (idx_uv == cr0) 
           continue;
 
-        const auto& [u1, v1] = graph.edges[e1_cr0];
-        const auto& [u2, v2] = graph.edges[e2_cr0];
+        const int e1_cr0 = possibleCrossings[cr0].first;
+        const int e2_cr0 = possibleCrossings[cr0].second;
+        const auto [u1, v1] = graph.edges[e1_cr0];
+        const auto [u2, v2] = graph.edges[e2_cr0];
         CHECK(u1 < v1 && u2 < v2);
 
         // skip the triple if this pair is already forbidden
-        if (isForbiddenCrossingPair(CrossingPair(m, e1, e2, e1_cr0, e2_cr0))) 
+        if (forbiddenTuples.contains(CrossingPair(m, e1, e2, e1_cr0, e2_cr0))) 
           continue;
 
         if (!canMarkCrossing(u1, v1, u2, v2))
@@ -226,19 +144,19 @@ struct SepCycleTraversal {
 
         // secondary crossing-B
         for (size_t cr1 = cr0 + 1; cr1 < possibleCrossings.size(); cr1++) {
-          const int e1_cr1 = possibleCrossings[cr1].first;
-          const int e2_cr1 = possibleCrossings[cr1].second;
           if (idx_uv == cr1) 
             continue;
 
-          const auto& [w1, z1] = graph.edges[e1_cr1];
-          const auto& [w2, z2] = graph.edges[e2_cr1];
+          const int e1_cr1 = possibleCrossings[cr1].first;
+          const int e2_cr1 = possibleCrossings[cr1].second;
+          const auto [w1, z1] = graph.edges[e1_cr1];
+          const auto [w2, z2] = graph.edges[e2_cr1];
           CHECK(w1 < z1 && w2 < z2);
 
           // skip the triple if these pairs are already forbidden
-          if (isForbiddenCrossingPair(CrossingPair(m, e1, e2, e1_cr1, e2_cr1))) 
+          if (forbiddenTuples.contains(CrossingPair(m, e1, e2, e1_cr1, e2_cr1))) 
             continue;
-          if (isForbiddenCrossingPair(CrossingPair(m, e1_cr0, e2_cr0, e1_cr1, e2_cr1))) 
+          if (forbiddenTuples.contains(CrossingPair(m, e1_cr0, e2_cr0, e1_cr1, e2_cr1))) 
             continue;
 
           // compatibility checks with already marked stuff
@@ -246,7 +164,7 @@ struct SepCycleTraversal {
             continue;
 
           const CrossingTriple triple(m, e1, e2, e1_cr0, e2_cr0, e1_cr1, e2_cr1);
-          if (isForbiddenCrossingTriple(triple))
+          if (forbiddenTuples.contains(triple))
             continue;
 
           markCrossing(w1, z1, w2, z2);
@@ -256,8 +174,8 @@ struct SepCycleTraversal {
           const std::vector<std::pair<int,int>> takenCrossings = {{e1,e2}, {e1_cr0,e2_cr0}, {e1_cr1,e2_cr1}};
           if (findSepCycle(x, y, u, v, takenCrossings) || findSepCycle(u, v, x, y, takenCrossings)) {
             // save the 3-clause
-            clauses3.push_back(triple);
-            addForbiddenCrossingTriple(triple);
+            numClauses3++;
+            forbiddenTuples.insert(triple);
           }
 
           unmarkCrossing(w1, z1, w2, z2);
@@ -269,27 +187,10 @@ struct SepCycleTraversal {
       unmarkCrossing(u, v, x, y);
     }
 
-    return clauses3;
+    return numClauses3;
   }
-
 
 private:
-  void addForbiddenCrossingPair(const CrossingPair& crossPair) {
-    forbiddenCrossingPairs.insert(crossPair.key);
-  }
-
-  bool isForbiddenCrossingPair(const CrossingPair& crossPair) const {
-    return forbiddenCrossingPairs.find(crossPair.key) != forbiddenCrossingPairs.end();
-  }
-
-  void addForbiddenCrossingTriple(const CrossingTriple& triple) {
-    forbiddenCrossingTriples.insert(triple.key);
-  }
-
-  bool isForbiddenCrossingTriple(const CrossingTriple& triple) const {
-    return forbiddenCrossingTriples.find(triple.key) != forbiddenCrossingTriples.end();
-  }
-
   void setEdge(std::vector<std::vector<bool>> &isEdge, int u, int v, bool value) {
     isEdge[u][v] = value;
     isEdge[v][u] = value;
@@ -467,9 +368,7 @@ private:
   const int n;
   const int m;
   const int verbose;
-
-  std::unordered_set<int64_t> forbiddenCrossingPairs;
-  std::unordered_set<int64_t> forbiddenCrossingTriples;
+  ForbiddenTuples& forbiddenTuples;
 
   std::vector<std::pair<int, int>> possibleCrossings;
   std::vector<std::vector<bool>> isEdge;
@@ -479,28 +378,22 @@ private:
   std::vector<std::vector<int>> isKiteEdge;
 };
 
-/// Separating cycles
+/// Add constraints based on separating cycles
 void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const Params& params) {
   const int verbose = params.verbose;
   const int numPairs = to_int(params.sepCycleConstraints);
   CHECK(2 <= numPairs && numPairs <= 3, "incorrect value of sepCycleConstraints");
 
-  SepCycleTraversal sct(graph, params);
+  SepCycleTraversal sct(graph, params, model.getForbiddenTuples());
   if (sct.init(numPairs)) {
     // forbidden pairs (2-clauses)
-    auto clauses2 = sct.build2Clauses();
-    for (const auto& clause : clauses2) {
-      clause.encode(model, graph);
-    }
-    LOG_IF(verbose, "  added %'7d unique sep-cycle 2-clauses", clauses2.size());
+    const size_t numClauses2 = sct.build2Clauses();
+    LOG_IF(verbose, "  found %'9d 2-clauses", numClauses2);
 
     if (numPairs == 3) {
       // forbidden triples (3-clauses)
-      auto clauses3 = sct.build3Clauses();
-      for (const auto& clause : clauses3) {
-        clause.encode(model, graph);
-      }
-      LOG_IF(verbose, "  added %'7d unique sep-cycle 3-clauses", clauses3.size());
+      const size_t numClauses3 = sct.build3Clauses();
+      LOG_IF(verbose, "  found %'9d 3-clauses", numClauses3);
     }
 
     // CHECK(params.custom != "");

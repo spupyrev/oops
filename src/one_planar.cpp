@@ -312,6 +312,8 @@ void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int v
     }
   }
 
+  LOG_IF(verbose, "cross-2 constraints:");
+
   if (!graph.isDirected()) {
     encodeK4Constraints(model, graph, verbose);
     encodeICConstraints(model, graph, verbose, 2);
@@ -487,6 +489,7 @@ void encodeICConstraints(SATModel& model, const InputGraph& graph, const int ver
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
   const int numVertices = n + m;
+  ForbiddenTuples& forbiddenTuples = model.getForbiddenTuples();
 
   // Two pairs of crossings have at most C vertices in common
   int numIC = 0;
@@ -520,19 +523,19 @@ void encodeICConstraints(SATModel& model, const InputGraph& graph, const int ver
 
           CHECK(i1 < j1 && i2 < j2 && i1 < i2);
           if (numCommon > C) {
-            model.addClause({
-                model.getCross2Var(i1, j1, false),
-                model.getCross2Var(i2, j2, false)
-            });
+            const CrossingPair crossPair(m, i1 - n, j1 - n, i2 - n, j2 - n);
+            if (forbiddenTuples.contains(crossPair))
+              continue;
+
+            forbiddenTuples.insert(crossPair);
             numIC++;
-            // LOG("i1 = %2d; j1 = %2d; i2 = %2d; j2 = %2d  [numCommon = %d]", i1, j1, i2, j2, numCommon);
           }
         }
       }
     }
   }
 
-  LOG_IF(verbose, "added %2d IC-%d constraints", numIC, C);
+  LOG_IF(verbose, "  found %'9d 2-clauses (IC-%d)", numIC, C);
 }
 
 /// A pair cross => K4-edges do not cross
@@ -542,6 +545,7 @@ void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int ver
   const int m = (int)edges.size();
   const int numVertices = n + m;
   const auto& adj = graph.adj;
+  ForbiddenTuples& forbiddenTuples = model.getForbiddenTuples();
 
   int numConstraints = 0;
   for (int divUV = n; divUV < numVertices; divUV++) {
@@ -565,19 +569,61 @@ void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int ver
           if (!canBeMerged(divUA, divVB, n, edges))
             continue;
           CHECK(divUV != divVB && divUV != divUA);
-          if (std::minmax(divUV, divXY) < std::minmax(divVB, divUA)) {
-            model.addClause({
-                model.getCross2Var(divUV, divXY, false),
-                model.getCross2Var(divVB, divUA, false)
-            });
-            numConstraints++;
-          }
+
+          const CrossingPair crossPair(m, divUV - n, divXY - n, divVB - n, divUA - n);
+          if (forbiddenTuples.contains(crossPair))
+            continue;
+
+          forbiddenTuples.insert(crossPair);
+          numConstraints++;
         }
       }
     }
   }
 
-  LOG_IF(verbose, "added %2d K4 2-clauses", numConstraints);
+  LOG_IF(verbose, "  found %'9d 2-clauses (K4)", numConstraints);
+}
+
+/// Add identified 2- and 3-clauses to the model 
+void encodeForbiddenTuples(SATModel& model, const InputGraph& graph, const int verbose) {
+  const int n = graph.n;
+  const ForbiddenTuples& forbiddenTuples = model.getForbiddenTuples();
+
+  // 2-clauses
+  for (const auto& clause : forbiddenTuples.pairs()) {
+    const int divE1 = clause.e1 + n;
+    const int divE2 = clause.e2 + n;
+    CHECK(canBeMerged(divE1, divE2, graph));
+    const int divP1 = clause.p1 + n;
+    const int divP2 = clause.p2 + n;
+    CHECK(canBeMerged(divP1, divP2, graph));
+
+    model.addClause({
+        model.getCross2Var(divE1, divE2, false),
+        model.getCross2Var(divP1, divP2, false)
+    });
+  }
+  LOG_IF(verbose, "encoded %'9d forbidden 2-clauses", forbiddenTuples.pairs().size());
+
+  // 3-clauses
+  for (const auto& clause : forbiddenTuples.triples()) {
+    const int divA1 = clause.a1 + n;
+    const int divA2 = clause.a2 + n;
+    CHECK(canBeMerged(divA1, divA2, graph));
+    const int divB1 = clause.b1 + n;
+    const int divB2 = clause.b2 + n;
+    CHECK(canBeMerged(divB1, divB2, graph));
+    const int divC1 = clause.c1 + n;
+    const int divC2 = clause.c2 + n;
+    CHECK(canBeMerged(divC1, divC2, graph));
+
+    model.addClause({
+        model.getCross2Var(divA1, divA2, false),
+        model.getCross2Var(divB1, divB2, false),
+        model.getCross2Var(divC1, divC2, false),
+    });
+  }
+  LOG_IF(verbose, "encoded %'9d forbidden 3-clauses", forbiddenTuples.triples().size());
 }
 
 void encodeMoveVariables(SATModel& model, const InputGraph& graph, const int verbose) {
@@ -889,6 +935,8 @@ void encodeStackPlanar(
     CHECK(params.useSATConstraints);
     encodeICConstraints(model, graph, params.verbose, 1);
   }
+
+  // Misc constraints containing 2- and 3-clauses
   if (params.swapConstraints != "") {
     CHECK(params.useSATConstraints);
     encodeSwapConstraints(model, graph, params);
@@ -901,6 +949,8 @@ void encodeStackPlanar(
     CHECK(params.useSATConstraints);
     encodeSepCyclesConstraints(model, graph, params);
   }
+
+  encodeForbiddenTuples(model, graph, params.verbose);
 
   // Symmetry
   encodeStackSymmetry(model, graph, params.verbose);
