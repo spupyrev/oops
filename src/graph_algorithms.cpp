@@ -598,37 +598,48 @@ bool hasReducibleSubgraph(const AdjListTy& adjList) {
   return false;
 }
 
-bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<bool>& used) {
+bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<bool>& used, const AdjListTy& adjList) {
 	used[now] = true;
 	if (now == t) 
     return true;
-  const int n = (int)g.size();
-	for (int i = 0; i < n; i++)
-		if (!used[i] && g[now][i] >= 1 && dfs_maxflow(i, t, g, used)) {
-			g[now][i] -= 1;
-			g[i][now] += 1;
+  for (int x : adjList[now]) {
+		if (!used[x] && g[now][x] >= 1 && dfs_maxflow(x, t, g, used, adjList)) {
+			g[now][x] -= 1;
+			g[x][now] += 1;
 			return true;
 		}
+  }
 
 	return false;
 }
 
 int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
                            const std::vector<int>& removedVertices, 
-                           const std::vector<EdgeTy>& removedEdges) {
-  const int n = (int)adjList.size();
-  // create a graph for max flow
-  std::vector<std::vector<int>> g(n, std::vector<int>(n));
-  for (int i = 0; i < n; i++) {
+                           const std::vector<EdgeTy>& removedEdges, 
+                           const int ub) {
+  const size_t n = adjList.size();
+  // create a graph for max flow (avoiding re-allocation)
+  // std::vector<std::vector<int>> g(n, std::vector<int>(n));
+  static std::vector<std::vector<int>> g;
+  if (n > g.size()) {
+    g.assign(n, std::vector<int>(n, 0));
+  } else {
+    for (size_t i = 0; i < n; ++i) {
+      std::fill(g[i].begin(), g[i].begin() + n, 0);
+    }
+  }
+
+  // init all edges
+  for (size_t i = 0; i < n; i++) {
     for (int x : adjList[i]) {
       g[i][x] = 1;
       g[x][i] = 1;
     }
   }
   // disable forbidden edges
-  for (const auto& edge : removedEdges) {
-    g[edge.first][edge.second] = 0;
-    g[edge.second][edge.first] = 0;
+  for (const auto& [u, v] : removedEdges) {
+    g[u][v] = 0;
+    g[v][u] = 0;
   }
 
   // find the max flow
@@ -639,9 +650,11 @@ int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList,
       CHECK(x != s && x != t);
       used[x] = true;
     }
-    if (!dfs_maxflow(s, t, g, used)) 
+    if (!dfs_maxflow(s, t, g, used, adjList)) 
       break;
     maxflow++;
+    if (maxflow >= ub)
+      break;
     std::fill(used.begin(), used.end(), false);
   }
 

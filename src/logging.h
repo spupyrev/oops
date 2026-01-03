@@ -24,11 +24,12 @@ const int VERIFICATION_EXIT_CODE = 10;
   }
 #define CHECK2(condition, ...) \
   if (0 == (condition)) { \
-    CHECK_LOG(XSTR(condition), __FILE__, __LINE__, __VA_ARGS__); \
+    CHECK_LOG(XSTR(condition), __FILE__, __LINE__, ##__VA_ARGS__); \
     throw CHECK_EXIT_CODE; \
   }
 #define GET_MACRO(_0,_1,_2,_3,_4,_5,_6,_7,_8,_9,NAME,...) NAME
-#define CHECK(...) GET_MACRO(__VA_ARGS__, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK1)(__VA_ARGS__)
+#define CHECK(...) \
+  GET_MACRO(__VA_ARGS__, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK1, _dummy)(__VA_ARGS__)
 
 #define ERROR(message) \
   { \
@@ -52,7 +53,7 @@ enum class TextColor {
 inline void CHECK_LOG(const char* desc, const char* file, int line, const char* message, va_list args) {
   char* buffer = new char[16384];
   setlocale(LC_NUMERIC, "");
-  std::vsprintf(buffer, message, args);
+  std::vsnprintf(buffer, 16384, message, args);
   std::cerr << "\033[91m" << "assertion '" << desc << "' failed: " << std::string(buffer) << "\033[0m" << " [" << file << ":" << line << "]\n";
   delete[] buffer;
 }
@@ -69,15 +70,15 @@ inline void CHECK_LOG_EMPTY(const char* desc, const char* file, int line) {
   std::cerr << "\033[91m" << "assertion '" << desc << "' failed" << "\033[0m" << " [" << file << ":" << line << "]\n";
 }
 
-inline void LOG(TextColor color, const char* message, va_list args) {
+inline void LOG(TextColor color, const char* message, va_list& args) {
   auto end = std::chrono::system_clock::now();
   auto time = std::chrono::system_clock::to_time_t(end);
   auto stime = std::string(std::ctime(&time));
   stime.erase(stime.find_last_not_of(" \n\r\t") + 1);
   stime = "\033[90m" + stime + ":\033[0m";
-  char* buffer = new char[16384];
+  char buffer[16384];
   setlocale(LC_NUMERIC, "");
-  std::vsprintf(buffer, message, args);
+  std::vsnprintf(buffer, sizeof(buffer), message, args);
   std::cerr << stime << " ";
 
   switch (color) {
@@ -85,18 +86,18 @@ inline void LOG(TextColor color, const char* message, va_list args) {
 
     case TextColor::red : std::cerr << "\033[91m" << std::string(buffer) << "\033[0m"; break;
 
-    case TextColor::blue: std::cerr << "\e[38;5;12m" << std::string(buffer) << "\e[0m"; break;
+    case TextColor::blue: std::cerr << "\033[38;5;12m" << std::string(buffer) << "\033[0m"; break;
 
-    case TextColor::green: std::cerr << "\e[38;5;34m" << std::string(buffer) << "\e[0m"; break;
+    case TextColor::green: std::cerr << "\033[38;5;34m" << std::string(buffer) << "\033[0m"; break;
 
-    case TextColor::pink: std::cerr << "\e[38;5;13m" << std::string(buffer) << "\e[0m"; break;
+    case TextColor::pink: std::cerr << "\033[38;5;13m" << std::string(buffer) << "\033[0m"; break;
   };
 
   std::cerr << "\n";
-  delete[] buffer;
+  // delete[] buffer;
   // for (int i = 0; i < 255; i++) {
   //   std::string label = "ABC012";
-  //   std::cout << i << ": " <<  "\e[38;5;" << i << "m" << label << "\e[0m\n";
+  //   std::cout << i << ": " <<  "\033[38;5;" << i << "m" << label << "\033[0m\n";
   // }
 }
 
@@ -117,6 +118,13 @@ inline void LOG(TextColor color, const char* message, ...) {
   va_start(args, message);
   LOG(color, message, args);
   va_end(args);
+}
+
+inline void LOG(const char* message, va_list& args) {
+  char buffer[16384];
+  std::vsnprintf(buffer, sizeof(buffer), message, args);
+  std::cerr << std::string(buffer);
+  std::cerr << "\n";
 }
 
 inline void LOG_IF(bool condition, const char* message, ...) {

@@ -554,13 +554,13 @@ void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int ver
       const int u = edges[divUV - n].first;
       const int v = edges[divUV - n].second;
 
-      for (size_t iu = 0; iu < adj[u].size(); iu++) {
-        const int a = adj[u][iu];
-        if (a == v) continue;
+      for (const int a: adj[u]) {
+        if (a == v) 
+          continue;
         const int divUA = graph.findDivIndex(u, a);
-        for (size_t iv = 0; iv < adj[v].size(); iv++) {
-          const int b = adj[v][iv];
-          if (b == u) continue;
+        for (const int b: adj[v]) {
+          if (b == u) 
+            continue;
           const int divVB = graph.findDivIndex(v, b);
           if (!canBeMerged(divUA, divVB, n, edges))
             continue;
@@ -577,7 +577,7 @@ void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int ver
     }
   }
 
-  LOG_IF(verbose, "added %2d K4 constraints", numConstraints);
+  LOG_IF(verbose, "added %2d K4 2-clauses", numConstraints);
 }
 
 void encodeMoveVariables(SATModel& model, const InputGraph& graph, const int verbose) {
@@ -897,7 +897,7 @@ void encodeStackPlanar(
     CHECK(params.useSATConstraints);
     encodePartialConstraints(model, graph, params);
   }
-  if (params.sepCycleConstraints) {
+  if (params.sepCycleConstraints != "") {
     CHECK(params.useSATConstraints);
     encodeSepCyclesConstraints(model, graph, params);
   }

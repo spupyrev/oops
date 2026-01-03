@@ -2,11 +2,15 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
+#include <initializer_list>
+#include <iostream>
+#include <iterator>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <iostream>
-#include <sstream>
+#include <utility>
 
 constexpr double EPS = 1e-8;
 constexpr double PI = 3.14159265358979323846;
@@ -157,6 +161,13 @@ size_t unique_size(const std::initializer_list<T>& vec) {
 template <typename T>
 bool all_unique(const std::initializer_list<T>& vec) {
   return unique_size(vec) == vec.size();
+}
+
+template <typename T>
+bool all_unique(const std::vector<T>& vec) {
+  std::vector<T> temp = vec;
+  std::sort(temp.begin(), temp.end());
+  return std::unique(temp.begin(), temp.end()) == temp.end();
 }
 
 template <typename T>

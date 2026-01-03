@@ -19,11 +19,11 @@
   #define OS_WINDOWS
 #endif
 
-#if __APPLE__
+#if defined(__APPLE__)
   #define OS_MAC
 #endif
 
-#if __linux__
+#if defined(__linux__)
   #define OS_LINUX
 #endif
 

@@ -71,7 +71,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
   options.addAllowedOption("-skip-reducible-subgraphs", "false", "[Experimental] Skip reducible subgraphs");
   options.addAllowedOption("-swap-constraints", "", "[Experimental] Add swap constraints: num_pairs/num_reorder");
-  options.addAllowedOption("-sep-cycles", "false", "[Experimental] Add constraints based on separating cycles");
+  options.addAllowedOption("-sep-cycles", "", "[Experimental] Add constraints based on separating cycles: max-clause");
   options.addAllowedOption("-custom", "", "Custom option");
 }
 
@@ -372,7 +372,7 @@ void genDirections(CMDOptions& options, const int n, std::vector<EdgeTy>& edges,
 void initSATParams(CMDOptions& options, Params& params) {
   params.verbose = options.getInt("-verbose");;
   params.timeout = options.getInt("-timeout");;
-  //params.directed = options.getBool("-directed");
+  // params.directed = options.getBool("-directed");
   params.applyBreakID = options.getBool("-breakID");
   params.applySatsuma = options.getBool("-satsuma");
   params.modelFile = options.getStr("-dimacs");
@@ -380,7 +380,7 @@ void initSATParams(CMDOptions& options, Params& params) {
 
   params.forbidCrossings = options.getBool("-forbid-crossings");
   params.swapConstraints = options.getStr("-swap-constraints");
-  params.sepCycleConstraints = options.getBool("-sep-cycles");
+  params.sepCycleConstraints = options.getStr("-sep-cycles");
   params.custom = options.getStr("-custom");
 
   params.useSATConstraints = options.getBool("-sat");
@@ -392,7 +392,8 @@ void initSATParams(CMDOptions& options, Params& params) {
       params.swapConstraints = "2/2";
     if (params.partialConstraints == "")
       params.partialConstraints = "3";
-    params.sepCycleConstraints = true;
+    if (params.sepCycleConstraints == "")
+      params.sepCycleConstraints = "2";
   }
   if (options.getBool("-ic")) {
     params.useIC = true;

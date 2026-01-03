@@ -44,12 +44,11 @@ public:
   }
 
   void adj_init() {
-    // adj.assign(n, std::vector<bool>(n, false));
-    if ((int)adj.size() < n) {
+    if (n > (int)adj.size()) {
       adj.assign(n, std::vector<bool>(n, false));
     }
     for (int i = 0; i < n; i++) {
-      adj[i].assign(n, false);
+      std::fill(adj[i].begin(), adj[i].begin() + n, false);
     }
   }
 

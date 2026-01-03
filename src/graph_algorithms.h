@@ -57,4 +57,5 @@ bool hasReducibleSubgraph(const AdjListTy& adjList);
 /// Count the number of edge-disjoint paths between s and t that avoid "removed" vertices and edges
 int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
                            const std::vector<int>& removedVertices, 
-                           const std::vector<EdgeTy>& removedEdges);
+                           const std::vector<EdgeTy>& removedEdges,
+                           const int ub);

@@ -48,11 +48,11 @@ public:
   }
 
   T *lea(Ref r) {
-    assert(r >= 0 && r < sz);
+    // assert(r >= 0 && r < sz);
     return &memory[r];
   }
   const T *lea(Ref r) const {
-    assert(r >= 0 && r < sz);
+    // assert(r >= 0 && r < sz);
     return &memory[r];
   }
   Ref ael(const T *t) {

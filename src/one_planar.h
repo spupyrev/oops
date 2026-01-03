@@ -214,7 +214,7 @@ struct Params {
   bool forbidCrossings = false;
   std::string swapConstraints = "";
   std::string partialConstraints = "";
-  bool sepCycleConstraints = false;
+  std::string sepCycleConstraints = "";
 
   std::string custom = "";
 
@@ -334,7 +334,9 @@ struct MClause {
 class SATModel {
   struct pair_hash {
     inline std::size_t operator()(const std::pair<int, int>& v) const {
-      return v.first * 31 + v.second;
+      std::size_t h1 = std::hash<int>{}(v.first);
+      std::size_t h2 = std::hash<int>{}(v.second);
+      return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
     }
   };
 

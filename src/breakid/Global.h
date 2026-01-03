@@ -145,7 +145,7 @@ public:
   }
 
   const std::map<uint, uint> &getTerms() const { return terms; }
-  const int getWeight() const { return weight; }
+  int getWeight() const { return weight; }
 
   size_t getHashValue() {
     if (hashValue == 0) {
