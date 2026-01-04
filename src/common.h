@@ -150,24 +150,57 @@ void sort_unique(std::vector<T>& vec) {
   vec.erase(std::unique(vec.begin(), vec.end()), vec.end());  
 }
 
+template <class It>
+size_t unique_size(It b, It e) {
+  if (b == e)
+    return 0;
+
+  using T = std::decay_t<decltype(*b)>;
+
+  if constexpr (std::is_integral_v<T>) {
+    constexpr int MAX_SIZE = 128;
+    bool used[MAX_SIZE] = {};
+    size_t num_unique = 0;
+    for (It it = b; it != e; it++) {
+      T x = *it;
+      if (0 <= x && x < MAX_SIZE) {
+        if (!used[(int)x]) {
+          used[(int)x] = true;
+          num_unique++;
+        }
+      } else {
+        num_unique = 0;
+        break;
+      }
+    }
+    if (num_unique > 0)
+      return num_unique;
+  }
+
+  std::vector<T> tmp(b, e);
+  std::sort(tmp.begin(), tmp.end());
+  auto it = std::unique(tmp.begin(), tmp.end());
+  return std::distance(tmp.begin(), it);
+}
+
 template <typename T>
 size_t unique_size(const std::initializer_list<T>& vec) {
-  std::vector<T> temp = vec;
-  std::sort(temp.begin(), temp.end());
-  auto it = std::unique(temp.begin(), temp.end());
-  return std::distance(temp.begin(), it);
+  return unique_size(vec.begin(), vec.end());
+}
+
+template <typename T>
+size_t unique_size(const std::vector<T>& vec) {
+  return unique_size(vec.begin(), vec.end());
 }
 
 template <typename T>
 bool all_unique(const std::initializer_list<T>& vec) {
-  return unique_size(vec) == vec.size();
+  return unique_size(vec.begin(), vec.end()) == vec.size();
 }
 
 template <typename T>
 bool all_unique(const std::vector<T>& vec) {
-  std::vector<T> temp = vec;
-  std::sort(temp.begin(), temp.end());
-  return std::unique(temp.begin(), temp.end()) == temp.end();
+  return unique_size(vec.begin(), vec.end()) == vec.size();
 }
 
 template <typename T>

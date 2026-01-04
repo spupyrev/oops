@@ -34,21 +34,37 @@ struct SwapTraversal {
   }
 
   std::pair<int, int> search(int numPairs) {
-    searchRec(0, numPairs);
+    CHECK(numPairs == 2 || numPairs == 3);
+    searchRec(0, 2);
+    if (numPairs == 3) {
+      searchRec(0, 3);
+    }
     return {numConstraints2, numConstraints3};
   }
 
 private:
   void searchRec(size_t curIdx, int remainingCrossings) {
-    if (remainingCrossings >= 0) {
-      if (!takenCrossings.empty() && canSwap()) {
-        processConstraint();
-        return;
-      }
-    }
-    if (remainingCrossings == 0)
-      return;
+    CHECK(remainingCrossings >= 0);
     CHECK(curIdx <= possibleCrossings.size());
+
+    if (remainingCrossings == 0) {
+      // Approximation: there should be some overlap in taken vertices
+      if (takenCrossings.size() == 3) {
+        const auto [v1, u1] = graph.edges[takenCrossings[0].first];
+        const auto [v2, u2] = graph.edges[takenCrossings[0].second];
+        const auto [v3, u3] = graph.edges[takenCrossings[1].first];
+        const auto [v4, u4] = graph.edges[takenCrossings[1].second];
+        const auto [v5, u5] = graph.edges[takenCrossings[2].first];
+        const auto [v6, u6] = graph.edges[takenCrossings[2].second];
+        if (unique_size({v1, u1, v2, u2, v3, u3, v4, u4, v5, u5, v6, u6}) >= 11)
+          return;
+      }
+      if (takenCrossings.size() >= 2 && canSwap()) {
+        processConstraint();
+      }
+      return;
+    }
+
     if (curIdx == possibleCrossings.size())
       return;
 
@@ -59,50 +75,20 @@ private:
     const auto [u2, v2] = graph.edges[e2];
     // circular order: u1--u2--v1--v2
 
-    if (isCrossedEdge[u1][v1] == 0 && isCrossedEdge[u2][v2] == 0) {
-      if (isFreeEdge[u1][v1] == 0 && isFreeEdge[u2][v2] == 0) {
-        if (isCrossedEdge[u1][u2] == 0 && isCrossedEdge[u2][v1] == 0 && isCrossedEdge[v1][v2] == 0 && isCrossedEdge[v2][u1] == 0) {
-          // register the crossings
-          addCrossedEdge(u1, v1, 1);
-          addCrossedEdge(u2, v2, 1);
+    if (canMarkCrossing(u1, v1, u2, v2)) {
+      takenCrossings.push_back(possibleCrossings[curIdx]);
 
-          addFreeEdge(u1, u2, 1);
-          addFreeEdge(u2, v1, 1);
-          addFreeEdge(v1, v2, 1);
-          addFreeEdge(v2, u1, 1);
-          takenCrossings.push_back(possibleCrossings[curIdx]);
+      // check if this crossing tuple is forbidden
+      const bool isForbidden = takenCrossings.size() > 1 && isTakenForbidden();
 
-          // check if this crossing tuple is forbidden
-          bool isForbidden = false;
-          if (takenCrossings.size() == 2) {
-            const CrossingPair crossPair(m, takenCrossings[0].first, takenCrossings[0].second, 
-                                            takenCrossings[1].first, takenCrossings[1].second);
-            if (forbiddenTuples.contains(crossPair))
-              isForbidden = true;
-          } else if (takenCrossings.size() == 3) {
-            const CrossingTriple crossTriple(m, takenCrossings[0].first, takenCrossings[0].second, 
-                                                takenCrossings[1].first, takenCrossings[1].second,
-                                                takenCrossings[2].first, takenCrossings[2].second);
-            if (forbiddenTuples.contains(crossTriple))
-              isForbidden = true;
-          }
-
-          // recurse
-          if (!isForbidden) {
-            searchRec(curIdx + 1, remainingCrossings - 1);
-          }
-
-          // rollback
-          addCrossedEdge(u1, v1, -1);
-          addCrossedEdge(u2, v2, -1);
-
-          addFreeEdge(u1, u2, -1);
-          addFreeEdge(u2, v1, -1);
-          addFreeEdge(v1, v2, -1);
-          addFreeEdge(v2, u1, -1);
-          takenCrossings.pop_back();
-        }
+      // recurse
+      if (!isForbidden) {
+        markCrossing(u1, v1, u2, v2);
+        searchRec(curIdx + 1, remainingCrossings - 1);
+        unmarkCrossing(u1, v1, u2, v2);
       }
+
+      takenCrossings.pop_back();
     }
 
     // skip the current
@@ -111,28 +97,68 @@ private:
 
   void processConstraint() {
     CHECK(takenCrossings.size() == 2 || takenCrossings.size() == 3);
-    bool added = false;
     if (takenCrossings.size() == 2) {
       const CrossingPair crossPair(m, takenCrossings[0].first, takenCrossings[0].second, 
                                       takenCrossings[1].first, takenCrossings[1].second);
-      if (!forbiddenTuples.contains(crossPair)) {
-        forbiddenTuples.insert(crossPair);
-        numConstraints2++;
-        added = true;
-      }
+      CHECK(!forbiddenTuples.contains(crossPair));
+      forbiddenTuples.insert(crossPair);
+      numConstraints2++;
     } else {
       const CrossingTriple crossTriple(m, takenCrossings[0].first, takenCrossings[0].second, 
                                           takenCrossings[1].first, takenCrossings[1].second,
                                           takenCrossings[2].first, takenCrossings[2].second);
-      if (!forbiddenTuples.contains(crossTriple)) {
-        forbiddenTuples.insert(crossTriple);
-        numConstraints3++;
-        added = true;
-      }
+      CHECK(!forbiddenTuples.contains(crossTriple));
+      forbiddenTuples.insert(crossTriple);
+      numConstraints3++;
     }
 
-    LOG_IF(verbose && added && (numConstraints2 + numConstraints3) % 5000 == 0, 
+    LOG_IF(verbose && (numConstraints2 + numConstraints3) % 10000 == 0, 
            "  found %d swap constraints so far...", numConstraints2 + numConstraints3);
+  }
+
+  bool isTakenForbidden() const {
+    CHECK(takenCrossings.size() == 2 || takenCrossings.size() == 3);
+    if (takenCrossings.size() == 2) {
+      const CrossingPair crossPair(m, takenCrossings[0].first, takenCrossings[0].second, 
+                                      takenCrossings[1].first, takenCrossings[1].second);
+      return forbiddenTuples.contains(crossPair);
+    } 
+
+    const CrossingTriple crossTriple(m, takenCrossings[0].first, takenCrossings[0].second, 
+                                        takenCrossings[1].first, takenCrossings[1].second,
+                                        takenCrossings[2].first, takenCrossings[2].second);
+    return forbiddenTuples.contains(crossTriple);
+  }
+
+  bool canMarkCrossing(int u1, int v1, int u2, int v2) const {
+    if (isCrossedEdge[u1][v1] == 0 && isCrossedEdge[u2][v2] == 0) {
+      if (isFreeEdge[u1][v1] == 0 && isFreeEdge[u2][v2] == 0) {
+        if (isCrossedEdge[u1][u2] == 0 && isCrossedEdge[u2][v1] == 0 && isCrossedEdge[v1][v2] == 0 && isCrossedEdge[v2][u1] == 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  void markCrossing(int u1, int v1, int u2, int v2) {
+    addCrossedEdge(u1, v1, 1);
+    addCrossedEdge(u2, v2, 1);
+
+    addFreeEdge(u1, u2, 1);
+    addFreeEdge(u2, v1, 1);
+    addFreeEdge(v1, v2, 1);
+    addFreeEdge(v2, u1, 1);
+  }
+
+  void unmarkCrossing(int u1, int v1, int u2, int v2) {
+    addCrossedEdge(u1, v1, -1);
+    addCrossedEdge(u2, v2, -1);
+
+    addFreeEdge(u1, u2, -1);
+    addFreeEdge(u2, v1, -1);
+    addFreeEdge(v1, v2, -1);
+    addFreeEdge(v2, u1, -1);
   }
 
   void addFreeEdge(const int u, const int v, const int delta) {
@@ -181,10 +207,8 @@ private:
     std::vector<int> takenVertices;
     takenVertices.reserve(4 * takenCrossings.size());
     for (const auto& [e1, e2] : takenCrossings) {
-      const int u1 = edges[e1].first;
-      const int v1 = edges[e1].second;
-      const int u2 = edges[e2].first;
-      const int v2 = edges[e2].second;
+      const auto [u1, v1] = edges[e1];
+      const auto [u2, v2] = edges[e2];
 
       // this is a K4 edge, which should be taken care of by earlier constraints
       if (cost[u1][v1] == 0 || cost[u2][v2] == 0)
@@ -347,8 +371,7 @@ private:
       if (processedNewEdge[i])
         continue;
       
-      const int u = newEdges[i].first;
-      const int v = newEdges[i].second;
+      const auto [u, v] = newEdges[i];
 
       // case 1: cost-0 => drop
       if (cost[u][v] == 0) {
@@ -444,8 +467,8 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
   CHECK(sc.size() == 2, "incorrect format for swap-constraints");
   const int numPairs = sc[0];
   const int numSwaps = sc[1];
-  CHECK(numPairs >= 1 && numSwaps >= 2, "incorrect format for swap-constraints");
-  CHECK(numSwaps <= 3, "numSwaps=%d is not implemeted yet", numSwaps);
+  CHECK(numPairs >= 1, "incorrect format for swap-constraints");
+  CHECK(2 <= numSwaps && numSwaps <= 3, "numSwaps=%d is not supported", numSwaps);
 
   SwapTraversal finder(graph, params, model.getForbiddenTuples());
   if (!finder.init(numPairs, numSwaps)) {

@@ -54,10 +54,15 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
   options.addAllowedOption("-timeout", "0", "Maximum time (in seconds) to solve SAT");
   options.addAllowedOption("-sparsify", "false", "Try to eliminate crossings in the resulting solution");
-  options.addAllowedOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
-  options.addAllowedOption("-unsat", "false", "Add auxiliary constraints to speedup finding non-1-planar instances");
+
+  // Constraints
   options.addAllowedOption("-ic", "false", "Enforce IC constraints");
   options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
+  options.addAllowedOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
+  options.addAllowedOption("-unsat", "false", "Add auxiliary constraints to speedup finding non-1-planar instances");
+  options.addAllowedOption("-extreme", "false", "Add extreme auxiliary constraints to speedup finding non-1-planar instances");
+  options.addAllowedOption("-swap-constraints", "", "Add swap constraints: num_pairs/num_reorder");
+  options.addAllowedOption("-sep-cycles", "", "Add constraints based on separating cycles: max-clause");
 
   // External SAT solver
   options.addAllowedOption("-dimacs", "", "Output dimacs file");
@@ -70,8 +75,6 @@ void prepareOptions(CMDOptions& options) {
   // Experimental
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
   options.addAllowedOption("-skip-reducible-subgraphs", "false", "[Experimental] Skip reducible subgraphs");
-  options.addAllowedOption("-swap-constraints", "", "[Experimental] Add swap constraints: num_pairs/num_reorder");
-  options.addAllowedOption("-sep-cycles", "", "[Experimental] Add constraints based on separating cycles: max-clause");
   options.addAllowedOption("-custom", "", "Custom option");
 }
 
@@ -384,6 +387,11 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.custom = options.getStr("-custom");
 
   params.useSATConstraints = options.getBool("-sat");
+  if (options.getBool("-extreme")) {
+    CHECK(options.getBool("-unsat"), "-extreme requires -unsat");
+    params.swapConstraints = "3/3";
+    params.sepCycleConstraints = "3";
+  }
   if (options.getBool("-unsat")) {
     params.useUNSATConstraints = true;
     params.useSATConstraints = true;

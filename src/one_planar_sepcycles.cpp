@@ -117,7 +117,6 @@ struct SepCycleTraversal {
       const int e2 = possibleCrossings[idx_uv].second;
       const auto [u, v] = graph.edges[e1];
       const auto [x, y] = graph.edges[e2];
-      CHECK(u < v && x < y);
       CHECK(all_unique({x, y, u, v}));
 
       markCrossing(u, v, x, y);
@@ -131,7 +130,10 @@ struct SepCycleTraversal {
         const int e2_cr0 = possibleCrossings[cr0].second;
         const auto [u1, v1] = graph.edges[e1_cr0];
         const auto [u2, v2] = graph.edges[e2_cr0];
-        CHECK(u1 < v1 && u2 < v2);
+
+        // // Approximation1: need to have at least one common vertex with the main crossing
+        // if (all_unique({x, y, u, v, u1, v1, u2, v2}))
+        //   continue;
 
         // skip the triple if this pair is already forbidden
         if (forbiddenTuples.contains(CrossingPair(m, e1, e2, e1_cr0, e2_cr0))) 
@@ -151,7 +153,10 @@ struct SepCycleTraversal {
           const int e2_cr1 = possibleCrossings[cr1].second;
           const auto [w1, z1] = graph.edges[e1_cr1];
           const auto [w2, z2] = graph.edges[e2_cr1];
-          CHECK(w1 < z1 && w2 < z2);
+
+          // Approximation2: need to have at least two common vertices among the crossings
+          if (unique_size({x, y, u, v, u1, v1, u2, v2, w1, z1, w2, z2}) >= 11)
+            continue;
 
           // skip the triple if these pairs are already forbidden
           if (forbiddenTuples.contains(CrossingPair(m, e1, e2, e1_cr1, e2_cr1))) 
