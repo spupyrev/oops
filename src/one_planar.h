@@ -212,6 +212,7 @@ struct Params {
   bool useIC = false;
   bool useNIC = false;
 
+  bool strict = false;
   bool forbidCrossings = false;
   std::string swapConstraints = "";
   std::string partialConstraints = "";
@@ -355,6 +356,10 @@ class SATModel {
   std::unordered_map<std::pair<int, int>, int, pair_hash> moveVars;
   // cover variables [edge_index][node_index]
   std::vector<std::vector<int>> coverVars;
+  // dir variables [edge_index]
+  std::vector<int> dirVars;
+  // aux variable
+  std::unordered_map<int, int> auxVars;
 
   // solution (provided by an external solver)
   std::unordered_map<int, bool> externalVars;
@@ -424,11 +429,12 @@ class SATModel {
     moveVars[pair] = var;
   }
 
-  void addCross2Var(int i, int j) {
+  int addCross2Var(int i, int j) {
     CHECK(i != j);
     const auto pair = i < j ? std::make_pair(i, j) : std::make_pair(j, i);
     CHECK(cross2Vars.count(pair) == 0);
     cross2Vars[pair] = addVar();
+    return cross2Vars[pair];
   }
 
   MVar getCross2Var(int i, int j, bool positive) const {
@@ -450,6 +456,7 @@ class SATModel {
 
   void reserveCoverVars(size_t numEdges, size_t numVertices) {
     coverVars = std::vector<std::vector<int>>(numEdges, std::vector<int>(numVertices, -1));
+    dirVars = std::vector<int>(numEdges, -1);
   }
 
   int addCoverVar(int e, int v) {
@@ -463,6 +470,29 @@ class SATModel {
   MVar getCoverVar(int e, int v, bool positive) const {
     CHECK(coverVars[e][v] != -1, "coverVars for tuple (%d, %d) not added", e, v);
     return MVar(coverVars[e][v], positive);
+  }
+
+  int addDirVar(int e) {
+    CHECK(0 <= e && e < (int)dirVars.size());
+    CHECK(dirVars[e] == -1);
+    dirVars[e] = addVar();
+    return dirVars[e];
+  }
+
+  MVar getDirVar(int e, bool positive) const {
+    CHECK(dirVars[e] != -1, "dirVars for edge %d not added", e);
+    return MVar(dirVars[e], positive);
+  }
+
+  int addAuxVar() {
+    const int var = addVar();
+    auxVars[var] = var;
+    return var;
+  }
+
+  MVar getAuxVar(int id, bool positive) const {
+    CHECK(auxVars.find(id) != auxVars.end(), "auxVars for id = %d not added", id);
+    return MVar(auxVars.at(id), positive);
   }
 
   void initVars(Solver& solver) {
@@ -747,6 +777,6 @@ Result bruteForce(const Params& params, const InputGraph& graph);
 void encodeICConstraints(SATModel& model, const InputGraph& graph, const int verbose, const int C);
 void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int verbose);
-void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const int verbose);
+void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodePartialConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const Params& params);

@@ -31,6 +31,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-part", "", "The part of the input to process in the form of part_idx/num_parts");
   options.addAllowedOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
   options.addAllowedOption("-min-n", "-1", "The minimum number of vertices in the processed graph");
+  options.addAllowedOption("-max-m", "-1", "The maximum number of edges in the processed graph");
   options.addAllowedOption("-max-degree", "-1", "Max vertex degree in the processed graph");
   options.addAllowedOption("-skip-planar", "false", "Whether to skip planar input instances");
 
@@ -61,8 +62,10 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
   options.addAllowedOption("-unsat", "false", "Add auxiliary constraints to speedup finding non-1-planar instances");
   options.addAllowedOption("-extreme", "false", "Add extreme auxiliary constraints to speedup finding non-1-planar instances");
+  options.addAllowedOption("-strict", "false", "Enforce strict 1-planarity (no unnecessary crossings)");
   options.addAllowedOption("-swap-constraints", "", "Add swap constraints: num_pairs/num_reorder");
-  options.addAllowedOption("-sep-cycles", "", "Add constraints based on separating cycles: max-clause");
+  options.addAllowedOption("-partial-constraints", "", "Add partial constraints: num_pairs");
+  options.addAllowedOption("-sep-cycles", "", "Add constraints based on separating cycles: num_pairs");
 
   // External SAT solver
   options.addAllowedOption("-dimacs", "", "Output dimacs file");
@@ -258,12 +261,15 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
 
   const int maxN = options.getInt("-max-n");
   const int minN = options.getInt("-min-n");
+  const int maxM = options.getInt("-max-m");
   const int maxD = options.getInt("-max-degree");
   const bool skipPlanar = options.getBool("-skip-planar");
-  auto graphFilter = [maxN,minN,maxD,skipPlanar](const int n, const std::vector<EdgeTy>& edges) -> bool {
+  auto graphFilter = [maxN,minN,maxM,maxD,skipPlanar](const int n, const std::vector<EdgeTy>& edges) -> bool {
     if (minN != -1 && n < minN)
       return false;
     if (maxN != -1 && n > maxN)
+      return false;
+    if (maxM != -1 && (int)edges.size() > maxM)
       return false;
     if (maxD != -1 && maxDegree(n, edges) > maxD)
       return false;
@@ -383,6 +389,7 @@ void initSATParams(CMDOptions& options, Params& params) {
 
   params.forbidCrossings = options.getBool("-forbid-crossings");
   params.swapConstraints = options.getStr("-swap-constraints");
+  params.partialConstraints = options.getStr("-partial-constraints");
   params.sepCycleConstraints = options.getStr("-sep-cycles");
   params.custom = options.getStr("-custom");
 
@@ -410,6 +417,9 @@ void initSATParams(CMDOptions& options, Params& params) {
   if (options.getBool("-nic")) {
     params.useNIC = true;
     params.useSATConstraints = true;
+  }
+  if (options.getBool("-strict")) {
+    params.strict = true;
   }
 
   if (options.getStr("-solver") == "move") {

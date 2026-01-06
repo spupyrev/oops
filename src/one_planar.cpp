@@ -211,10 +211,10 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const int
     }
   }
 
-  // Ensure associativity for non-mergable vertices
+  // Ensure associativity for mergable vertices
   model.reserveClauses(numVertices * numVertices * numVertices + numVertices * numVertices);
   for (int i = n; i < numVertices; i++) {
-    for (int j = n + 1; j < numVertices; j++) {
+    for (int j = n; j < numVertices; j++) {
       if (i == j)
         continue;
       if (canBeMerged(i, j, n, edges)) {
@@ -286,6 +286,7 @@ void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int v
       }
     }
   }
+
   // At most two division vertices are merged together
   for (int i = n; i < numVertices; i++) {
     for (int j = i + 1; j < numVertices; j++) {
@@ -321,7 +322,7 @@ void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int v
 }
 
 /// Encode edge-crossing variables and constraints
-void encodeCross1Constraints(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeCross1Constraints(SATModel& model, const InputGraph& graph, const Params& params) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -398,15 +399,15 @@ void encodeCross1Constraints(SATModel& model, const InputGraph& graph, const int
     }
   }
 
-  LOG_IF(verbose, "cross-1 constraints: %d planar-K4; %d degree-2-lex", numPlanarK4, numDegree2Lex);
+  LOG_IF(params.verbose, "cross-1 constraints: %d planar-K4; %d degree-2-lex", numPlanarK4, numDegree2Lex);
 
   if (!graph.isDirected()) {
-    encodeCoverConstraints(model, graph, verbose);
+    encodeCoverConstraints(model, graph, params);
   }
 }
 
 /// Encode cover variables and constraints
-void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const Params& params) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -414,71 +415,140 @@ void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const int 
 
   // Variables
   model.reserveCoverVars(m, numVertices);
-  for (int i = n; i < numVertices; i++) {
-    const int e = i - n;
-    model.addCoverVar(e, i);
+  for (int div = n; div < numVertices; div++) {
+    const int e = div - n;
+    const auto [s, t] = edges[e];
 
-    const int u = edges[e].first;
-    const int v = edges[e].second;
+    // edge e covers its division vertex, div
+    model.addCoverVar(e, div);
 
     // Cover is true => vertex is in between
     model.addClause({
-        model.getCoverVar(e, i, false), 
-        model.getRelVar(i, u, true),
-        model.getRelVar(i, v, true)
+        model.getCoverVar(e, div, false), 
+        model.getRelVar(div, s, true),
+        model.getRelVar(div, t, true)
     });
     model.addClause({
-        model.getCoverVar(e, i, false), 
-        model.getRelVar(u, i, true),
-        model.getRelVar(v, i, true)
+        model.getCoverVar(e, div, false), 
+        model.getRelVar(s, div, true),
+        model.getRelVar(t, div, true)
     });
 
-    // // Cover is false => vertex is not in between (optional)
-    // model.addClause({
-    //     model.getCoverVar(e, i, true), 
-    //     model.getRelVar(u, v, false),
-    //     model.getRelVar(i, u, true),
-    //     model.getRelVar(v, i, true)
-    // });
-    // model.addClause({
-    //     model.getCoverVar(e, i, true), 
-    //     model.getRelVar(u, v, true),
-    //     model.getRelVar(i, v, true),
-    //     model.getRelVar(u, i, true)
-    // });
+    // Between => cover
+    model.addClause({
+      model.getRelVar(div, s, true),
+      model.getRelVar(t, div, true),
+      model.getCoverVar(e, div, true)
+    });
+    model.addClause({
+      model.getRelVar(div, t, true),
+      model.getRelVar(s, div, true),
+      model.getCoverVar(e, div, true)
+    });
   }
 
   // Constraints
   // An edge doesn't cross => the division is in between
-  int numMid = 0;
-  for (int i = n; i < numVertices; i++) {
-    const int e = i - n;
+  int numMid1 = 0;
+  for (int d = n; d < numVertices; d++) {
+    const int e = d - n;
     model.addClause({
-      model.getCross1Var(i, true), 
-      model.getCoverVar(e, i, true)
+      model.getCross1Var(d, true), 
+      model.getCoverVar(e, d, true)
     });
-    numMid++;
+    numMid1++;
   }
-  // Every crossed division vertex is in between
+  // Every crossed division vertex is in between one of the two edges
   int numMid2 = 0;
-  for (int i = n; i < numVertices; i++) {
-    for (int j = i + 1; j < numVertices; j++) {
-      if (!canBeMerged(i, j, n, edges)) 
+  for (int d1 = n; d1 < numVertices; d1++) {
+    for (int d2 = d1 + 1; d2 < numVertices; d2++) {
+      if (!canBeMerged(d1, d2, n, edges)) 
         continue;
 
-      const int e1 = i - n;
-      const int e2 = j - n;
+      const int e1 = d1 - n;
+      const int e2 = d2 - n;
 
       model.addClause({
-        model.getCross2Var(i, j, false), 
-        model.getCoverVar(e1, i, true),
-        model.getCoverVar(e2, j, true)
+        model.getCross2Var(d1, d2, false), 
+        model.getCoverVar(e1, d1, true),
+        model.getCoverVar(e2, d2, true)
       });
       numMid2++;
     }
   }
 
-  LOG_IF(verbose, "cover constraints: %d mid-1; %d mid-2", numMid, numMid2);
+  // Two edges cross => edge intervals overlap
+  int numStrict1 = 0;
+  if (params.strict) {
+    for (int div = n; div < numVertices; div++) {
+      const int e = div - n;
+      const auto [s, t] = edges[e];
+      // edge e is directed s < t
+      model.addDirVar(e);
+      model.addClause({ model.getRelVar(s, t, true),  model.getDirVar(e, false) });
+      model.addClause({ model.getRelVar(s, t, false), model.getDirVar(e, true) });
+      model.addClause({ model.getRelVar(t, s, true),  model.getDirVar(e, true) });
+      model.addClause({ model.getRelVar(t, s, false), model.getDirVar(e, false) });
+    }
+
+    // forbid relative order a < b < c < d  with d1+d2 crossed
+    // auto addStrictClause = [&](int a, int b, int c, int d, int d1, int d2) {
+    //   model.addClause({
+    //     model.getCross2Var(d1, d2, false), 
+    //     model.getRelVar(a, b, false),
+    //     model.getRelVar(b, c, false),
+    //     model.getRelVar(c, d, false)
+    //   });
+    // };
+
+    auto addStrictClause2 = [&](int e1, bool guard1_is_dir,
+                                int e2, bool guard2_is_dir,
+                                int sepA, int sepB,
+                                int d1, int d2) {
+      model.addClause({
+        model.getCross2Var(d1, d2, false),
+        model.getDirVar(e1, !guard1_is_dir),
+        model.getDirVar(e2, !guard2_is_dir),
+        model.getRelVar(sepA, sepB, false)
+      });
+    };
+
+    for (int d1 = n; d1 < numVertices; d1++) {
+      for (int d2 = d1 + 1; d2 < numVertices; d2++) {
+        if (!canBeMerged(d1, d2, n, edges)) 
+          continue;
+
+        const int e1 = d1 - n;
+        const int e2 = d2 - n;
+        const auto [u1, v1] = edges[e1];
+        const auto [u2, v2] = edges[e2];
+
+        // addStrictClause(u1, v1, u2, v2,  d1, d2);
+        // addStrictClause(u1, v1, v2, u2,  d1, d2);
+        // addStrictClause(v1, u1, u2, v2,  d1, d2);
+        // addStrictClause(v1, u1, v2, u2,  d1, d2);
+        // addStrictClause(u2, v2, u1, v1,  d1, d2);
+        // addStrictClause(u2, v2, v1, u1,  d1, d2);
+        // addStrictClause(v2, u2, u1, v1,  d1, d2);
+        // addStrictClause(v2, u2, v1, u1,  d1, d2);
+
+        // e1 before e2: forbid right(e1) < left(e2)
+        addStrictClause2(e1, true,  e2, true,   v1, u2,  d1, d2);
+        addStrictClause2(e1, true,  e2, false,  v1, v2,  d1, d2);
+        addStrictClause2(e1, false, e2, true,   u1, u2,  d1, d2);
+        addStrictClause2(e1, false, e2, false,  u1, v2,  d1, d2);
+        // e2 before e1: forbid right(e2) < left(e1)
+        addStrictClause2(e2, true,  e1, true,   v2, u1,  d1, d2);
+        addStrictClause2(e2, true,  e1, false,  v2, v1,  d1, d2);
+        addStrictClause2(e2, false, e1, true,   u2, u1,  d1, d2);
+        addStrictClause2(e2, false, e1, false,  u2, v1,  d1, d2);
+
+        numStrict1++;
+      }
+    }
+  }
+
+  LOG_IF(params.verbose, "cover constraints: %d mid-1; %d mid-2; %d strict1", numMid1, numMid2, numStrict1);
 }
 
 /// C=0 <=> IC; C=1 <=> NIC; C=2 <=> 1-planar
@@ -798,7 +868,7 @@ void encodeMovePlanar(
   // Optional encoding
   if (params.useUNSATConstraints) {
     CHECK(params.useSATConstraints);
-    encodeCross1Constraints(model, graph, params.verbose);
+    encodeCross1Constraints(model, graph, params);
   }
   if (params.useIC) {
     CHECK(params.useSATConstraints);
@@ -925,7 +995,7 @@ void encodeStackPlanar(
   }
   if (params.useUNSATConstraints) {
     CHECK(params.useSATConstraints);
-    encodeCross1Constraints(model, graph, params.verbose);
+    encodeCross1Constraints(model, graph, params);
   }
   if (params.useIC) {
     CHECK(params.useSATConstraints);

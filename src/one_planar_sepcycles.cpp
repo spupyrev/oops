@@ -2,8 +2,6 @@
 #include "logging.h"
 #include "one_planar.h"
 
-//#include <utility>
-
 /// TODO: merge with similar impl
 struct SepCycleTraversal {
   SepCycleTraversal(const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
@@ -19,10 +17,6 @@ struct SepCycleTraversal {
       }
     }
 
-    if (possibleCrossings.size() > 4096) {
-      LOG_IF(verbose, "skipped sep-cycles constraints due to too many possible_crossings (%d)", possibleCrossings.size());
-      return false;
-    }
     LOG_IF(verbose, "sep-cycles constraints for %d pairs; |possible_crossings| = %d", 
            numPairs, possibleCrossings.size());
 
@@ -99,6 +93,11 @@ struct SepCycleTraversal {
 
   /// Find triples of crossings that cannot happen in a 1-planar drawing
   size_t build3Clauses() {
+    if (possibleCrossings.size() > 2048) {
+      LOG_IF(verbose, "  skipped building sep-cycles 3-clauses due to too many possible_crossings");
+      return 0;
+    }
+
     for (const auto& [u, v] : graph.edges) {
       CHECK(isEdge[u][v]);
     }
@@ -131,10 +130,6 @@ struct SepCycleTraversal {
         const auto [u1, v1] = graph.edges[e1_cr0];
         const auto [u2, v2] = graph.edges[e2_cr0];
 
-        // // Approximation1: need to have at least one common vertex with the main crossing
-        // if (all_unique({x, y, u, v, u1, v1, u2, v2}))
-        //   continue;
-
         // skip the triple if this pair is already forbidden
         if (forbiddenTuples.contains(CrossingPair(m, e1, e2, e1_cr0, e2_cr0))) 
           continue;
@@ -154,7 +149,7 @@ struct SepCycleTraversal {
           const auto [w1, z1] = graph.edges[e1_cr1];
           const auto [w2, z2] = graph.edges[e2_cr1];
 
-          // Approximation2: need to have at least two common vertices among the crossings
+          // Approximation: need to have at least two common vertices among the crossings
           if (unique_size({x, y, u, v, u1, v1, u2, v2, w1, z1, w2, z2}) >= 11)
             continue;
 

@@ -17,10 +17,6 @@ struct SwapTraversal {
         possibleCrossings.push_back({e1, e2});
       }
     }
-    if (possibleCrossings.size() > 4096) {
-      LOG_IF(verbose, "skipped swap constraints due to too many possible_crossings (%d)", possibleCrossings.size());
-      return false;
-    }
     LOG_IF(verbose, "swap constraints for %d pairs and %d swaps; |possible_crossings| = %d", 
            numPairs, maxNumSwaps, possibleCrossings.size());
 
@@ -33,13 +29,19 @@ struct SwapTraversal {
     return true;
   }
 
-  std::pair<int, int> search(int numPairs) {
-    CHECK(numPairs == 2 || numPairs == 3);
+  size_t search2() {
     searchRec(0, 2);
-    if (numPairs == 3) {
-      searchRec(0, 3);
-    }
-    return {numConstraints2, numConstraints3};
+    return numConstraints2;
+  }
+
+  size_t search3() {
+    if (possibleCrossings.size() > 1280) {
+      LOG_IF(verbose, "skipped building swap 3-clauses due to too many possible_crossings (%d)", possibleCrossings.size());
+      return 0;
+    } 
+      
+    searchRec(0, 3);
+    return numConstraints3;
   }
 
 private:
@@ -112,7 +114,7 @@ private:
       numConstraints3++;
     }
 
-    LOG_IF(verbose && (numConstraints2 + numConstraints3) % 10000 == 0, 
+    LOG_IF(verbose && (numConstraints2 + numConstraints3) % 50000 == 0, 
            "  found %d swap constraints so far...", numConstraints2 + numConstraints3);
   }
 
@@ -475,8 +477,13 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
     return;
   }
 
-  const auto [numClauses2, numClauses3] = finder.search(numPairs);
-  LOG_IF(verbose && numClauses2 + numClauses3 == 0, "  no swap constraints");
-  LOG_IF(verbose && numClauses2 > 0, "  found %'9d 2-clauses", numClauses2);
-  LOG_IF(verbose && numClauses3 > 0, "  found %'9d 3-clauses", numClauses3);
+  // forbidden pairs (2-clauses)
+  const size_t numClauses2 = finder.search2();
+  LOG_IF(verbose, "  found %'9d 2-clauses", numClauses2);
+
+  if (numPairs == 3) {
+    // forbidden triples (3-clauses)
+    const size_t numClauses3 = finder.search3();
+    LOG_IF(verbose, "  found %'9d 3-clauses", numClauses3);
+  }
 }

@@ -3,4 +3,4 @@
 #include <vector>
 
 std::pair<int, std::vector<std::vector<int>>> 
-applySatsumaSymmetry(int verbose, int numVars, const std::vector<std::vector<int>> &clauses);
+applySatsumaSymmetry(int verbose, int numVars, std::vector<std::vector<int>> &clauses);
