@@ -258,7 +258,7 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const int
 }
 
 /// Add pairwise crossing (merge) variables
-void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeCross2Variables(SATModel& model, const InputGraph& graph, const Params& params) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -313,11 +313,11 @@ void encodeCross2Variables(SATModel& model, const InputGraph& graph, const int v
     }
   }
 
-  LOG_IF(verbose, "cross-2 constraints:");
+  LOG_IF(params.verbose, "cross-2 constraints:");
 
   if (!graph.isDirected()) {
-    encodeK4Constraints(model, graph, verbose);
-    encodeICConstraints(model, graph, verbose, 2);
+    encodeK4Constraints(model, graph, params);
+    encodeICConstraints(model, graph, params.verbose, 2);
   }
 }
 
@@ -403,6 +403,9 @@ void encodeCross1Constraints(SATModel& model, const InputGraph& graph, const Par
 
   if (!graph.isDirected()) {
     encodeCoverConstraints(model, graph, params);
+    if (params.strict) {
+      encodeStrictConstraints(model, graph, params);
+    }
   }
 }
 
@@ -477,78 +480,87 @@ void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const Para
     }
   }
 
+  LOG_IF(params.verbose, "cover constraints: added %d 2-clauses and %d 3-caluses", numMid1, numMid2);
+}
+
+/// Encode strict constraints that guarantee 1-planarity (that is, non-crossed merged pairs)
+/// TODO: the current implementation is not complete
+void encodeStrictConstraints(SATModel& model, const InputGraph& graph, const Params& params) {
+  const int n = graph.n;
+  const auto& edges = graph.edges;
+  const int m = (int)edges.size();
+  const int numVertices = n + m;
+
   // Two edges cross => edge intervals overlap
-  int numStrict1 = 0;
-  if (params.strict) {
-    for (int div = n; div < numVertices; div++) {
-      const int e = div - n;
-      const auto [s, t] = edges[e];
-      // edge e is directed s < t
-      model.addDirVar(e);
-      model.addClause({ model.getRelVar(s, t, true),  model.getDirVar(e, false) });
-      model.addClause({ model.getRelVar(s, t, false), model.getDirVar(e, true) });
-      model.addClause({ model.getRelVar(t, s, true),  model.getDirVar(e, true) });
-      model.addClause({ model.getRelVar(t, s, false), model.getDirVar(e, false) });
-    }
+  int numStrict = 0;
+  for (int div = n; div < numVertices; div++) {
+    const int e = div - n;
+    const auto [s, t] = edges[e];
+    // edge e is directed s < t
+    model.addDirVar(e);
+    model.addClause({ model.getRelVar(s, t, true),  model.getDirVar(e, false) });
+    model.addClause({ model.getRelVar(s, t, false), model.getDirVar(e, true) });
+    model.addClause({ model.getRelVar(t, s, true),  model.getDirVar(e, true) });
+    model.addClause({ model.getRelVar(t, s, false), model.getDirVar(e, false) });
+  }
 
-    // forbid relative order a < b < c < d  with d1+d2 crossed
-    // auto addStrictClause = [&](int a, int b, int c, int d, int d1, int d2) {
-    //   model.addClause({
-    //     model.getCross2Var(d1, d2, false), 
-    //     model.getRelVar(a, b, false),
-    //     model.getRelVar(b, c, false),
-    //     model.getRelVar(c, d, false)
-    //   });
-    // };
+  // forbid relative order a < b < c < d  with d1+d2 crossed
+  // auto addStrictClause = [&](int a, int b, int c, int d, int d1, int d2) {
+  //   model.addClause({
+  //     model.getCross2Var(d1, d2, false), 
+  //     model.getRelVar(a, b, false),
+  //     model.getRelVar(b, c, false),
+  //     model.getRelVar(c, d, false)
+  //   });
+  // };
 
-    auto addStrictClause2 = [&](int e1, bool guard1_is_dir,
-                                int e2, bool guard2_is_dir,
-                                int sepA, int sepB,
-                                int d1, int d2) {
-      model.addClause({
-        model.getCross2Var(d1, d2, false),
-        model.getDirVar(e1, !guard1_is_dir),
-        model.getDirVar(e2, !guard2_is_dir),
-        model.getRelVar(sepA, sepB, false)
-      });
-    };
+  auto addStrictClause2 = [&](int e1, bool guard1_is_dir,
+                              int e2, bool guard2_is_dir,
+                              int sepA, int sepB,
+                              int d1, int d2) {
+    model.addClause({
+      model.getCross2Var(d1, d2, false),
+      model.getDirVar(e1, !guard1_is_dir),
+      model.getDirVar(e2, !guard2_is_dir),
+      model.getRelVar(sepA, sepB, false)
+    });
+  };
 
-    for (int d1 = n; d1 < numVertices; d1++) {
-      for (int d2 = d1 + 1; d2 < numVertices; d2++) {
-        if (!canBeMerged(d1, d2, n, edges)) 
-          continue;
+  for (int d1 = n; d1 < numVertices; d1++) {
+    for (int d2 = d1 + 1; d2 < numVertices; d2++) {
+      if (!canBeMerged(d1, d2, n, edges)) 
+        continue;
 
-        const int e1 = d1 - n;
-        const int e2 = d2 - n;
-        const auto [u1, v1] = edges[e1];
-        const auto [u2, v2] = edges[e2];
+      const int e1 = d1 - n;
+      const int e2 = d2 - n;
+      const auto [u1, v1] = edges[e1];
+      const auto [u2, v2] = edges[e2];
 
-        // addStrictClause(u1, v1, u2, v2,  d1, d2);
-        // addStrictClause(u1, v1, v2, u2,  d1, d2);
-        // addStrictClause(v1, u1, u2, v2,  d1, d2);
-        // addStrictClause(v1, u1, v2, u2,  d1, d2);
-        // addStrictClause(u2, v2, u1, v1,  d1, d2);
-        // addStrictClause(u2, v2, v1, u1,  d1, d2);
-        // addStrictClause(v2, u2, u1, v1,  d1, d2);
-        // addStrictClause(v2, u2, v1, u1,  d1, d2);
+      // addStrictClause(u1, v1, u2, v2,  d1, d2);
+      // addStrictClause(u1, v1, v2, u2,  d1, d2);
+      // addStrictClause(v1, u1, u2, v2,  d1, d2);
+      // addStrictClause(v1, u1, v2, u2,  d1, d2);
+      // addStrictClause(u2, v2, u1, v1,  d1, d2);
+      // addStrictClause(u2, v2, v1, u1,  d1, d2);
+      // addStrictClause(v2, u2, u1, v1,  d1, d2);
+      // addStrictClause(v2, u2, v1, u1,  d1, d2);
 
-        // e1 before e2: forbid right(e1) < left(e2)
-        addStrictClause2(e1, true,  e2, true,   v1, u2,  d1, d2);
-        addStrictClause2(e1, true,  e2, false,  v1, v2,  d1, d2);
-        addStrictClause2(e1, false, e2, true,   u1, u2,  d1, d2);
-        addStrictClause2(e1, false, e2, false,  u1, v2,  d1, d2);
-        // e2 before e1: forbid right(e2) < left(e1)
-        addStrictClause2(e2, true,  e1, true,   v2, u1,  d1, d2);
-        addStrictClause2(e2, true,  e1, false,  v2, v1,  d1, d2);
-        addStrictClause2(e2, false, e1, true,   u2, u1,  d1, d2);
-        addStrictClause2(e2, false, e1, false,  u2, v1,  d1, d2);
+      // e1 before e2: forbid right(e1) < left(e2)
+      addStrictClause2(e1, true,  e2, true,   v1, u2,  d1, d2);
+      addStrictClause2(e1, true,  e2, false,  v1, v2,  d1, d2);
+      addStrictClause2(e1, false, e2, true,   u1, u2,  d1, d2);
+      addStrictClause2(e1, false, e2, false,  u1, v2,  d1, d2);
+      // e2 before e1: forbid right(e2) < left(e1)
+      addStrictClause2(e2, true,  e1, true,   v2, u1,  d1, d2);
+      addStrictClause2(e2, true,  e1, false,  v2, v1,  d1, d2);
+      addStrictClause2(e2, false, e1, true,   u2, u1,  d1, d2);
+      addStrictClause2(e2, false, e1, false,  u2, v1,  d1, d2);
 
-        numStrict1++;
-      }
+      numStrict += 8;
     }
   }
 
-  LOG_IF(params.verbose, "cover constraints: %d mid-1; %d mid-2; %d strict1", numMid1, numMid2, numStrict1);
+  LOG_IF(params.verbose, "strict constraints: added %d clauses", numStrict);
 }
 
 /// C=0 <=> IC; C=1 <=> NIC; C=2 <=> 1-planar
@@ -609,7 +621,7 @@ void encodeICConstraints(SATModel& model, const InputGraph& graph, const int ver
 }
 
 /// A pair cross => K4-edges do not cross
-void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeK4Constraints(SATModel& model, const InputGraph& graph, const Params& params) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -651,7 +663,7 @@ void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int ver
     }
   }
 
-  LOG_IF(verbose, "  found %'9d 2-clauses (K4)", numConstraints);
+  LOG_IF(params.verbose, "  found %'9d 2-clauses (K4)", numConstraints);
 }
 
 /// Add identified 2- and 3-clauses to the model 
@@ -861,7 +873,7 @@ void encodeMovePlanar(
 
   // Main encoding
   encodeRelativeVariables(model, graph, params.verbose);
-  encodeCross2Variables(model, graph, params.verbose);
+  encodeCross2Variables(model, graph, params);
   encodeMoveVariables(model, graph, params.verbose);
   encodeMoveConstraints(model, graph, params.verbose);
 
@@ -991,7 +1003,7 @@ void encodeStackPlanar(
 
   // Optional encoding
   if (params.useSATConstraints) {
-    encodeCross2Variables(model, graph, params.verbose);
+    encodeCross2Variables(model, graph, params);
   }
   if (params.useUNSATConstraints) {
     CHECK(params.useSATConstraints);

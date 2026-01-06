@@ -776,7 +776,8 @@ Result bruteForce(const Params& params, const InputGraph& graph);
 
 void encodeICConstraints(SATModel& model, const InputGraph& graph, const int verbose, const int C);
 void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Params& params);
-void encodeK4Constraints(SATModel& model, const InputGraph& graph, const int verbose);
+void encodeK4Constraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const Params& params);
+void encodeStrictConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodePartialConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const Params& params);
