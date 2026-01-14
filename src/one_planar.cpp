@@ -1,19 +1,20 @@
 #include "one_planar.h"
 #include "logging.h"
+#include "graph_algorithms.h"
+
+#include <functional>
 
 using namespace std;
 
 /// Check if a crossing plus the corresponding K4-induced planar edges violate 4*n-8 density
-bool violateDensity(int u, int v, const InputGraph& graph) {
+bool violateDensity(int div_e, int div_f, const InputGraph& graph) {
   const int n = graph.n;
   const int m = (int)graph.edges.size();
   CHECK(n >= 4);
-  CHECK(u >= n && v >= n);
+  CHECK(div_e >= n && div_f >= n);
 
-  const int e_first = graph.edges[u - n].first;
-  const int e_second = graph.edges[u - n].second;
-  const int f_first = graph.edges[v - n].first;
-  const int f_second = graph.edges[v - n].second;
+  const auto [e_first, e_second] = graph.edges[div_e - n];
+  const auto [f_first, f_second] = graph.edges[div_f - n];
   const std::vector<EdgeTy> k4 = {
     {e_first, f_first},
     {e_first, f_second},
@@ -22,7 +23,7 @@ bool violateDensity(int u, int v, const InputGraph& graph) {
   };
   int extraEdges = 0;
   for (const auto& [s, t] : k4) {
-    if (!graph.hasEdge(s, t)) {
+    if (!graph.adjacentVV(s, t)) {
       extraEdges++;
     }
   }
@@ -92,19 +93,18 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
 
   // Skip adjacent edges and density violations
   int numDensitySkipped = 0;
-  for (int u = n; u < numVertices; u++) {
-    for (int v = u + 1; v < numVertices; v++) {
+  for (int d1 = n; d1 < numVertices; d1++) {
+    for (int d2 = d1 + 1; d2 < numVertices; d2++) {
       // two (non-adjacent) division vertices can be non-comparable
-      if (graph.adjacent(edges[u - n], edges[v - n])) {
+      if (graph.adjacentEE(edges[d1 - n], edges[d2 - n]))
         continue;
-      }
       // some crossings violate density
-      if (violateDensity(u, v, graph)) {
+      if (violateDensity(d1, d2, graph)) {
         numDensitySkipped++;
         continue;
       }
-      crossablePairs[u][v] = true;
-      crossablePairs[v][u] = true;
+      crossablePairs[d1][d2] = true;
+      crossablePairs[d2][d1] = true;
     }
   }
 
@@ -159,6 +159,65 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
     }
   }
 
+  // Separating cycles
+  int numSepCyclesSkipped = 0;
+  int numSepCyclesSkipped4 = 0;
+  int numSepCyclesSkipped5 = 0;
+  for (int d1 = n; d1 < numVertices; d1++) {
+    for (int d2 = d1 + 1; d2 < numVertices; d2++) {
+      if (!crossablePairs[d1][d2])
+        continue;        
+      const int u = edges[d1 - n].first;
+      const int v = edges[d1 - n].second;
+      const auto [x, y] = edges[d2 - n];
+
+      /// Returns true if the cycles forbids crossing (u, v) and the cycle
+      auto processCycle = [&](const std::vector<int>& cycle) -> bool {
+        CHECK(all_unique(cycle) && !contains(cycle, u) && !contains(cycle, v));
+        CHECK(cycle.size() >= 3);
+        for (size_t i = 0; i < cycle.size(); i++) {
+          const int v1 = cycle[i];
+          const int v2 = cycle[(i + 1) % cycle.size()];
+          CHECK(graph.adjacentVV(v1, v2));
+        }
+
+        const int numFree = (int)cycle.size() - 1;
+        // Stop early, if possible
+        if (numFree >= std::min(graph.degree(u) - 1, graph.degree(v) - 1))
+          return false;
+
+        // Check if there are many edge-disjoint paths from u to v disjoint from the cycle; one extra path is via edge (u, v)
+        std::vector<EdgeTy> forbiddenEdges = {EdgeTy(u, v)};
+        const int numPaths = countEdgeDisjointPaths(u, v, graph.adj, cycle, forbiddenEdges, numFree + 1);
+        if (numPaths > numFree) {
+          crossablePairs[d1][d2] = false;
+          crossablePairs[d2][d1] = false;
+          numSepCyclesSkipped++;
+          if (cycle.size() == 4)
+            numSepCyclesSkipped4++;
+          if (cycle.size() == 5)
+            numSepCyclesSkipped5++;
+          return true;
+        }
+        return false;
+      };
+
+      const std::vector<int> avoidedVertices = {x, y, u, v};
+      // separating triangle
+      forEachCycle(graph.adj, 3, x, y, avoidedVertices, processCycle);
+      // stop early if found a cycle
+      if (!crossablePairs[d1][d2])
+        continue;
+      // separating 4-cycle
+      forEachCycle(graph.adj, 4, x, y, avoidedVertices, processCycle);
+      // stop early if found a cycle
+      if (!crossablePairs[d1][d2])
+        continue;
+      // separating 5-cycle
+      forEachCycle(graph.adj, 5, x, y, avoidedVertices, processCycle);
+    }
+  }
+
   // Count pairs
   int mergablePairs = 0;
   int possiblePairs = 0;
@@ -169,13 +228,23 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
         mergablePairs++;
     }
   }
-  LOG_IF(params.verbose, "created %d (%.2lf%% out of %d) crossing pairs; "
-                         "filtered out %d (%.2lf%%) due to density, %d (%.2lf%%) due to degree-3, and %d (%.2lf%%) almost twins", 
-    mergablePairs, 100.0 * mergablePairs / double(possiblePairs), possiblePairs,
-    numDensitySkipped, 100.0 * numDensitySkipped / double(possiblePairs),
-    numDegree3Skipped, 100.0 * numDegree3Skipped / double(possiblePairs),
-    numAlmostTwinsSkipped, 100.0 * numAlmostTwinsSkipped / double(possiblePairs)
-  );
+  if (params.verbose > 0) {
+    LOG("created %d (%.2lf%% out of %d) crossing pairs; filtered out:",
+      mergablePairs, 100.0 * mergablePairs / double(possiblePairs), possiblePairs
+    );
+    LOG("  %d (%.2lf%%) due to density", 
+      numDensitySkipped, 100.0 * numDensitySkipped / double(possiblePairs)
+    );
+    LOG("  %d (%.2lf%%) due to degree-3", 
+      numDegree3Skipped, 100.0 * numDegree3Skipped / double(possiblePairs)
+    );
+    LOG("  %d (%.2lf%%) almost twins", 
+      numAlmostTwinsSkipped, 100.0 * numAlmostTwinsSkipped / double(possiblePairs)
+    );
+    LOG("  %d (%.2lf%%) due to separating cycles", 
+      numSepCyclesSkipped, 100.0 * numSepCyclesSkipped / double(possiblePairs)
+    );
+  }
 }
 
 /// Return true iff the two (division) vertices can be merged
@@ -789,7 +858,7 @@ void encodeMoveConstraints(SATModel& model, const InputGraph& graph, const int v
       const auto [f_first, f_second] = graph.seg2edge(seg_f);
 
       // skip adjacent edge
-      if (graph.adjacent(EdgeTy(e_first, e_second), EdgeTy(f_first, f_second)))
+      if (graph.adjacentEE(EdgeTy(e_first, e_second), EdgeTy(f_first, f_second)))
         continue;
 
       // R^m_0
@@ -914,7 +983,7 @@ void encodeStackConstraints(SATModel& model, const InputGraph& graph, const int 
       const auto [e_org, e_div] = graph.seg2edge_v2(seg_e);
       const auto [f_org, f_div] = graph.seg2edge_v2(seg_f);
       // skip adjacent edges
-      if (graph.adjacent(EdgeTy(e_org, e_div), EdgeTy(f_org, f_div)))
+      if (graph.adjacentEE(EdgeTy(e_org, e_div), EdgeTy(f_org, f_div)))
         continue;
 
       // e_org < f_org < e_div < f_div [stack 0]
@@ -1092,7 +1161,7 @@ void fillResultMove(
       const int e1 = i - n;
       const int e2 = equal[0] - n;
       CHECK(e1 != e2);
-      CHECK(!graph.adjacent(edges[e1], edges[e2]));
+      CHECK(!graph.adjacentEE(edges[e1], edges[e2]));
       result.crossings.push_back({e1, e2});
 
       CHECK(!result.isCrossed[e1] && !result.isCrossed[e2]);
@@ -1190,7 +1259,7 @@ void fillResultStack(
       const int e1 = i - n;
       const int e2 = equal[0] - n;
       CHECK(e1 != e2);
-      CHECK(!graph.adjacent(edges[e1], edges[e2]));
+      CHECK(!graph.adjacentEE(edges[e1], edges[e2]));
       CHECK(canBeMerged(i, equal[0], n, edges));
       result.crossings.push_back({e1, e2});
 
@@ -1309,6 +1378,14 @@ Result runSolver(const Params& params, const InputGraph& graph) {
 
   if (params.modelFile != "") {
     LOG_IF(verbose, "encoded %'d variables and %'d constraints", model.varCount(), model.clauseCount());
+    if (verbose >= 1) {
+      size_t clause2Count;
+      size_t clause3Count; 
+      size_t clause4PlusCount;
+      model.fillClauseCount(clause2Count, clause3Count, clause4PlusCount);
+      LOG("  model stats: |2-clauses| = %'d; |3-clauses| = %'d; |4+-clauses| = %'d", clause2Count, clause3Count, clause4PlusCount);
+    }
+
     model.toDimacs(params.modelFile);
     LOG("SAT model in dimacs format saved to '%s'", params.modelFile.c_str());
     exit(0);
@@ -1329,6 +1406,13 @@ Result runSolver(const Params& params, const InputGraph& graph) {
   } else {
     solver.simplify();
     LOG_IF(verbose, "solving SAT model with %'d variables and %'d clauses...", solver.nVars(), solver.nClauses());
+    if (verbose >= 1) {
+      size_t clause2Count;
+      size_t clause3Count; 
+      size_t clause4PlusCount;
+      model.fillClauseCount(clause2Count, clause3Count, clause4PlusCount);
+      LOG("  model stats: |2-clauses| = %'d; |3-clauses| = %'d; |4+-clauses| = %'d", clause2Count, clause3Count, clause4PlusCount);
+    }
 
     if (!solver.okay()) {
       ret = l_False;

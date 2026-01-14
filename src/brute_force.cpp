@@ -168,7 +168,7 @@ int computeSkewness(const InputGraph& graph, const int verbose, const int max_sk
   }
 
   for (int c = 1; c <= max_skewnees; c++) {
-    LOG_IF(verbose >= 2, "  check skewness = %d; possibleCrossings = %d", c, possibleCrossings.size());
+    LOG_IF(verbose >= 2, "checking skewness = %d; possibleCrossings = %d", c, possibleCrossings.size());
     BruteForceSolver solver(graph, possibleCrossings, 0);
     Result res = solver.solve(c);
     if (res.code == ResultCodeTy::SAT) {

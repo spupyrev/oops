@@ -109,17 +109,6 @@ struct InputGraph {
     return (int)adj[v].size();
   }
 
-  /// Check if the edge exists
-  bool hasEdge(int u, int v) const {
-    if (u > v)
-      std::swap(u, v);
-    for (const auto& e : edges) {
-      if (e.first == u && e.second == v)
-        return true;
-    }
-    return false;
-  }
-
   /// Find the index of edge (u, v) or "-1" if it doesn't exist
   int findEdgeIndex(const int u, const int v) const {
     for (int i = 0; i < (int)edges.size(); i++) {
@@ -137,15 +126,22 @@ struct InputGraph {
     return edgeIndex + n;
   }
 
+  /// Check if the two vertices are connected
+  bool adjacentVV(const int u, const int v) const {
+    CHECK(0 <= u && u < n);
+    CHECK(0 <= v && v < n);
+    return contains(adj[u], v);
+  }
+
   /// Check if the edge adjacent to the vertex
-  bool adjacent(const int edgeIndex, const int nodeIndex) const {
+  bool adjacentEV(const int edgeIndex, const int nodeIndex) const {
     CHECK(0 <= edgeIndex && edgeIndex < (int)edges.size());
     CHECK(0 <= nodeIndex && nodeIndex < n + (int)edges.size());
     return (edges[edgeIndex].first == nodeIndex || edges[edgeIndex].second == nodeIndex);
   }
 
   /// Check if the two edges are adjacent
-  bool adjacent(const EdgeTy& edgeI, const EdgeTy& edgeJ) const {
+  bool adjacentEE(const EdgeTy& edgeI, const EdgeTy& edgeJ) const {
     if (edgeI.first == edgeJ.first)
       return true;
     if (edgeI.first == edgeJ.second)
@@ -757,6 +753,20 @@ class SATModel {
 
   size_t clauseCount() const {
     return clauses.size();
+  }
+
+  void fillClauseCount(size_t &clause2Count, size_t &clause3Count, size_t &clause4PlusCount) const {
+    clause2Count = 0;
+    clause3Count = 0; 
+    clause4PlusCount = 0;
+    for (const auto& clause : clauses) {
+      if (clause.vars.size() == 2)
+        clause2Count++;
+      else if (clause.vars.size() == 3)
+        clause3Count++;
+      else 
+        clause4PlusCount++;
+    }
   }
 
   ForbiddenTuples& getForbiddenTuples() {

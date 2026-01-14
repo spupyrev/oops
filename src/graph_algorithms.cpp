@@ -2,12 +2,11 @@
 #include "adjacency.h"
 #include "common.h"
 
-#include <iostream>
 #include <algorithm>
+#include <functional>
+#include <iostream>
 #include <vector>
-#include <set>
 #include <queue>
-#include <map>
 
 using namespace std;
 
@@ -659,4 +658,80 @@ int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList,
   }
 
   return maxflow;
+}
+
+// Calls lambda onCycle({x, ..., y}) for every simple cycle of size 3/4/5. Forbidden vertices may not appear in the cycle.
+// Returns early if onCycle returns true.
+void forEachCycle(const AdjListTy& adj, const int cycleLength,
+                  const int x, const int y,
+                  const std::vector<int>& forbidden,   
+                  const CycleCallback& onCycle) {
+  CHECK(cycleLength == 3 || cycleLength == 4 || cycleLength == 5, "Only cycle sizes 3/4/5 supported");
+
+  if (cycleLength == 3) {
+    // (x, c, y)
+    for (int c : adj[x]) {
+      if (contains({y, x}, c))
+        continue;
+      if (contains(forbidden, c)) 
+        continue;
+      if (!contains(adj[y], c)) 
+        continue;
+
+      if (onCycle({x, c, y})) 
+        return;
+    }
+    return;
+  }
+
+  if (cycleLength == 4) {
+    // (x, c1, c2, y)
+    for (int c1 : adj[x]) {
+      if (contains({y, x}, c1))
+        continue;
+      if (contains(forbidden, c1)) 
+        continue;
+
+      for (int c2 : adj[c1]) {
+        if (contains({y, x, c1}, c2))
+          continue;
+        if (contains(forbidden, c2)) 
+          continue;
+        if (!contains(adj[y], c2)) 
+          continue;
+
+        if (onCycle({x, c1, c2, y})) 
+          return;
+      }
+    }
+    return;
+  }
+
+  // cycleVertices == 5
+  // (x, c1, c2, c3, y)
+  for (int c1 : adj[x]) {
+    if (contains({y, x}, c1))
+      continue;
+    if (contains(forbidden, c1)) 
+      continue;
+
+    for (int c2 : adj[c1]) {
+      if (contains({y, x, c1}, c2))
+        continue;
+      if (contains(forbidden, c2)) 
+        continue;
+
+      for (int c3 : adj[c2]) {
+        if (contains({y, x, c1, c2}, c3))
+          continue;
+        if (contains(forbidden, c3)) 
+          continue;
+        if (!contains(adj[y], c3)) 
+          continue;
+
+        if (onCycle({x, c1, c2, c3, y})) 
+          return;
+      }
+    }
+  }
 }

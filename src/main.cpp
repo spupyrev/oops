@@ -32,6 +32,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
   options.addAllowedOption("-min-n", "-1", "The minimum number of vertices in the processed graph");
   options.addAllowedOption("-max-m", "-1", "The maximum number of edges in the processed graph");
+  options.addAllowedOption("-min-m", "-1", "The minimum number of edges in the processed graph");
   options.addAllowedOption("-max-degree", "-1", "Max vertex degree in the processed graph");
   options.addAllowedOption("-skip-planar", "false", "Whether to skip planar input instances");
 
@@ -262,14 +263,17 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
   const int maxN = options.getInt("-max-n");
   const int minN = options.getInt("-min-n");
   const int maxM = options.getInt("-max-m");
+  const int minM = options.getInt("-min-m");
   const int maxD = options.getInt("-max-degree");
   const bool skipPlanar = options.getBool("-skip-planar");
-  auto graphFilter = [maxN,minN,maxM,maxD,skipPlanar](const int n, const std::vector<EdgeTy>& edges) -> bool {
+  auto graphFilter = [maxN,minN,maxM,minM,maxD,skipPlanar](const int n, const std::vector<EdgeTy>& edges) -> bool {
     if (minN != -1 && n < minN)
       return false;
     if (maxN != -1 && n > maxN)
       return false;
     if (maxM != -1 && (int)edges.size() > maxM)
+      return false;
+    if (minM != -1 && (int)edges.size() < minM)
       return false;
     if (maxD != -1 && maxDegree(n, edges) > maxD)
       return false;
