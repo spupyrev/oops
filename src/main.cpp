@@ -497,42 +497,52 @@ void testOnePlanar(CMDOptions& options) {
     ResultCodeTy res = ResultCodeTy::ERROR;
     bool needStop = false;
 
-    // only for cubic
-    if (options.getBool("-skip-reducible-subgraphs") && hasReducibleSubgraph(graphAdj)) {
-      if (verbose)
-        LOG(TextColor::green, "the graph contains a reducible subgraph");
-      numSkipped++;
-    } else {
+    auto processGraph = [&](const std::string& graphName, const AdjListTy& graphAdj) -> void {
+      // special case for cubic graphs
+      if (options.getBool("-skip-reducible-subgraphs") && hasReducibleSubgraph(graphAdj)) {
+        if (verbose)
+          LOG(TextColor::green, "the graph contains a reducible subgraph");
+        numSkipped++;
+        return;
+      } 
+      
       // test planarity
       if (!skipPlanar && directions.empty() && isPlanar(n, edges, 0)) {
         if (verbose || stopOn == "planar")
           LOG(TextColor::green, "graph '%s' (index %d) is planar", graphName.c_str(), t);
         numPlanar++;
         if (stopOn == "planar") needStop = true;
-      } else {
-        // test 1-planarity
-        CHECK(n >= 5, "the graph is too small");
-        InputGraph graph(n, edges, directions);
-        res = isOnePlanar(options, params, graph, true, graphName);
-        if (res == ResultCodeTy::SAT) {
-          if (verbose || stopOn == "1-planar")
-            LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
-          num1Planar++;
-          if (stopOn == "1-planar") needStop = true;
-        } else if (res == ResultCodeTy::UNSAT) {
-          if (verbose || stopOn == "non-1-planar")
-            LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
-          numNon1Planar++;
-          if (stopOn == "non-1-planar") needStop = true;
-        } else if (res == ResultCodeTy::TIMEOUT) {
-          if (verbose >= 0)
-            LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
-          numUnknown++;
-        } else {
-          ERROR("unreachable");
-        }
+        return;
       }
-    }
+
+      // test 1-planarity
+      CHECK(n >= 5, "the graph is too small");
+      InputGraph graph(n, edges, directions);
+      res = isOnePlanar(options, params, graph, true, graphName);
+      if (res == ResultCodeTy::SAT) {
+        if (verbose || stopOn == "1-planar")
+          LOG(TextColor::green, "graph '%s' (index %d) with |V| = %d and |E| = %d is 1-planar", graphName.c_str(), t, n, edges.size());
+        num1Planar++;
+        if (stopOn == "1-planar") needStop = true;
+        return;
+      } 
+      if (res == ResultCodeTy::UNSAT) {
+        if (verbose || stopOn == "non-1-planar")
+          LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d is not 1-planar", graphName.c_str(), t, n, edges.size());
+        numNon1Planar++;
+        if (stopOn == "non-1-planar") needStop = true;
+        return;
+      } 
+      if (res == ResultCodeTy::TIMEOUT) {
+        if (verbose >= 0)
+          LOG(TextColor::red, "graph '%s' (index %d) with |V| = %d and |E| = %d timed out", graphName.c_str(), t, n, edges.size());
+        numUnknown++;
+        return;
+      } 
+      ERROR("unreachable");
+    };
+
+    processGraph(graphName, graphAdj);
 
     times.push_back(chrono::steady_clock::now());
     processingTimes.push_back(chrono::duration_cast<chrono::milliseconds>(times[t + 1] - times[t]).count());
