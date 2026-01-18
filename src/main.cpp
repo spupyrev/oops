@@ -562,21 +562,27 @@ void testOnePlanar(CMDOptions& options) {
         t + 1, 100.0 * (t + 1) / numGraphs, n, ms_to_str(remainingMs).c_str()
     );
     LOG_EVERY_MS(
-        180000, 
-        "#planar = %'d; #1-planar = %'d; #non-1-planar = %'d; #unknown = %'d; #skipped = %'d", 
-        numPlanar, num1Planar, numNon1Planar, numUnknown, numSkipped
-    );
+        180000,
+        "#planar = %'d; #1-planar = %s; #non-1-planar = %s; #unknown = %'d; #skipped = %'d", 
+        numPlanar,
+        colored_str(num1Planar   > 0 ? TextColor::green : TextColor::none, "%'d", num1Planar).c_str(),
+        colored_str(numNon1Planar> 0 ? TextColor::red   : TextColor::none, "%'d", numNon1Planar).c_str(),
+        numUnknown, numSkipped);
   }
   CHECK((int)times.size() == numGraphs + 1 || stopOn != "");
 
   LOG("processed %'d graphs; total runtime is %s; mean processing time is %zu ± %zu ms", 
       times.size() - 1, ms_to_str(times.front(), times.back()).c_str(),
       uint64_t(average(processingTimes)), uint64_t(confidence_interval(processingTimes)));
-  LOG("#planar = %'d; #1-planar = %'d; #non-1-planar = %'d; #unknown = %'d; #skipped = %'d", 
-      numPlanar, num1Planar, numNon1Planar, numUnknown, numSkipped);
+  LOG("#planar = %'d; #1-planar = %s; #non-1-planar = %s; #unknown = %'d; #skipped = %'d", 
+      numPlanar,
+      colored_str(num1Planar   > 0 ? TextColor::green : TextColor::none, "%'d", num1Planar).c_str(),
+      colored_str(numNon1Planar> 0 ? TextColor::red   : TextColor::none, "%'d", numNon1Planar).c_str(),
+      numUnknown, numSkipped);
 }
 
 int main(int argc, char* argv[]) {
+  setlocale(LC_NUMERIC, "");
   auto options = CMDOptions::create();
 
   try {

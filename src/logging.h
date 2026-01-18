@@ -1,10 +1,11 @@
 #pragma once
 
-#include <iostream>
-#include <string>
 #include <chrono>
 #include <ctime>
 #include <cstdarg>
+#include <iostream>
+#include <cstring>
+#include <string>
 #include <unordered_map>
 
 // assertion (wild server error)
@@ -70,40 +71,77 @@ inline void CHECK_LOG_EMPTY(const char* desc, const char* file, int line) {
   std::cerr << "\033[91m" << "assertion '" << desc << "' failed" << "\033[0m" << " [" << file << ":" << line << "]\n";
 }
 
-inline void LOG(TextColor color, const char* message, va_list& args) {
-  auto end = std::chrono::system_clock::now();
-  auto time = std::chrono::system_clock::to_time_t(end);
-  auto stime = std::string(std::ctime(&time));
-  stime.erase(stime.find_last_not_of(" \n\r\t") + 1);
-  stime = "\033[90m" + stime + ":\033[0m";
-  char buffer[16384];
-  setlocale(LC_NUMERIC, "");
-  std::vsnprintf(buffer, sizeof(buffer), message, args);
-  std::cerr << stime << " ";
+inline std::string timestamp_prefix() {
+  auto now  = std::chrono::system_clock::now();
+  auto t    = std::chrono::system_clock::to_time_t(now);
+  std::string s = std::ctime(&t);
+  s.erase(s.find_last_not_of(" \n\r\t") + 1);
+  return "\033[90m" + s + ":\033[0m";
+}
 
-  switch (color) {
-    case TextColor::none: std::cerr << std::string(buffer); break;
+inline const char* ansi_prefix(TextColor c) {
+  switch (c) {
+    case TextColor::none:  return "";
+    case TextColor::red:   return "\033[91m";
+    case TextColor::blue:  return "\033[38;5;12m";
+    case TextColor::green: return "\033[38;5;34m";
+    case TextColor::pink:  return "\033[38;5;13m";
+  }
+  return "";
+}
+inline const char* ansi_suffix(TextColor c) {
+  return (c == TextColor::none) ? "" : "\033[0m";
+}
 
-    case TextColor::red : std::cerr << "\033[91m" << std::string(buffer) << "\033[0m"; break;
-
-    case TextColor::blue: std::cerr << "\033[38;5;12m" << std::string(buffer) << "\033[0m"; break;
-
-    case TextColor::green: std::cerr << "\033[38;5;34m" << std::string(buffer) << "\033[0m"; break;
-
-    case TextColor::pink: std::cerr << "\033[38;5;13m" << std::string(buffer) << "\033[0m"; break;
-  };
-
+inline void LOG_line(TextColor color, const std::string& line) {
+  std::cerr << timestamp_prefix() << " ";
+  if (color == TextColor::none) std::cerr << line;
+  else std::cerr << ansi_prefix(color) << line << ansi_suffix(color);
   std::cerr << "\n";
-  // delete[] buffer;
+
+  // Check colors:
   // for (int i = 0; i < 255; i++) {
   //   std::string label = "ABC012";
   //   std::cout << i << ": " <<  "\033[38;5;" << i << "m" << label << "\033[0m\n";
   // }
 }
 
+inline std::string vformat_to_string(const char* fmt, va_list ap) {
+  char buf[16384];
+  va_list ap2;
+  va_copy(ap2, ap);
+  std::vsnprintf(buf, sizeof(buf), fmt, ap2);
+  va_end(ap2);
+  return std::string(buf);
+}
+
+inline void LOG(TextColor color, const char* message, va_list& args) {
+  LOG_line(color, vformat_to_string(message, args));
+}
+
+struct ColoredStr {
+  std::string s;
+  const char* c_str() const noexcept { return s.c_str(); }
+};
+
+inline ColoredStr colored_str(TextColor color, const char* fmt, ...) {
+  char buf[4096];
+
+  va_list ap;
+  va_start(ap, fmt);
+  std::vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+
+  ColoredStr out;
+  out.s.reserve(std::strlen(ansi_prefix(color)) + std::strlen(buf) + std::strlen(ansi_suffix(color)));
+  out.s += ansi_prefix(color);
+  out.s += buf;
+  out.s += ansi_suffix(color);
+  return out;
+}
+
 inline void LOG(const std::string& message) {
-  va_list args;
-  LOG(TextColor::none, message.c_str(), args);
+  LOG_line(TextColor::none, message);
 }
 
 inline void LOG(const char* message, ...) {
@@ -118,13 +156,6 @@ inline void LOG(TextColor color, const char* message, ...) {
   va_start(args, message);
   LOG(color, message, args);
   va_end(args);
-}
-
-inline void LOG(const char* message, va_list& args) {
-  char buffer[16384];
-  std::vsnprintf(buffer, sizeof(buffer), message, args);
-  std::cerr << std::string(buffer);
-  std::cerr << "\n";
 }
 
 inline void LOG_IF(bool condition, const char* message, ...) {
