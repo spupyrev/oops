@@ -43,12 +43,15 @@ const int VERIFICATION_EXIT_CODE = 10;
     throw VERIFICATION_EXIT_CODE; \
   }
 
+inline bool LOGGER_USE_COLORS = true;
+
 enum class TextColor {
   none,
   red,
   blue,
   green,
   pink,
+  grey
 };
 
 inline void CHECK_LOG(const char* desc, const char* file, int line, const char* message, va_list args) {
@@ -71,26 +74,32 @@ inline void CHECK_LOG_EMPTY(const char* desc, const char* file, int line) {
   std::cerr << "\033[91m" << "assertion '" << desc << "' failed" << "\033[0m" << " [" << file << ":" << line << "]\n";
 }
 
-inline std::string timestamp_prefix() {
-  auto now  = std::chrono::system_clock::now();
-  auto t    = std::chrono::system_clock::to_time_t(now);
-  std::string s = std::ctime(&t);
-  s.erase(s.find_last_not_of(" \n\r\t") + 1);
-  return "\033[90m" + s + ":\033[0m";
-}
-
 inline const char* ansi_prefix(TextColor c) {
+  if (!LOGGER_USE_COLORS || c == TextColor::none) return "";
+
   switch (c) {
     case TextColor::none:  return "";
     case TextColor::red:   return "\033[91m";
     case TextColor::blue:  return "\033[38;5;12m";
     case TextColor::green: return "\033[38;5;34m";
     case TextColor::pink:  return "\033[38;5;13m";
+    case TextColor::grey:  return "\033[90m";
   }
   return "";
 }
 inline const char* ansi_suffix(TextColor c) {
-  return (c == TextColor::none) ? "" : "\033[0m";
+  if (!LOGGER_USE_COLORS || c == TextColor::none) return "";
+
+  return "\033[0m";
+}
+
+inline std::string timestamp_prefix() {
+  auto now  = std::chrono::system_clock::now();
+  auto t    = std::chrono::system_clock::to_time_t(now);
+  std::string s = std::ctime(&t);
+  s.erase(s.find_last_not_of(" \n\r\t") + 1);
+
+  return std::string(ansi_prefix(TextColor::grey)) + s + ansi_suffix(TextColor::grey);
 }
 
 inline void LOG_line(TextColor color, const std::string& line) {
@@ -189,4 +198,9 @@ inline void LOG_EVERY_MS(int period, const char* message, ...) {
   LOG(TextColor::none, message, args);
   va_end(args);
   LastLogTime[msg] = time;
+}
+
+inline void initLogger(bool useColors) {
+  setlocale(LC_NUMERIC, "");
+  LOGGER_USE_COLORS = useColors;
 }

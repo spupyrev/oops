@@ -39,6 +39,7 @@ void prepareOptions(CMDOptions& options) {
   // Debug
   options.addAllowedOption("-verbose", "1", "Verbosity level");
   options.addAllowedOption("-seed", "0", "Random seed");
+  options.addAllowedOption("-colors", "true", "Use colored output");
   options.addAllowedOption("-skip-solve", "false", "Whether to skip a solver");
   options.addAllowedOption("-stop-on", "", "Stop the execution when a graph of the specified type is encountered");
   options.addAllowedValue("-stop-on", "planar");
@@ -582,12 +583,13 @@ void testOnePlanar(CMDOptions& options) {
 }
 
 int main(int argc, char* argv[]) {
-  setlocale(LC_NUMERIC, "");
   auto options = CMDOptions::create();
 
   try {
     prepareOptions(*options);
     options->parse(argc, argv);
+    initLogger(options->getBool("-colors"));
+    
     testOnePlanar(*options);
   } catch (int code) {
     return code;

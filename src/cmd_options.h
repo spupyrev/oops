@@ -87,10 +87,10 @@ class CMDOptions {
   bool getBool(const std::string& optionName) const {
     if (!hasOption(optionName)) {
       // check default value
-      return defaultValues.at(optionName) == "true" || defaultValues.at(optionName) == "1";
+      return defaultValues.at(optionName) == "true" || defaultValues.at(optionName) == "1" || defaultValues.at(optionName) == "yes";
     }
     // if specified, everything is true except "false" or "0"
-    return getOption(optionName) != "false" && getOption(optionName) != "0";
+    return getOption(optionName) != "false" && getOption(optionName) != "0" && getOption(optionName) != "no";
   }
 
   void setBool(const std::string& optionName, bool value) {
