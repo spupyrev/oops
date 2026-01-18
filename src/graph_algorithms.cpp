@@ -661,7 +661,7 @@ int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList,
 }
 
 // Calls lambda onCycle({x, ..., y}) for every simple cycle of size 3/4/5. Forbidden vertices may not appear in the cycle.
-// Returns early if onCycle returns true.
+// Returns early if onCycle returns "true".
 void forEachCycle(const AdjListTy& adj, const int cycleLength,
                   const int x, const int y,
                   const std::vector<int>& forbidden,   
@@ -671,7 +671,7 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
   if (cycleLength == 3) {
     // (x, c, y)
     for (int c : adj[x]) {
-      if (contains({y, x}, c))
+      if (y == c || x == c)
         continue;
       if (contains(forbidden, c)) 
         continue;
@@ -679,7 +679,7 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
         continue;
 
       if (onCycle({x, c, y})) 
-        return;
+        return; // stop processing early
     }
     return;
   }
@@ -687,13 +687,13 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
   if (cycleLength == 4) {
     // (x, c1, c2, y)
     for (int c1 : adj[x]) {
-      if (contains({y, x}, c1))
+      if (y == c1 || x == c1)
         continue;
       if (contains(forbidden, c1)) 
         continue;
 
       for (int c2 : adj[c1]) {
-        if (contains({y, x, c1}, c2))
+        if (y == c2 || x == c2 || c1 == c2)
           continue;
         if (contains(forbidden, c2)) 
           continue;
@@ -701,7 +701,7 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
           continue;
 
         if (onCycle({x, c1, c2, y})) 
-          return;
+          return; // stop processing early
       }
     }
     return;
@@ -710,19 +710,19 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
   // cycleVertices == 5
   // (x, c1, c2, c3, y)
   for (int c1 : adj[x]) {
-    if (contains({y, x}, c1))
+    if (y == c1 || x == c1)
       continue;
     if (contains(forbidden, c1)) 
       continue;
 
     for (int c2 : adj[c1]) {
-      if (contains({y, x, c1}, c2))
+      if (y == c2 || x == c2 || c1 == c2)
         continue;
       if (contains(forbidden, c2)) 
         continue;
 
       for (int c3 : adj[c2]) {
-        if (contains({y, x, c1, c2}, c3))
+        if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
           continue;
         if (contains(forbidden, c3)) 
           continue;
@@ -730,7 +730,7 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
           continue;
 
         if (onCycle({x, c1, c2, c3, y})) 
-          return;
+          return; // stop processing early
       }
     }
   }

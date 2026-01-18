@@ -2,8 +2,9 @@
 
 #include "adjacency.h"
 
-#include <vector>
+#include <functional>
 #include <set>
+#include <vector>
 
 void printGraphStats(const int n, const std::vector<EdgeTy>& edges, const std::vector<bool>& direction);
 void printGraphStats(std::ostream& out, const int n, const std::vector<EdgeTy>& edges, const std::vector<bool>& direction);

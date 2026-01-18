@@ -79,7 +79,7 @@ void prepareOptions(CMDOptions& options) {
   // Experimental
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
   options.addAllowedOption("-skip-reducible-subgraphs", "false", "[Experimental] Skip reducible subgraphs");
-  options.addAllowedOption("-custom", "", "Custom option");
+  options.addAllowedOption("-custom", "", "Custom options");
 }
 
 /// Check if 1-planarity test can be skipped because of graphs size or density
@@ -396,6 +396,7 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.partialConstraints = options.getStr("-partial-constraints");
   params.sepCycleConstraints = options.getStr("-sep-cycles");
   params.custom = options.getStr("-custom");
+  params.ignoreTransitiveRels = options.hasCustomOption("no-transitive");
 
   params.useSATConstraints = options.getBool("-sat");
   if (options.getBool("-extreme")) {

@@ -215,6 +215,7 @@ struct Params {
   std::string sepCycleConstraints = "";
 
   std::string custom = "";
+  bool ignoreTransitiveRels = false;
 
   std::string to_string() const {
     std::ostringstream ss;

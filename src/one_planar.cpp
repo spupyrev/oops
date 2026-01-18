@@ -260,7 +260,7 @@ bool canBeMerged(int u, int v, const InputGraph& graph) {
 }
 
 /// Encode relative position constraints for pairs of vertices
-void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const Params& params) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -297,20 +297,24 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const int
   }
 
   // Ensure transitivity
-  for (int i = 0; i < numVertices; i++) {
-    for (int j = 0; j < numVertices; j++) {
-      for (int k = 0; k < numVertices; k++) {
-        if (i == j || i == k || j == k)
-          continue;
+  if (!params.ignoreTransitiveRels) {
+    for (int i = 0; i < numVertices; i++) {
+      for (int j = 0; j < numVertices; j++) {
+        for (int k = 0; k < numVertices; k++) {
+          if (i == j || i == k || j == k)
+            continue;
 
-        // i <= j && j <= k => i < k
-        model.addClause(MClause({
-            model.getRelVar(j, i, true), 
-            model.getRelVar(k, j, true), 
-            model.getRelVar(i, k, true)
-        }));
+          // i <= j && j <= k => i < k
+          model.addClause(MClause({
+              model.getRelVar(j, i, true), 
+              model.getRelVar(k, j, true), 
+              model.getRelVar(i, k, true)
+          }));
+        }
       }
     }
+  } else {
+    LOG_IF(params.verbose, "ignore transitive relations");
   }
 
   // Ensure edge directions
@@ -649,10 +653,8 @@ void encodeICConstraints(SATModel& model, const InputGraph& graph, const int ver
       if (!canBeMerged(i1, j1, n, edges))
         continue;
       // a crossing for edges (u, v) and (x, y)
-      const int u1 = edges[i1 - n].first;
-      const int v1 = edges[i1 - n].second;
-      const int x1 = edges[j1 - n].first;
-      const int y1 = edges[j1 - n].second;
+      const auto [u1, v1] = edges[i1 - n];
+      const auto [x1, y1] = edges[j1 - n];
       const std::vector<int> k4_vertices = {u1, v1, x1, y1};
 
       for (int i2 = i1 + 1; i2 < numVertices; i2++) {
@@ -941,7 +943,7 @@ void encodeMovePlanar(
   CHECK(params.useSATConstraints, "move-planarity should be used with -sat=1");
 
   // Main encoding
-  encodeRelativeVariables(model, graph, params.verbose);
+  encodeRelativeVariables(model, graph, params);
   encodeCross2Variables(model, graph, params);
   encodeMoveVariables(model, graph, params.verbose);
   encodeMoveConstraints(model, graph, params.verbose);
@@ -1067,7 +1069,7 @@ void encodeStackPlanar(
   CHECK(!graph.isDirected(), "directed edges should be used with move-planarity");
 
   // Main encoding
-  encodeRelativeVariables(model, graph, params.verbose);
+  encodeRelativeVariables(model, graph, params);
   encodeStackConstraints(model, graph, params.verbose);
 
   // Optional encoding
