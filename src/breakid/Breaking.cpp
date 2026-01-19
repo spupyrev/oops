@@ -18,7 +18,7 @@ void Breaker::print() {
   std::cout << "c auxiliary variables: " << getAuxiliaryNbVars() << "\n";
   // original
   std::cout << "p cnf " << getTotalNbVars() << " " << getTotalNbClauses() << "\n";
-  originalTheory->print(std::cout);
+  // originalTheory->print(std::cout);
   // new
   for (auto c : clauses) {
     c->print(std::cout);

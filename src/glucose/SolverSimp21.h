@@ -139,7 +139,6 @@ public:
   bool VSIDS;
   int ccmin_mode;      // Controls conflict clause minimization (0=none, 1=basic, 2=deep).
   int phase_saving;    // Controls the level of phase saving (0=none, 1=limited, 2=full).
-  bool rnd_pol;        // Use random polarities for branching heuristics.
   bool rnd_init_act;   // Initialize variable activities with a small random value.
   double garbage_frac; // The fraction of wasted memory allowed before a garbage collection is triggered.
 
@@ -161,7 +160,7 @@ public:
 
   // Statistics: (read-only member variable)
   //
-  uint64_t solves, starts, decisions, rnd_decisions, propagations, conflicts, conflicts_VSIDS;
+  uint64_t solves, starts, decisions, propagations, conflicts, conflicts_VSIDS;
   uint64_t dec_vars, clauses_literals, learnts_literals, max_literals, tot_literals;
   uint64_t chrono_backtrack, non_chrono_backtrack;
 
@@ -385,7 +384,6 @@ public:
   void simplifyLearnt(Clause &c);
   bool simplifyLearnt_core();
   int trailRecord;
-  void litsEnqueue(int cutP, Clause &c);
   void cancelUntilTrailRecord();
   void simpleUncheckEnqueue(Lit p, CRef from = CRef_Undef);
   CRef simplePropagate();
@@ -397,8 +395,6 @@ public:
   vec<CRef> simp_reason_clause;
   void simpleAnalyze(CRef confl, vec<Lit> &out_learnt, vec<CRef> &reason_clause, bool True_confl);
 
-  // in redundant
-  bool removed(CRef cr);
   // adjust simplifyAll occasion
   long curSimplify;
   int nbconfbeforesimplify;

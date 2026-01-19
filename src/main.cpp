@@ -224,7 +224,7 @@ ResultCodeTy isOnePlanar(
   }
 
   // print output
-  printOutput(options.getStr("-o"), graphName, graph, result, verbose);
+  printOutput(options.getStr("-o"), graph, result, verbose);
 
   return result.code;
 }
@@ -336,6 +336,7 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
 
 // TODO: merge with the above method
 void genDirections(CMDOptions& options, const int n, std::vector<EdgeTy>& edges, std::vector<bool>& directions) {
+  (void)options;
   // read from file
   // const std::string filename = options.getStr("-i");
   // const std::string extension = filename.substr(filename.find_last_of(".") + 1);

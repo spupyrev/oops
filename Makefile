@@ -27,7 +27,7 @@ RCOBJS     = $(addsuffix r,$(COBJS))
 # Compiler / linker
 CXX    ?= g++
 CFLAGS ?= -Wall -Wextra -Wno-pedantic -Wno-shadow -Wformat=2 -Wundef -Wno-unused-parameter \
-          -Wno-deprecated-declarations -Wsign-compare -std=c++17
+          -Wno-deprecated-declarations -Wsign-compare -std=c++17 \
 LFLAGS ?= -Wall
 LDLIBS += -lz
 

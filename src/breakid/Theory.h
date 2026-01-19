@@ -22,7 +22,6 @@ public:
   Specification();
   virtual ~Specification();
 
-  virtual void print(std::ostream &out) = 0;
   virtual uint getSize() = 0;
 
   std::shared_ptr<Graph> getGraph();
@@ -50,7 +49,6 @@ public:
   CNF(std::vector<std::shared_ptr<Clause>> &clss, std::shared_ptr<Group> grp);
   ~CNF();
 
-  void print(std::ostream &out);
   uint getSize();
 
   void setSubTheory(std::shared_ptr<Group> subgroup);
@@ -70,8 +68,6 @@ public:
   LogicProgram(std::istream &input);
   LogicProgram(std::vector<std::shared_ptr<Rule>> &rls, std::shared_ptr<Group> grp);
   ~LogicProgram();
-
-  void print(std::ostream &out);
 
   uint getSize();
 
@@ -95,8 +91,6 @@ private:
 public:
   PB(std::istream &input);
   PB(std::vector<std::shared_ptr<PBConstraint>> &rls, std::shared_ptr<Group> grp);
-
-  void print(std::ostream &out);
 
   uint getSize();
 

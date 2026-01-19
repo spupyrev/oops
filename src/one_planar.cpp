@@ -161,8 +161,6 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
 
   // Separating cycles
   int numSepCyclesSkipped = 0;
-  int numSepCyclesSkipped4 = 0;
-  int numSepCyclesSkipped5 = 0;
   for (int d1 = n; d1 < numVertices; d1++) {
     for (int d2 = d1 + 1; d2 < numVertices; d2++) {
       if (!crossablePairs[d1][d2])
@@ -193,10 +191,6 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
           crossablePairs[d1][d2] = false;
           crossablePairs[d2][d1] = false;
           numSepCyclesSkipped++;
-          if (cycle.size() == 4)
-            numSepCyclesSkipped4++;
-          if (cycle.size() == 5)
-            numSepCyclesSkipped5++;
           return true;
         }
         return false;
@@ -779,7 +773,7 @@ void encodeForbiddenTuples(SATModel& model, const InputGraph& graph, const int v
   LOG_IF(verbose, "encoded %'9d forbidden 3-clauses", forbiddenTuples.triples().size());
 }
 
-void encodeMoveVariables(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeMoveVariables(SATModel& model, const InputGraph& graph) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -825,7 +819,7 @@ void encodeMoveVariables(SATModel& model, const InputGraph& graph, const int ver
 
 }
 
-void encodeMoveConstraints(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeMoveConstraints(SATModel& model, const InputGraph& graph) {
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
   const int numSegments = 2 * m;
@@ -840,6 +834,7 @@ void encodeMoveConstraints(SATModel& model, const InputGraph& graph, const int v
     });
   };
   auto rm1Clause = [&](int seg_e, int seg_f, int se, int te, int sf, int tf, bool moveFlag) {
+    (void)seg_f;
     return MClause({
         model.getRelVar(se, sf, false),
         model.getRelVar(sf, tf, false),
@@ -945,8 +940,8 @@ void encodeMovePlanar(
   // Main encoding
   encodeRelativeVariables(model, graph, params);
   encodeCross2Variables(model, graph, params);
-  encodeMoveVariables(model, graph, params.verbose);
-  encodeMoveConstraints(model, graph, params.verbose);
+  encodeMoveVariables(model, graph);
+  encodeMoveConstraints(model, graph);
 
   // Optional encoding
   if (params.useUNSATConstraints) {
@@ -966,7 +961,7 @@ void encodeMovePlanar(
   encodeMoveSymmetry(model, graph, params.verbose);
 }
 
-void encodeStackConstraints(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeStackConstraints(SATModel& model, const InputGraph& graph) {
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
   const int numSegments = 2 * m;
@@ -1070,7 +1065,7 @@ void encodeStackPlanar(
 
   // Main encoding
   encodeRelativeVariables(model, graph, params);
-  encodeStackConstraints(model, graph, params.verbose);
+  encodeStackConstraints(model, graph);
 
   // Optional encoding
   if (params.useSATConstraints) {

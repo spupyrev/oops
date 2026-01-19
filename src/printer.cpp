@@ -457,7 +457,7 @@ void printResultSvgStack(const std::string& filename, const InputGraph& graph, c
   LOG(TextColor::blue, "written SVG result to '%s'", filename.c_str());  
 }
 
-void printOutput(const std::string& filename, const std::string& graphName, const InputGraph& graph, const Result& result, const int verbose) {
+void printOutput(const std::string& filename, const InputGraph& graph, const Result& result, const int verbose) {
   const std::string extension = filename.substr(filename.find_last_of(".") + 1);
 
   if (verbose >= 2 || extension == "txt") {

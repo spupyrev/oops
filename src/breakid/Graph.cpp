@@ -11,6 +11,7 @@ std::vector<std::shared_ptr<Permutation>> perms;
 //           INTERACTION WITH SAUCY
 void Graph::initializeGraph(uint nbNodes, uint nbEdges, std::map<uint, uint> &lit2color,
                             std::vector<std::vector<uint>> &neighbours) {
+  (void)nbEdges;
   perms.clear();
 
   saucy_g = (saucy_graph *)malloc(sizeof(struct saucy_graph));

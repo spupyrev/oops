@@ -85,12 +85,6 @@ CNF::CNF(std::vector<std::shared_ptr<Clause>> &clss, std::shared_ptr<Group> grp)
 
 CNF::~CNF() {}
 
-void CNF::print(std::ostream &out) {
-  for (auto clause : clauses) {
-    clause->print(out);
-  }
-}
-
 uint CNF::getSize() { return clauses.size(); }
 
 void CNF::setSubTheory(std::shared_ptr<Group> subgroup) {
@@ -307,7 +301,7 @@ LogicProgram::LogicProgram(std::istream &input) {
   readLogicProgram(input);
   if (verbosity > 6) {
     std::clog << "Parsed logic program:\n";
-    print(std::clog);
+    // print(std::clog);
   }
   if (verbosity >= 2) {
     std::clog << "*** Creating first graph..." << std::endl;
@@ -346,14 +340,7 @@ LogicProgram::LogicProgram(std::vector<std::shared_ptr<Rule>> &rls, std::shared_
   }
 }
 
-// CNF(std::vector<std::shared_ptr<Clause> >& clss, std::shared_ptr<Group> grp);
 LogicProgram::~LogicProgram() {}
-
-void LogicProgram::print(std::ostream &out) {
-  for (auto rule : rules) {
-    rule->print(out);
-  }
-}
 
 uint LogicProgram::getSize() { return rules.size(); }
 
@@ -463,7 +450,7 @@ PB::PB(std::istream &input) {
   readPB(input);
   if (verbosity > 6) {
     std::clog << "Parsed PB theory:\n";
-    print(std::clog);
+    // print(std::clog);
   }
   if (verbosity >= 2) {
     std::clog << "*** Creating first graph..." << std::endl;
@@ -499,12 +486,6 @@ PB::PB(std::vector<std::shared_ptr<PBConstraint>> &constr, std::shared_ptr<Group
     for (uint r = 0; r < mat->nbRows() - 1; ++r) {
       getGraph()->setUniqueColor(*(mat->getRow(r)));
     }
-  }
-}
-
-void PB::print(std::ostream &out) {
-  for (auto c : constraints) {
-    c->print(out);
   }
 }
 

@@ -3,8 +3,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <signal.h>
-#include <unistd.h>
 
 using namespace std;
 using namespace Simp21;
@@ -21,10 +19,10 @@ static DoubleOption opt_var_decay(_cat, "var-decay", "The variable activity deca
                                   DoubleRange(0, false, 1, false));
 static DoubleOption opt_clause_decay(_cat, "cla-decay", "The clause activity decay factor", 0.999,
                                      DoubleRange(0, false, 1, false));
-static DoubleOption
-    opt_random_var_freq(_cat, "rnd-freq",
-                        "The frequency with which the decision heuristic tries to choose a random variable", 0,
-                        DoubleRange(0, true, 1, true));
+// static DoubleOption
+//     opt_random_var_freq(_cat, "rnd-freq",
+//                         "The frequency with which the decision heuristic tries to choose a random variable", 0,
+//                         DoubleRange(0, true, 1, true));
 static DoubleOption opt_random_seed(_cat, "rnd-seed", "Used by the random variable selection", 91648253,
                                     DoubleRange(0, false, HUGE_VAL, false));
 static IntOption opt_ccmin_mode(_cat, "ccmin-mode", "Controls conflict clause minimization (0=none, 1=basic, 2=deep)",
@@ -67,8 +65,8 @@ Solver::Solver()
       //
       verbosity(0), step_size(opt_step_size), step_size_dec(opt_step_size_dec),
       min_step_size(opt_min_step_size), timer(5000), var_decay(opt_var_decay), clause_decay(opt_clause_decay),
-      random_var_freq(opt_random_var_freq), random_seed(opt_random_seed), VSIDS(false), ccmin_mode(opt_ccmin_mode),
-      phase_saving(opt_phase_saving), rnd_pol(false), rnd_init_act(opt_rnd_init_act), garbage_frac(opt_garbage_frac),
+      random_seed(opt_random_seed), VSIDS(false), ccmin_mode(opt_ccmin_mode),
+      phase_saving(opt_phase_saving), rnd_init_act(opt_rnd_init_act), garbage_frac(opt_garbage_frac),
       restart_first(opt_restart_first), restart_inc(opt_restart_inc),
 
       // Parameters (the rest):
@@ -81,7 +79,7 @@ Solver::Solver()
 
       // Statistics: 
       //
-      solves(0), starts(0), decisions(0), rnd_decisions(0), propagations(0), conflicts(0), conflicts_VSIDS(0),
+      solves(0), starts(0), decisions(0), propagations(0), conflicts(0), conflicts_VSIDS(0),
       dec_vars(0), clauses_literals(0), learnts_literals(0), max_literals(0), tot_literals(0), chrono_backtrack(0),
       non_chrono_backtrack(0),
 
@@ -233,14 +231,6 @@ void Solver::cancelUntilTrailRecord() {
   qhead = trailRecord;
   trail.shrink(trail.size() - trailRecord);
 }
-
-void Solver::litsEnqueue(int cutP, Clause &c) {
-  for (int i = cutP; i < c.size(); i++) {
-    simpleUncheckEnqueue(~c[i]);
-  }
-}
-
-bool Solver::removed(CRef cr) { return ca[cr].mark() == 1; }
 
 void Solver::simpleAnalyze(CRef confl, vec<Lit> &out_learnt, vec<CRef> &reason_clause, bool True_confl) {
   int pathC = 0;
@@ -1672,8 +1662,6 @@ static double luby(double y, int x) {
   return pow(y, seq);
 }
 
-static bool switch_mode = false;
-
 uint32_t Solver::reduceduplicates() {
   uint32_t removed_duplicates = 0;
   std::vector<std::vector<uint64_t>> tmp;
@@ -1750,7 +1738,6 @@ lbool Solver::solve_() {
 
     if (propagations - curr_props > VSIDS_props_limit) {
       curr_props = propagations;
-      switch_mode = true;
       VSIDS_props_limit = VSIDS_props_limit + VSIDS_props_limit / 10;
     }
 

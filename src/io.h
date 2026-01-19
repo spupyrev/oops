@@ -428,7 +428,6 @@ void printInputDot(
 
 void printOutput(
     const std::string& filename, 
-    const std::string& graphName, 
     const InputGraph& graph, 
     const Result& result,
     const int verbose);

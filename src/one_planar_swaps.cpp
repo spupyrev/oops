@@ -300,7 +300,7 @@ private:
 
     sort_unique(newEdges);
 
-    if (canSwapX(takenVertices)) {
+    if (canSwapX()) {
       LOG_IF(Debug, "yay-2, swapped %d and %d", S, T);
       return true;
     }
@@ -350,7 +350,7 @@ private:
       return true;
     }
 
-    if (canSwapX(takenVertices)) {
+    if (canSwapX()) {
       LOG_IF(Debug, "yay, swapped %d -> %d -> %d", V1, V2, V3);
       return true;
     }
@@ -358,7 +358,7 @@ private:
     return false;
   }
 
-  bool canSwapX(const std::vector<int>& takenVertices) const {
+  bool canSwapX() const {
     // assumes new edges are collected and sorted
     CHECK(!newEdges.empty());
     const bool Debug = false;
