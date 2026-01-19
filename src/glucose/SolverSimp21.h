@@ -155,7 +155,6 @@ public:
   uint32_t min_number_of_learnts_copies;
   uint32_t dupl_db_init_size;
   uint32_t max_lbd_dup;
-  std::chrono::microseconds duptime;
   // duplicate learnts version
 
   // Statistics: (read-only member variable)
@@ -220,15 +219,19 @@ protected:
   };
 
   // Solver state:
-  //
   bool ok;           // If FALSE, the constraints are already unsatisfiable. No part of the solver state may be used!
   vec<CRef> clauses; // List of problem clauses.
   vec<CRef> learnts; // List of learnt clauses.
 
   double cla_inc;           // Amount to bump next clause with.
-  vec<double> activity_CHB, // A heuristic measurement of the activity of a variable.
-      activity_VSIDS, activity_distance;
-  double var_inc;                                          // Amount to bump next variable with.
+  // A heuristic measurement of the activity of a variable.
+  vec<double> activity_CHB, activity_VSIDS, activity_distance;
+  // Lazy CHB decay (pow-free)
+  vec<uint32_t> chb_last_conflict;
+  static constexpr int CHB_DECAY_TABLE_SIZE = 2048;
+  double chb_decay_pows[CHB_DECAY_TABLE_SIZE];
+  // Amount to bump next variable with.
+  double var_inc;                                          
   OccLists<Lit, vec<Watcher>, WatcherDeleted> watches_bin, // Watches for binary clauses only.
       watches;        // 'watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true).
   vec<lbool> assigns; // The current assignments.
@@ -241,8 +244,8 @@ protected:
   int simpDB_assigns;   // Number of top-level assignments since last execution of 'simplify()'.
   int64_t simpDB_props; // Remaining number of propagations that must be made before next execution of 'simplify()'.
   vec<Lit> assumptions; // Current set of assumptions provided to solve by the user.
-  Heap<VarOrderLt> order_heap_CHB, // A priority queue of variables ordered with respect to the variable activity.
-      order_heap_VSIDS, order_heap_distance;
+  // A priority queue of variables ordered with respect to the variable activity.
+  Heap<VarOrderLt> order_heap_CHB, order_heap_VSIDS, order_heap_distance;
   bool remove_satisfied; // Indicates whether possibly inefficient linear scan for satisfied clauses should be performed
                          // in 'simplify'.
 
@@ -305,7 +308,6 @@ protected:
   void reduceDB();                                    // Reduce the set of learnt clauses.
   void reduceDB_Tier2();
   void removeSatisfied(vec<CRef> &cs); // Shrink 'cs' to contain only non-satisfied clauses.
-  void safeRemoveSatisfied(vec<CRef> &cs, unsigned valid_mark);
   void rebuildOrderHeap();
   bool binResMinimize(vec<Lit> &out_learnt); // Further learnt clause minimization by binary resolution.
 
@@ -319,7 +321,6 @@ protected:
   void claBumpActivity(Clause &c); // Increase a clause with the current 'bump' value.
 
   // Operations on clauses:
-  //
   void attachClause(CRef cr);                      // Attach a clause to watcher lists.
   void detachClause(CRef cr, bool strict = false); // Detach a clause to watcher lists.
   void removeClause(CRef cr);                      // Detach and free a clause.
@@ -333,7 +334,6 @@ protected:
   // duplicate learnts version
 
   // Misc:
-  //
   int decisionLevel() const;           // Gives the current decisionlevel.
   uint32_t abstractLevel(Var x) const; // Used to represent an abstraction of sets of decision levels.
   CRef reason(Var x) const;
@@ -378,7 +378,6 @@ protected:
   static inline int irand(double &seed, int size) { return (int)(drand(seed) * size); }
 
   // simplify
-  //
 public:
   bool simplifyAll();
   void simplifyLearnt(Clause &c);

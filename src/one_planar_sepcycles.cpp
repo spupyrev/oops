@@ -4,7 +4,8 @@
 
 /// TODO: merge with similar impl
 struct SepCycleTraversal {
-  static constexpr size_t MAX_CROSSINGS_FOR_3CLAUSES = 2048;
+  static constexpr size_t MAX_CROSSINGS_FOR_3EQ = 2048;
+  static constexpr size_t MAX_CROSSINGS_FOR_3GT = 1280;
 
   SepCycleTraversal(SATModel& model, const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
     : model(model), graph(graph), n(graph.n), m((int)graph.edges.size()), verbose(params.verbose), forbiddenTuples(tuples)
@@ -90,7 +91,7 @@ struct SepCycleTraversal {
           forbiddenTuples.insert(crossPair);
         }
 
-        if (possibleCrossings.size() < MAX_CROSSINGS_FOR_3CLAUSES) {
+        if (possibleCrossings.size() < MAX_CROSSINGS_FOR_3EQ) {
           numEqFlowClauses3 += findEqualFlow(x, y, u, v, takenCrossings);
           numEqFlowClauses3 += findEqualFlow(u, v, x, y, takenCrossings);
         }
@@ -108,7 +109,7 @@ struct SepCycleTraversal {
 
   /// Find triples of crossings that cannot happen in a 1-planar drawing
   size_t build3Clauses() {
-    if (possibleCrossings.size() > MAX_CROSSINGS_FOR_3CLAUSES) {
+    if (possibleCrossings.size() > MAX_CROSSINGS_FOR_3GT) {
       LOG_IF(verbose, "  skipped building sep-cycles 3-clauses due to too many possible_crossings");
       return 0;
     }

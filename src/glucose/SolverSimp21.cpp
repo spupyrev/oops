@@ -19,10 +19,6 @@ static DoubleOption opt_var_decay(_cat, "var-decay", "The variable activity deca
                                   DoubleRange(0, false, 1, false));
 static DoubleOption opt_clause_decay(_cat, "cla-decay", "The clause activity decay factor", 0.999,
                                      DoubleRange(0, false, 1, false));
-// static DoubleOption
-//     opt_random_var_freq(_cat, "rnd-freq",
-//                         "The frequency with which the decision heuristic tries to choose a random variable", 0,
-//                         DoubleRange(0, true, 1, true));
 static DoubleOption opt_random_seed(_cat, "rnd-seed", "Used by the random variable selection", 91648253,
                                     DoubleRange(0, false, HUGE_VAL, false));
 static IntOption opt_ccmin_mode(_cat, "ccmin-mode", "Controls conflict clause minimization (0=none, 1=basic, 2=deep)",
@@ -54,11 +50,28 @@ static IntOption opt_VSIDS_props_limit(
     "specifies the number of propagations after which the solver switches between LRB and VSIDS(in millions).", 30,
     IntRange(1, INT32_MAX));
 
-// VSIDS_props_limit
-
 //=================================================================================================
-// Constructor/Destructor:
+// Fast pow(0.95, age) for small non-negative integer ages.
+// Falls back to std::pow for large ages to preserve exact semantics.
+static constexpr int POW95_TABLE_SIZE = 4096;
+static double pow95_table[POW95_TABLE_SIZE];
+static bool pow95_init_done = false;
 
+static inline void init_pow95_table() {
+  if (pow95_init_done) return;
+  pow95_table[0] = 1.0;
+  for (int i = 1; i < POW95_TABLE_SIZE; ++i)
+    pow95_table[i] = pow95_table[i - 1] * 0.95;
+  pow95_init_done = true;
+}
+
+static inline double pow95_u32(uint32_t age) {
+  if (age < (uint32_t)POW95_TABLE_SIZE) return pow95_table[age];
+  return std::pow(0.95, (double)age);
+}
+//=================================================================================================
+
+// Constructor/Destructor:
 Solver::Solver()
     :
       // Parameters (user settable):
@@ -112,6 +125,7 @@ Solver::Solver()
   max_trail = 0;
   timeout_ms = -1;
   start_time = std::chrono::system_clock::now();
+  init_pow95_table();
 }
 
 Solver::~Solver() {}
@@ -421,10 +435,9 @@ bool Solver::simplifyLearnt_core() {
 }
 
 int Solver::is_duplicate(std::vector<uint32_t> &c) {
-  auto time_point_0 = std::chrono::high_resolution_clock::now();
   dupl_db_size++;
   int res = 0;
-  int sz = c.size();
+  const int sz = (int)c.size();
   std::vector<uint32_t> tmp(c);
   sort(tmp.begin(), tmp.end());
   uint64_t hash = 0;
@@ -433,7 +446,7 @@ int Solver::is_duplicate(std::vector<uint32_t> &c) {
     hash ^= tmp[i] + 0x9e3779b9 + (hash << 6) + (hash >> 2);
   }
 
-  int32_t head = tmp[0];
+  const int32_t head = tmp[0];
   auto it0 = ht.find(head);
 
   if (it0 != ht.end()) {
@@ -455,8 +468,6 @@ int Solver::is_duplicate(std::vector<uint32_t> &c) {
     ht[head][sz][hash] = 1;
   }
 
-  auto time_point_1 = std::chrono::high_resolution_clock::now();
-  duptime += std::chrono::duration_cast<std::chrono::microseconds>(time_point_1 - time_point_0);
   return res;
 }
 
@@ -481,7 +492,7 @@ bool Solver::simplifyAll() {
 // used as a decision variable (NOTE! This has effects on the meaning of a SATISFIABLE result).
 //
 Var Solver::newVar(bool sign, bool dvar) {
-  int v = nVars();
+  const int v = nVars();
   watches_bin.init(mkLit(v, false));
   watches_bin.init(mkLit(v, true));
   watches.init(mkLit(v, false));
@@ -668,7 +679,8 @@ Lit Solver::pickBranchLit() {
         uint32_t age = conflicts - canceled[v];
 
         while (age > 0) {
-          double decay = pow(0.95, age);
+          // const double decay = pow(0.95, age);
+          const double decay = pow95_u32(age);
           activity_CHB[v] *= decay;
 
           if (order_heap_CHB.inHeap(v)) {
@@ -1052,16 +1064,17 @@ void Solver::analyzeFinal(Lit p, vec<Lit> &out_conflict) {
 
 void Solver::uncheckedEnqueue(Lit p, int level, CRef from) {
   assert(value(p) == l_Undef);
-  Var x = var(p);
+  const Var x = var(p);
 
   if (!VSIDS) {
     picked[x] = conflicts;
     conflicted[x] = 0;
     almost_conflicted[x] = 0;
-    uint32_t age = conflicts - canceled[var(p)];
+    const uint32_t age = conflicts - canceled[var(p)];
 
     if (age > 0) {
-      double decay = pow(0.95, age);
+      // const double decay = pow(0.95, age);
+      const double decay = pow95_u32(age);
       activity_CHB[var(p)] *= decay;
 
       if (order_heap_CHB.inHeap(var(p))) {

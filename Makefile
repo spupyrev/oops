@@ -43,14 +43,14 @@ d:   $(EXEC)_debug
 
 ## Compile options
 %.o:  CFLAGS += -O3 -g
-%.or: CFLAGS += -O3 -g -DNDEBUG -flto
-%.op: CFLAGS += -O2 -pg -g -DNDEBUG -fno-omit-frame-pointer
+%.or: CFLAGS += -O3 -flto -DNDEBUG
+%.op: CFLAGS += -O2 -g -DNDEBUG -fno-omit-frame-pointer
 %.od: CFLAGS += -O0 -g -DDEBUG -fno-omit-frame-pointer
 
 ## Link options
 $(EXEC):            LFLAGS += -g
 $(EXEC)_release:    LFLAGS += -flto
-$(EXEC)_profile:    LFLAGS += -g -pg
+$(EXEC)_profile:    LFLAGS += -g
 $(EXEC)_debug:      LFLAGS += -g
 
 ## Dependencies

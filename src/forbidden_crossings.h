@@ -6,8 +6,8 @@
 #include <unordered_set>
 
 struct CrossingPair {
-  int e1, e2;
-  int p1, p2;
+  int32_t e1, e2;
+  int32_t p1, p2;
   int64_t key;
 
   explicit CrossingPair(int m, int x1, int x2, int y1, int y2)
@@ -32,9 +32,9 @@ struct CrossingPair {
 };
 
 struct CrossingTriple {
-  int a1, a2;
-  int b1, b2;
-  int c1, c2;
+  int32_t a1, a2;
+  int32_t b1, b2;
+  int32_t c1, c2;
   int64_t key;
 
   explicit CrossingTriple(int m,
@@ -61,11 +61,11 @@ struct CrossingTriple {
 
 class ForbiddenTuples {
 public:
-  explicit ForbiddenTuples() {}
+  ForbiddenTuples() = default;
 
   void insert(const CrossingPair& pair) {
-    CHECK(forbiddenCrossingPairs.find(pair.key) == forbiddenCrossingPairs.end());
-    forbiddenCrossingPairs.insert(pair.key);
+    const auto [it, inserted] = forbiddenCrossingPairs.insert(pair.key);
+    CHECK(inserted);
     clauses2.push_back(pair);
   }
 
@@ -74,8 +74,8 @@ public:
   }
 
   void insert(const CrossingTriple& triple) {
-    CHECK(forbiddenCrossingTriples.find(triple.key) == forbiddenCrossingTriples.end());
-    forbiddenCrossingTriples.insert(triple.key);
+    const auto [it, inserted] = forbiddenCrossingTriples.insert(triple.key);
+    CHECK(inserted);
     clauses3.push_back(triple);
   }
 
