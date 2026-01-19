@@ -37,7 +37,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-skip-planar", "false", "Whether to skip planar input instances");
 
   // Debug
-  options.addAllowedOption("-verbose", "1", "Verbosity level");
+  options.addAllowedOption("-verbose", "0", "Verbosity level");
   options.addAllowedOption("-seed", "0", "Random seed");
   options.addAllowedOption("-colors", "true", "Use colored output");
   options.addAllowedOption("-skip-solve", "false", "Whether to skip a solver");
@@ -258,8 +258,10 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
     return std::make_unique<GraphListRaw>(graphs);
   }
 
-  const std::string filename = options.getStr("-i");
-  const std::string extension = filename.substr(filename.find_last_of(".") + 1);
+  const std::string in = options.getStr("-i");
+  const std::string filename = in.find_last_of(".") == std::string::npos ? "" : in;
+  const std::string extension = in.substr(in.find_last_of(".") + 1);
+  // LOG("filename: %s; extension: %s", filename.c_str(), extension.c_str());
 
   const int maxN = options.getInt("-max-n");
   const int minN = options.getInt("-min-n");
@@ -289,9 +291,8 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
     return std::make_unique<GraphListG6>(filename, part, graphFilter);
   }
   if (extension == "s6") {
-    // TODO: replace with lazy list
     const std::string part = options.getStr("-part");
-    return std::make_unique<GraphListRaw>(readS6(filename, part, graphFilter));
+    return std::make_unique<GraphListS6>(filename, part, graphFilter);
   }
   if (extension == "cfg") {
     const std::string part = options.getStr("-part");
@@ -589,7 +590,7 @@ int main(int argc, char* argv[]) {
     prepareOptions(*options);
     options->parse(argc, argv);
     initLogger(options->getBool("-colors"));
-    
+
     testOnePlanar(*options);
   } catch (int code) {
     return code;

@@ -47,6 +47,7 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/reg5.gml"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test6.graphml"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test7.graphml"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1"
+assert_pass "cat ${DATA_DIR}/test1.cfg | ${OP} -verbose=1 -i=cfg"
 # TODO: read directed
 
 # gen random

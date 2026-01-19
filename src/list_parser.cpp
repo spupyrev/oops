@@ -130,8 +130,15 @@ std::vector<std::pair<std::string, AdjListTy>> readCfg(
     const std::string& filename, 
     const std::string& part,
     const std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter) {
-  std::ifstream ifs(filename);
-  CHECK(ifs.good(), "file '%s' not found", filename.c_str());
+  std::ifstream file;
+  std::istream& ifs = filename.empty()
+    ? static_cast<std::istream&>(std::cin)
+    : static_cast<std::istream&>(file);
+
+  if (!filename.empty()) {
+    file.open(filename);
+    CHECK(file.good(), "file '%s' not found", filename.c_str());
+  }
 
   const auto [partIdx, numParts] = parsePartOption(part);
 
@@ -204,214 +211,13 @@ std::vector<std::pair<std::string, AdjListTy>> readCfg(
     }
   }
 
-  ifs.close();
+  if (!filename.empty()) {
+    file.close();
+  }
 
   LOG(TextColor::blue, "extracted %'d graphs (%.2lf%% out of %'d) with maximum |V| = %d from %s", 
     graphs.size(), 100.0 * graphs.size() / graphIdx, graphIdx,
     graphMaxN, filename.c_str()
-  );
-
-  return graphs;
-}
-
-// TODO: drop this
-std::vector<std::pair<std::string, AdjListTy>> readG6(
-    const std::string& filename, 
-    const std::string& part,
-    const std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter) {
-  ifstream ifs(filename);
-  CHECK(ifs.good(), "file '%s' not found", filename.c_str());
-
-  const auto [partIdx, numParts] = parsePartOption(part);
-
-  int maxN = 0;
-  std::vector<std::pair<std::string, AdjListTy>> graphs;
-  std::string line;
-  int graphIdx = 0;
-  while (std::getline(ifs, line)) {
-    //std::cout << line << "\n";
-    if (graphIdx % numParts != partIdx) {
-      graphIdx++;
-      continue;
-    }
-    if (starts_with(line, ">>graph6<<")) {
-      line = line.substr(10);
-    }
-
-    std::vector<int> data;
-    for (char c : line) {
-      CHECK(63 <= c && c <= 126);
-      data.push_back(int(c - 63));
-    }
-
-    int n;
-    if (data[0] <= 62) {
-      n = data[0];
-      data.erase(data.begin(), data.begin() + 1);
-    } else if (data[1] <= 62) {
-      n = (data[1]<<12) + (data[2]<<6) + data[3];
-      data.erase(data.begin(), data.begin() + 4);
-    } else {
-      ERROR("not implemented yet");
-      // return ((data[2]<<30) + (data[3]<<24) + (data[4]<<18) +
-      //       (data[5]<<12) + (data[6]<<6) + data[7], data[8:])
-    }
-    //LOG("n = %d", n);
-    CHECK(n >= 1);
-
-    const int nd = (n * (n - 1) / 2 + 5) / 6;
-    CHECK((int)data.size() == nd);
-    std::vector<bool> bitAdj;
-    for (int i = 0; i < nd; i++) {
-      for (int j = 0; j < 6; j++) {
-        const int bit = 5-j;
-        if ((data[i] & (1 << bit)))
-          bitAdj.push_back(1);
-        else
-          bitAdj.push_back(0);
-      }
-    }
-    CHECK((int)bitAdj.size() == nd * 6);
-
-    // the order is (0,1),(0,2),(1,2),(0,3),(1,3),(2,3),...,(n-2,n-1)
-    size_t idx = 0;
-    std::vector<EdgeTy> edges;
-    for (int i = 0; i < n; i++) {
-      for (int j = 0; j < i; j++) {
-        CHECK(idx < bitAdj.size());
-        if (bitAdj[idx])
-          edges.push_back({j, i});
-        idx++;
-      }
-    }
-
-    if (graphFilter(n, edges)) {
-      const std::string base = filename.substr(filename.find_last_of("/") + 1);
-      const std::string graphName = base + "_" + to_string(graphIdx);
-      graphs.push_back({
-        graphName,
-        edges_to_adj(n, edges)
-      });
-      maxN = std::max(n, maxN);
-    }
-    graphIdx++;
-  }
-
-  ifs.close();
-
-  LOG(TextColor::blue, "extracted %'d graphs (%.2lf%% out of %'d) with maximum |V| = %d from %s", 
-    graphs.size(), 100.0 * graphs.size() / graphIdx, graphIdx, maxN, filename.c_str()
-  );
-
-  return graphs;
-}
-
-std::vector<std::pair<std::string, AdjListTy>> readS6(
-    const std::string& filename, 
-    const std::string& part,
-    const std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter) {
-  ifstream ifs(filename);
-  CHECK(ifs.good(), "file '%s' not found", filename.c_str());
-
-  const auto [partIdx, numParts] = parsePartOption(part);
-
-  int maxN = 0;
-  std::vector<std::pair<std::string, AdjListTy>> graphs;
-  std::string line;
-  int graphIdx = 0;
-  while (std::getline(ifs, line)) {
-    // std::cout << line << "\n";
-    if (graphIdx % numParts != partIdx) {
-      graphIdx++;
-      continue;
-    }
-
-    if (starts_with(line, ">>sparse6<<")) {
-      line = line.substr(11);
-    }
-
-    CHECK(line[0] == ':');
-    line = line.substr(1);
-    std::vector<int> data;
-    for (char c : line) {
-      CHECK(63 <= c && c <= 126);
-      data.push_back(int(c - 63));
-    }
-
-    int n;
-    if (data[0] <= 62) {
-      n = data[0];
-      data.erase(data.begin(), data.begin() + 1);
-    } else if (data[1] <= 62) {
-      n = (data[1]<<12) + (data[2]<<6) + data[3];
-      data.erase(data.begin(), data.begin() + 4);
-    } else {
-      ERROR("not implemented yet");
-      // return ((data[2]<<30) + (data[3]<<24) + (data[4]<<18) +
-      //       (data[5]<<12) + (data[6]<<6) + data[7], data[8:])
-    }
-    // std::cout << "n = " << n << "\n";
-    CHECK(n >= 1);
-
-    int k = 1;
-    while ((1 << k) < n)
-      k++;
-	
-    // extract bits
-    // CHECK((data.size() * 8) % 6 == 0, "data.size() = %d", data.size());
-    std::vector<bool> bits;
-    for (int i = 0; i < (int)data.size(); i++) {
-      for (int j = 0; j < 6; j++) {
-        const int bit = 5-j;
-        if ((data[i] & (1 << bit)))
-          bits.push_back(1);
-        else
-          bits.push_back(0);
-      }
-    }
-
-    std::vector<EdgeTy> edges;
-    int v = 0;
-    size_t idx = 0;
-    while (idx < bits.size()) {
-      int b = bits[idx]; idx++;
-      // read k bits
-      int x = 0;
-      for (int i = 0; i < k; i++) {
-        x = x * 2 + bits[idx];
-        idx++;
-      }
-
-      if (b == 1) {
-        v += 1;
-      }
-
-      if (x >= n || v >= n) {
-        break;
-      } else if (x > v) {
-        v = x;
-      } else {
-        CHECK(x < v);
-        edges.push_back({x, v});
-      }
-    }
-
-    if (graphFilter(n, edges)) {
-      const std::string base = filename.substr(filename.find_last_of("/") + 1);
-      const std::string graphName = base + "_" + to_string(graphIdx);
-      graphs.push_back({
-        graphName,
-        edges_to_adj(n, edges)
-      });
-      maxN = std::max(n, maxN);
-    }
-    graphIdx++;
-  }
-
-  ifs.close();
-
-  LOG(TextColor::blue, "extracted %'d graphs (%.2lf%% out of %'d) with maximum |V| = %d from %s", 
-    graphs.size(), 100.0 * graphs.size() / graphIdx, graphIdx, maxN, filename.c_str()
   );
 
   return graphs;
@@ -487,7 +293,7 @@ std::pair<std::string, AdjListTy> GraphListG6::next() {
   return {};
 }
 
-std::pair<int, std::vector<EdgeTy>> GraphListG6::parse(const std::string& line_) {
+std::pair<int, std::vector<EdgeTy>> GraphListG6::parse(const std::string& line_) {  
   std::string line = line_;
   if (starts_with(line, ">>graph6<<")) {
     line = line.substr(10);
@@ -540,4 +346,145 @@ std::pair<int, std::vector<EdgeTy>> GraphListG6::parse(const std::string& line_)
     }
   }
   return std::make_pair(n, edges);
+}
+
+GraphListS6::GraphListS6(
+    const std::string& filename_,
+    const std::string& part_,
+    const std::function<bool(const int, const std::vector<EdgeTy>&)>& graphFilter_) {
+  filename = filename_;
+  graphFilter = graphFilter_;
+
+  const auto [partIdx_, numParts_] = parsePartOption(part_);
+  partIdx = partIdx_;
+  numParts = numParts_;
+  graphIdx = 0;
+
+  ifs.open(filename);
+  CHECK(ifs.good(), "file '%s' not found", filename.c_str());
+
+  int maxN = 0;
+  std::string line;
+
+  while (std::getline(ifs, line)) {
+    if (graphIdx % numParts != partIdx) {
+      graphIdx++;
+      continue;
+    }
+
+    const auto [n, edges] = parseS6Line(line);
+    if (graphFilter(n, edges)) {
+      numGraphs++;
+      maxN = std::max(maxN, n);
+    }
+    graphIdx++;
+  }
+
+  LOG(TextColor::blue,
+      "extracted %'d graphs (%.2lf%% out of %'d) with maximum |V| = %d from %s",
+      numGraphs, 100.0 * numGraphs / graphIdx, graphIdx, maxN, filename.c_str());
+
+  ifs.close();
+}
+
+std::pair<std::string, AdjListTy> GraphListS6::next() {
+  if (!ifs.is_open()) {
+    ifs.open(filename);
+    graphIdx = 0;
+  }
+  CHECK(ifs.good() && ifs.is_open());
+
+  std::string line;
+  while (std::getline(ifs, line)) {
+    if (graphIdx % numParts != partIdx) {
+      graphIdx++;
+      continue;
+    }
+
+    const auto [n, edges] = parseS6Line(line);
+    if (!graphFilter(n, edges)) {
+      graphIdx++;
+      continue;
+    }
+
+    const std::string base = filename.substr(filename.find_last_of("/") + 1);
+    const std::string graphName = base + "_" + to_string(graphIdx);
+
+    graphIdx++;
+    return {graphName, edges_to_adj(n, edges)};
+  }
+
+  ERROR("not reachable");
+  return {};
+}
+
+std::pair<int, std::vector<EdgeTy>> GraphListS6::parseS6Line(const std::string& lineIn) {
+  std::string line = lineIn;
+
+  if (starts_with(line, ">>sparse6<<")) {
+    line = line.substr(11);
+  }
+
+  CHECK(!line.empty());
+  CHECK(line[0] == ':');
+  line = line.substr(1);
+
+  std::vector<int> data;
+  data.reserve(line.size());
+  for (char c : line) {
+    CHECK(63 <= c && c <= 126);
+    data.push_back(int(c - 63));
+  }
+
+  int n = 0;
+  if (data[0] <= 62) {
+    n = data[0];
+    data.erase(data.begin(), data.begin() + 1);
+  } else if (data.size() >= 4 && data[1] <= 62) {
+    n = (data[1] << 12) + (data[2] << 6) + data[3];
+    data.erase(data.begin(), data.begin() + 4);
+  } else {
+    ERROR("not implemented yet");
+  }
+  CHECK(n >= 1);
+
+  int k = 1;
+  while ((1 << k) < n) k++;
+
+  // extract bits from 6-bit chunks
+  std::vector<bool> bits;
+  bits.reserve(data.size() * 6);
+  for (int x : data) {
+    for (int j = 0; j < 6; j++) {
+      const int bit = 5 - j;
+      bits.push_back((x & (1 << bit)) != 0);
+    }
+  }
+
+  std::vector<EdgeTy> edges;
+  int v = 0;
+  size_t idx = 0;
+  while (idx < bits.size()) {
+    int b = bits[idx]; idx++;
+
+    int x = 0;
+    for (int i = 0; i < k; i++) {
+      if (idx >= bits.size()) break;
+      x = x * 2 + bits[idx];
+      idx++;
+    }
+
+    if (b == 1) v += 1;
+
+    if (x >= n || v >= n) {
+      break;
+    } else if (x > v) {
+      v = x;
+    } else {
+      CHECK(x < v);
+      edges.push_back({x, v});
+    }
+  }
+
+  return {n, edges};
 }

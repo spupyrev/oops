@@ -357,7 +357,7 @@ public:
               const std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter);
 
   ~GraphListG6() {
-    ifs.close();
+    if (ifs.is_open()) ifs.close();
   }
 
   size_t size() const override {
@@ -372,10 +372,35 @@ private:
   size_t numGraphs = 0;
   std::ifstream ifs;
   std::string filename;
-  int partIdx;
-  int numParts;
+  int partIdx = 0;
+  int numParts = 1;
   std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter;
-  int graphIdx;
+  int graphIdx = 0;
+};
+
+class GraphListS6 : public GraphList {
+public:
+  GraphListS6(const std::string& filename,
+              const std::string& part,
+              const std::function<bool(const int, const std::vector<EdgeTy>&)>& graphFilter);
+
+  ~GraphListS6() override {
+    if (ifs.is_open()) ifs.close();
+  }
+
+  size_t size() const override { return numGraphs; }
+  std::pair<std::string, AdjListTy> next() override;
+
+private:
+  std::pair<int, std::vector<EdgeTy>> parseS6Line(const std::string& line);
+
+  size_t numGraphs = 0;
+  std::ifstream ifs;
+  std::string filename;
+  int partIdx = 0;
+  int numParts = 1;
+  std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter;
+  int graphIdx = 0;
 };
 
 std::vector<std::pair<std::string, AdjListTy>> readMagma(const std::string& filename, const int maxN);
@@ -385,17 +410,6 @@ std::vector<std::pair<std::string, AdjListTy>> readCfg(
     const std::string& filename, 
     const std::string& part,
     const std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter);
-
-std::vector<std::pair<std::string, AdjListTy>> readG6(
-    const std::string& filename, 
-    const std::string& part,
-    const std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter);
-
-std::vector<std::pair<std::string, AdjListTy>> readS6(
-    const std::string& filename, 
-    const std::string& part,
-    const std::function<bool(const int, const std::vector<EdgeTy>&)> graphFilter);
-
 
 struct InputGraph;
 struct Result;
