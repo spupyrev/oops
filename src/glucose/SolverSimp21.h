@@ -11,7 +11,6 @@
 #include <map>
 #include <set>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 enum clause_Type { LONG = 0, REMOVED, MIDSZ, SMALL };

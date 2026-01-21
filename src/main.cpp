@@ -63,7 +63,6 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
   options.addAllowedOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
   options.addAllowedOption("-unsat", "false", "Add auxiliary constraints to speedup finding non-1-planar instances");
-  options.addAllowedOption("-extreme", "false", "Add extreme auxiliary constraints to speedup finding non-1-planar instances");
   options.addAllowedOption("-strict", "false", "Enforce strict 1-planarity (no unnecessary crossings)");
   options.addAllowedOption("-swap-constraints", "", "Add swap constraints: num_pairs/num_reorder");
   options.addAllowedOption("-partial-constraints", "", "Add partial constraints: num_pairs");
@@ -402,11 +401,6 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.ignoreTransitiveRels = options.hasCustomOption("no-transitive");
 
   params.useSATConstraints = options.getBool("-sat");
-  if (options.getBool("-extreme")) {
-    CHECK(options.getBool("-unsat"), "-extreme requires -unsat");
-    params.swapConstraints = "3/3";
-    params.sepCycleConstraints = "3";
-  }
   if (options.getBool("-unsat")) {
     params.useUNSATConstraints = true;
     params.useSATConstraints = true;

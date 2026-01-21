@@ -27,7 +27,7 @@ public:
   // Permutation constructed from swapping two rows.
   Permutation(std::vector<uint> &row1, std::vector<uint> &row2);
 
-  ~Permutation(){};
+  ~Permutation() {};
 
   uint getImage(uint from);
   // return value is true iff the image is different from the original
@@ -91,9 +91,9 @@ public:
   // pointed to by these pointers will ever be freed :(
   Specification *theory; // non-owning pointer
 
-  Group(){};
+  Group() {};
 
-  ~Group(){};
+  ~Group() {};
 
   void add(std::shared_ptr<Permutation> p);
   void checkColumnInterchangeability(std::shared_ptr<Matrix> m);

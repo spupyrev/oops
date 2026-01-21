@@ -28,7 +28,7 @@ private:
 public:
   Breaker(std::shared_ptr<Specification> origTheo);
 
-  ~Breaker(){};
+  ~Breaker() {};
 
   // Prints the current breaker
   void print();

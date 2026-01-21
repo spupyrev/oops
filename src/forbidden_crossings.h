@@ -3,7 +3,8 @@
 #include "common.h"
 #include "logging.h"
 
-#include <unordered_set>
+// #include <unordered_set>
+#include "satsuma/tsl.hpp"
 
 struct CrossingPair {
   int32_t e1, e2;
@@ -92,8 +93,10 @@ public:
   }
 
 private:
-  std::unordered_set<int64_t> forbiddenCrossingPairs;
-  std::unordered_set<int64_t> forbiddenCrossingTriples;
+  // std::unordered_set<int64_t> forbiddenCrossingPairs;
+  // std::unordered_set<int64_t> forbiddenCrossingTriples;
+  tsl::robin_set<int64_t> forbiddenCrossingPairs;
+  tsl::robin_set<int64_t> forbiddenCrossingTriples;
 
   std::vector<CrossingPair> clauses2;
   std::vector<CrossingTriple> clauses3;
