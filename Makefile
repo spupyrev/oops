@@ -43,7 +43,7 @@ d:   $(EXEC)_debug
 
 ## Compile options
 %.o:  CFLAGS += -O3 -g
-%.or: CFLAGS += -O3 -flto -DNDEBUG
+%.or: CFLAGS += -O3 -flto -DNDEBUG -march=native
 %.op: CFLAGS += -O2 -g -DNDEBUG -fno-omit-frame-pointer
 %.od: CFLAGS += -O0 -g -DDEBUG -fno-omit-frame-pointer
 

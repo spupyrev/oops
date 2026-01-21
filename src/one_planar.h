@@ -6,12 +6,14 @@
 #include "glucose/SolverSimp21.h"
 #include "breakid/sat_symmetry.h"
 #include "satsuma/sat_symmetry.h"
+#include "satsuma/tsl.hpp"
 
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <zlib.h>
 
 using namespace Simp21;
@@ -305,14 +307,7 @@ struct MClause {
   }
 
   bool operator == (const MClause& other) const {
-    if (vars.size() != other.vars.size())
-      return false;
-    for (size_t i = 0; i < vars.size(); i++) {
-      if (vars[i] != other.vars[i]) {
-        return false;
-      }
-    }
-    return true;
+    return equals(other);
   }
 
   bool operator < (const MClause& other) const {
@@ -328,7 +323,63 @@ struct MClause {
   void sort() {
     std::sort(vars.begin(), vars.end());
   }
+
+  // Compute a 64-bit FNV-1a style hash over the clause variables
+  size_t hash() const noexcept {
+    uint64_t h = 1469598103934665603ULL;
+    for (const auto& v : vars) {
+      uint64_t x = (uint64_t(v.id) << 1) | (v.positive ? 1ULL : 0ULL);
+      h ^= x;
+      h *= 1099511628211ULL;
+    }
+    return (size_t)h;
+  }
+
+  // Equality check (same as operator== but as a member)
+  bool equals(const MClause& other) const noexcept {
+    if (vars.size() != other.vars.size())
+      return false;
+    for (size_t i = 0; i < vars.size(); ++i) {
+      if (vars[i].id != other.vars[i].id || vars[i].positive != other.vars[i].positive)
+        return false;
+    }
+    return true;
+  }
 };
+
+// Optimized dedup for MClause vectors: use hash-set for large vectors,
+inline void sort_unique_fast(std::vector<MClause>& vec) {
+  const size_t n = vec.size();
+  if (n <= 64) {
+    sort_unique(vec);
+    return;
+  }
+
+  struct MClauseHash {
+    size_t operator()(const MClause& c) const noexcept {
+      return c.hash();
+    }
+  };
+
+  struct MClauseEq {
+    bool operator()(const MClause& a, const MClause& b) const noexcept {
+      return a.equals(b);
+    }
+  };
+
+  tsl::robin_set<MClause, MClauseHash, MClauseEq> seen;
+  seen.reserve(n * 2);
+  std::vector<MClause> out;
+  out.reserve(n);
+  for (auto& c : vec) {
+    auto it = seen.find(c);
+    if (it == seen.end()) {
+      seen.insert(c);
+      out.push_back(std::move(c));
+    }
+  }
+  vec.swap(out);
+}
 
 class SATModel {
   struct pair_hash {
@@ -503,7 +554,7 @@ class SATModel {
     for (auto& c : clauses) {
       c.sort();
     }
-    sort_unique(clauses);
+    sort_unique_fast(clauses);
   }
 
   void initClauses(Solver& solver) {

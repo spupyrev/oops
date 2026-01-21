@@ -8,3 +8,4 @@ log_*
 oops
 *.o
 *.d
+*.op
