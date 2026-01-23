@@ -100,17 +100,45 @@ bool skipTestingBySize(const InputGraph& graph, const int verbose, ResultCodeTy&
   }
   CHECK(n >= 7);
 
-  // density of general
+  // density of general: at most 4n-8 edges
   if (m > 4 * n - 8) {
     LOG_IF(verbose, "the graph is not 1-planar due to edge density (%d > %d)", m, 4 * n - 8);
     resultCode = ResultCodeTy::UNSAT;
     return true;
   }
   // density of bipartite
-  if (m > 3 * n - 8 - n % 2 && isBipartite(n, graph.edges)) {
-    LOG_IF(verbose, "the graph is not 1-planar due to edge density (%d > %d)", m, 3 * n - 8 - n % 2);
-    resultCode = ResultCodeTy::UNSAT;
-    return true;
+  int x, y;
+  const bool bipartite = isBipartite(n, graph.edges, x, y);
+  if (bipartite) {
+    // at most 3n-8 for even n and 3n-9 for odd n
+    if (m > 3 * n - 8 - n % 2) {
+      LOG_IF(verbose, "the bipartite graph is not 1-planar due to edge density (%d > %d)", m, 3 * n - 8 - n % 2);
+      resultCode = ResultCodeTy::UNSAT;
+      return true;
+    }
+    CHECK(x > 0 && y > 0);
+    if (x > y) std::swap(x, y);
+    // if 2 <= x <= y, then there are at most 2n + 4x - 12 edges
+    if (x >= 2 && m > 2 * n + 4 * x - 12) {
+      resultCode = ResultCodeTy::UNSAT;
+      return true;
+    }
+  }
+  // density of larger girth
+  const int girth = computeGirth(n, graph.edges);
+  if (girth >= 4) {
+    // girth-4 1-planar graphs have at most 3n-6 edges
+    if (n >= 4 && m > 3 * n - 6) {
+      resultCode = ResultCodeTy::UNSAT;
+      return true;
+    }
+  }
+  if (girth >= 5) {
+    // girth-5 1-planar graphs have at most 12/5 * n edges
+    if (n >= 4 && m > (12 * n + 4) / 5) {
+      resultCode = ResultCodeTy::UNSAT;
+      return true;
+    }
   }
   return false;
 }

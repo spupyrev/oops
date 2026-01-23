@@ -110,7 +110,7 @@ std::vector<int> dfs(const std::vector<std::vector<bool>>& adj, int seed) {
   return order;
 }
 
-bool isBipartite(int n, const std::vector<EdgeTy>& edges, vector<int>& part1, vector<int>& part2) {
+bool isBipartite(int n, const std::vector<EdgeTy>& edges, std::vector<int>& part1, std::vector<int>& part2) {
   vector<int> depth(n, -1);
   Adjacency adj(n);
   adj.from_edges(edges);
@@ -137,8 +137,8 @@ bool isBipartite(int n, const std::vector<EdgeTy>& edges, vector<int>& part1, ve
   }
 
   for (auto& edge : edges) {
-    int color1 = depth[edge.first] % 2;
-    int color2 = depth[edge.second] % 2;
+    const int color1 = depth[edge.first] % 2;
+    const int color2 = depth[edge.second] % 2;
 
     if (color1 == color2)
       return false;
@@ -155,9 +155,18 @@ bool isBipartite(int n, const std::vector<EdgeTy>& edges, vector<int>& part1, ve
 }
 
 bool isBipartite(int n, const std::vector<EdgeTy>& edges) {
-  vector<int> part1;
-  vector<int> part2;
+  std::vector<int> part1;
+  std::vector<int> part2;
   return isBipartite(n, edges, part1, part2);
+}
+
+bool isBipartite(int n, const std::vector<EdgeTy>& edges, int &leftSize, int &rightSize) {
+  std::vector<int> part1;
+  std::vector<int> part2;
+  const bool res = isBipartite(n, edges, part1, part2);
+  leftSize = (int)part1.size();
+  rightSize = (int)part2.size();
+  return res;
 }
 
 bool isConnected(const vector<int>& vList, const vector<vector<int>>& adj, set<int>& removed) {

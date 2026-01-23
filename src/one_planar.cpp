@@ -291,6 +291,7 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const Par
   }
 
   // Ensure transitivity
+  // TODO: make an option for prob
   if (!params.ignoreTransitiveRels) {
     for (int i = 0; i < numVertices; i++) {
       for (int j = 0; j < numVertices; j++) {
@@ -1009,7 +1010,8 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
   }
 
   /////////////////////////////////////////////////////////////////////////////////
-  // // TMP: custom constraints
+  // custom constraints
+  /////////////////////////////////////////////////////////////////////////////////
   // auto addOrder = [&](const std::vector<int>& order) {
   //   for (size_t i = 0; i < order.size(); i++) {
   //     for (size_t j = i + 1; j < order.size(); j++) {
@@ -1021,7 +1023,6 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
   //   for (int x = 0; x < n; x++) {
   //     if (contains(group, x)) 
   //       continue;
-
   //     for (size_t i = 0; i < group.size(); i++) {
   //       for (size_t j = 0; j < group.size(); j++) {
   //         if (i == j)
@@ -1032,6 +1033,23 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
   //     }
   //   }
   // };
+  // std::vector<int> customCrossIdx =  {12,    67,    90,    342,   554,   785,   802};
+  // std::vector<bool> customCrossRes = {false, false, false, false, false, false, false};
+  // int idx = 0;
+  // int numCustom = 0;
+  // for (int e1 = 0; e1 < m; e1++) {
+  //   for (int e2 = e1 + 1; e2 < m; e2++) {
+  //     if (!canBeMerged(e1 + n, e2 + n, n, graph.edges))
+  //       continue;
+  //     if (contains(customCrossIdx, idx)) {
+  //       const size_t pos = std::find(customCrossIdx.begin(), customCrossIdx.end(), idx) - customCrossIdx.begin();
+  //       model.addClause(MClause(model.getCross2Var(e1 + n, e2 + n, customCrossRes[pos])));
+  //       numCustom++;
+  //     }
+  //     idx++;
+  //   }
+  // }
+  // LOG_IF(verbose > 0 && numCustom > 0, "added %d custom cross-2 constraints", numCustom);
   /////////////////////////////////////////////////////////////////////////////////
 
   // vertex twins
