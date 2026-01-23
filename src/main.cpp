@@ -286,8 +286,9 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
   }
 
   const std::string in = options.getStr("-i");
-  const std::string filename = in.find_last_of(".") == std::string::npos ? "" : in;
-  const std::string extension = in.substr(in.find_last_of(".") + 1);
+  const auto pos = in.find_last_of(".");
+  const std::string filename = pos == std::string::npos ? "" : in;
+  const std::string extension = pos == std::string::npos ? in : in.substr(pos + 1);
   // LOG("filename: %s; extension: %s", filename.c_str(), extension.c_str());
 
   const int maxN = options.getInt("-max-n");
@@ -350,9 +351,9 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options) {
   const int numGraphs = options.getInt("-graphs");
   std::vector<std::pair<std::string, AdjListTy>> graphs;
   for (int i = 0; i < numGraphs; i++) {
-    std::string graphName = (numGraphs == 1 ? filename : filename + "_" + to_string(i));
+    const std::string graphName = (numGraphs == 1 ? filename : filename + "_" + to_string(i));
     graphs.push_back({
-      filename,
+      graphName,
       edges_to_adj(n, edges)
     });
     // TODO: all but the first graph have random directions
