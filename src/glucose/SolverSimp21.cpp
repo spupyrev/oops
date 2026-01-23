@@ -916,18 +916,19 @@ void Solver::analyze(CRef confl, vec<Lit> &out_learnt, int &out_btlevel, int &ou
     seen[var(p)] = true;
 
     for (int i = out_learnt.size() - 1; i >= 0; i--) {
-      Var v = var(out_learnt[i]);
-      CRef rea = reason(v);
+      const Var v = var(out_learnt[i]);
+      const CRef rea = reason(v);
 
       if (rea != CRef_Undef) {
         const Clause &reaC = ca[rea];
 
         for (int i = 0; i < reaC.size(); i++) {
-          Lit l = reaC[i];
+          const Lit l = reaC[i];
+          const auto varL = var(l);
 
-          if (!seen[var(l)]) {
-            seen[var(l)] = true;
-            almost_conflicted[var(l)]++;
+          if (!seen[varL]) {
+            seen[varL] = true;
+            almost_conflicted[varL]++;
             analyze_toclear.push(l);
           }
         }
@@ -1002,7 +1003,7 @@ bool Solver::litRedundant(Lit p, uint32_t abstract_levels) {
 
       if (!seen[var(p)] && level(var(p)) > 0) {
         if (reason(var(p)) != CRef_Undef && (abstractLevel(var(p)) & abstract_levels) != 0) {
-          seen[var(p)] = 1;
+          seen[var(p)] = true;
           analyze_stack.push(p);
           analyze_toclear.push(p);
         } else {
@@ -1037,7 +1038,7 @@ void Solver::analyzeFinal(Lit p, vec<Lit> &out_conflict) {
     return;
   }
 
-  seen[var(p)] = 1;
+  seen[var(p)] = true;
 
   for (int i = trail.size() - 1; i >= trail_lim[0]; i--) {
     Var x = var(trail[i]);
@@ -1184,7 +1185,7 @@ CRef Solver::propagate() {
 
           // pass over all the literals in the clause and find the one with the biggest level
           for (int nInd = 2; nInd < c_size; nInd++) {
-            int nLevel = level(var(c[nInd]));
+            const int nLevel = level(var(c[nInd]));
 
             if (nLevel > nMaxLevel) {
               nMaxLevel = nLevel;
@@ -1444,7 +1445,6 @@ lbool Solver::search(int &nof_conflicts) {
   }
 
   // simplify
-  //
   if ((signed)conflicts >= curSimplify * nbconfbeforesimplify) {
     nbSimplifyAll++;
 
