@@ -609,7 +609,7 @@ bool hasReducibleSubgraph(const AdjListTy& adjList) {
 bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<bool>& used, const AdjListTy& adjList) {
 	used[now] = true;
 	if (now == t) 
-    return true;
+	    return true;
   for (int x : adjList[now]) {
 		if (!used[x] && g[now][x] >= 1 && dfs_maxflow(x, t, g, used, adjList)) {
 			g[now][x] -= 1;
@@ -621,10 +621,36 @@ bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<b
 	return false;
 }
 
-int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
-                           const std::vector<int>& removedVertices, 
-                           const std::vector<EdgeTy>& removedEdges, 
-                           const int ub) {
+bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<uint8_t>& used, const AdjListTy& adjList) {
+  used[now] = 1;
+  if (now == t)
+    return true;
+  for (int x : adjList[now]) {
+    if (!used[x] && g[now][x] >= 1 && dfs_maxflow(x, t, g, used, adjList)) {
+      g[now][x] -= 1;
+      g[x][now] += 1;
+      return true;
+    }
+  }
+  return false;
+}
+
+size_t countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
+                              const std::vector<int>& removedVertices, 
+                              const std::vector<EdgeTy>& removedEdges, 
+                              const size_t ub) {
+  const std::vector<int> sources = {s};
+  const std::vector<int> targets = {t};
+  return countEdgeDisjointPaths(sources, targets, adjList, removedVertices, removedEdges, ub);
+}
+
+size_t countEdgeDisjointPaths(const std::vector<int>& sources, const std::vector<int>& targets,
+                              const AdjListTy& adjList, 
+                              const std::vector<int>& removedVertices, 
+                              const std::vector<EdgeTy>& removedEdges,
+                              const size_t ub) {
+  CHECK(sources.size() == targets.size());
+  CHECK(!overlap(sources, targets));
   const size_t n = adjList.size();
   // create a graph for max flow (avoiding re-allocation)
   // std::vector<std::vector<int>> g(n, std::vector<int>(n));
@@ -651,31 +677,40 @@ int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList,
   }
 
   // find the max flow
-  int maxflow = 0;
-  std::vector<bool> used(n, false);
+  std::vector<uint8_t> blocked(n, 0);
+  std::vector<uint8_t> used(n, 0);
+  for (int x : removedVertices) {
+    CHECK(!contains(sources, x) && !contains(targets, x));
+    blocked[x] = 1;
+  }
+  size_t maxflow = 0;
   while (true) {
-    for (int x : removedVertices) {
-      CHECK(x != s && x != t);
-      used[x] = true;
+    bool progress = false;
+    for (size_t i = 0; i < sources.size(); i++) {
+      const int s = sources[i];
+      const int t = targets[i];
+      used = blocked;
+      if (dfs_maxflow(s, t, g, used, adjList)) {
+        maxflow++;
+        if (maxflow >= ub)
+          return maxflow;
+        progress = true;
+      }
     }
-    if (!dfs_maxflow(s, t, g, used, adjList)) 
+    if (!progress)
       break;
-    maxflow++;
-    if (maxflow >= ub)
-      break;
-    std::fill(used.begin(), used.end(), false);
   }
 
   return maxflow;
 }
 
-// Calls lambda onCycle({x, ..., y}) for every simple cycle of size 3/4/5. Forbidden vertices may not appear in the cycle.
+// Calls lambda onCycle({x, ..., y}) for every simple cycle of small size. Forbidden vertices may not appear in the cycle.
 // Returns early if onCycle returns "true".
 void forEachCycle(const AdjListTy& adj, const int cycleLength,
                   const int x, const int y,
                   const std::vector<int>& forbidden,   
                   const CycleCallback& onCycle) {
-  CHECK(cycleLength == 3 || cycleLength == 4 || cycleLength == 5, "Only cycle sizes 3/4/5 supported");
+  CHECK(3 <= cycleLength && cycleLength <= 8, "Only cycle sizes 3/4/5/6/7/8 supported");
 
   if (cycleLength == 3) {
     // (x, c, y)
@@ -716,30 +751,162 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
     return;
   }
 
-  // cycleVertices == 5
-  // (x, c1, c2, c3, y)
+  if (cycleLength == 5) {
+    // (x, c1, c2, c3, y)
+    for (int c1 : adj[x]) {
+      if (y == c1 || x == c1)
+        continue;
+      if (contains(forbidden, c1)) 
+        continue;
+
+      for (int c2 : adj[c1]) {
+        if (y == c2 || x == c2 || c1 == c2)
+          continue;
+        if (contains(forbidden, c2)) 
+          continue;
+
+        for (int c3 : adj[c2]) {
+          if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
+            continue;
+          if (contains(forbidden, c3)) 
+            continue;
+          if (!contains(adj[y], c3)) 
+            continue;
+
+          if (onCycle({x, c1, c2, c3, y})) 
+            return; // stop processing early
+        }
+      }
+    }
+    return;
+  }
+
+  if (cycleLength == 6) {
+    // (x, c1, c2, c3, c4, y)
+    for (int c1 : adj[x]) {
+      if (y == c1 || x == c1)
+        continue;
+      if (contains(forbidden, c1)) 
+        continue;
+
+      for (int c2 : adj[c1]) {
+        if (y == c2 || x == c2 || c1 == c2)
+          continue;
+        if (contains(forbidden, c2)) 
+          continue;
+
+        for (int c3 : adj[c2]) {
+          if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
+            continue;
+          if (contains(forbidden, c3)) 
+            continue;
+
+          for (int c4 : adj[c3]) {
+            if (y == c4 || x == c4 || c1 == c4 || c2 == c4 || c3 == c4)
+              continue;
+            if (contains(forbidden, c4)) 
+              continue;
+            if (!contains(adj[y], c4)) 
+              continue;
+
+            if (onCycle({x, c1, c2, c3, c4, y})) 
+              return; // stop processing early
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  if (cycleLength == 7) {
+    // (x, c1, c2, c3, c4, c5, y)
+    for (int c1 : adj[x]) {
+      if (y == c1 || x == c1)
+        continue;
+      if (contains(forbidden, c1))
+        continue;
+
+      for (int c2 : adj[c1]) {
+        if (y == c2 || x == c2 || c1 == c2)
+          continue;
+        if (contains(forbidden, c2))
+          continue;
+
+        for (int c3 : adj[c2]) {
+          if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
+            continue;
+          if (contains(forbidden, c3))
+            continue;
+
+          for (int c4 : adj[c3]) {
+            if (y == c4 || x == c4 || c1 == c4 || c2 == c4 || c3 == c4)
+              continue;
+            if (contains(forbidden, c4))
+              continue;
+
+            for (int c5 : adj[c4]) {
+              if (y == c5 || x == c5 || c1 == c5 || c2 == c5 || c3 == c5 || c4 == c5)
+                continue;
+              if (contains(forbidden, c5))
+                continue;
+              if (!contains(adj[y], c5))
+                continue;
+
+              if (onCycle({x, c1, c2, c3, c4, c5, y}))
+                return; // stop processing early
+            }
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  // cycleLength == 8
+  // (x, c1, c2, c3, c4, c5, c6, y)
   for (int c1 : adj[x]) {
     if (y == c1 || x == c1)
       continue;
-    if (contains(forbidden, c1)) 
+    if (contains(forbidden, c1))
       continue;
 
     for (int c2 : adj[c1]) {
       if (y == c2 || x == c2 || c1 == c2)
         continue;
-      if (contains(forbidden, c2)) 
+      if (contains(forbidden, c2))
         continue;
 
       for (int c3 : adj[c2]) {
         if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
           continue;
-        if (contains(forbidden, c3)) 
-          continue;
-        if (!contains(adj[y], c3)) 
+        if (contains(forbidden, c3))
           continue;
 
-        if (onCycle({x, c1, c2, c3, y})) 
-          return; // stop processing early
+        for (int c4 : adj[c3]) {
+          if (y == c4 || x == c4 || c1 == c4 || c2 == c4 || c3 == c4)
+            continue;
+          if (contains(forbidden, c4))
+            continue;
+
+          for (int c5 : adj[c4]) {
+            if (y == c5 || x == c5 || c1 == c5 || c2 == c5 || c3 == c5 || c4 == c5)
+              continue;
+            if (contains(forbidden, c5))
+              continue;
+
+            for (int c6 : adj[c5]) {
+              if (y == c6 || x == c6 || c1 == c6 || c2 == c6 || c3 == c6 || c4 == c6 || c5 == c6)
+                continue;
+              if (contains(forbidden, c6))
+                continue;
+              if (!contains(adj[y], c6))
+                continue;
+
+              if (onCycle({x, c1, c2, c3, c4, c5, c6, y}))
+                return; // stop processing early
+            }
+          }
+        }
       }
     }
   }

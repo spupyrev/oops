@@ -62,7 +62,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-ic", "false", "Enforce IC constraints");
   options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
   options.addAllowedOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
-  options.addAllowedOption("-unsat", "false", "Add auxiliary constraints to speedup finding non-1-planar instances");
+  options.addAllowedOption("-unsat", "0", "Add auxiliary constraints to speedup finding non-1-planar instances");
   options.addAllowedOption("-strict", "false", "Enforce strict 1-planarity (no unnecessary crossings)");
   options.addAllowedOption("-swap-constraints", "", "Add swap constraints: num_pairs/num_reorder");
   options.addAllowedOption("-partial-constraints", "", "Add partial constraints: num_pairs");
@@ -156,9 +156,6 @@ ResultCodeTy isOnePlanar(
   const auto& edges = graph.edges;
 
   LOG_IF(verbose, "testing 1-planarity of a graph with |V| = %d and |E| = %d", n, edges.size());
-  // if (verbose) {
-  //   printGraphStats(n, edges, std::vector<bool>());
-  // }
 
   // print input
   printInput(options.getStr("-o"), graphName, graph, verbose);
@@ -430,7 +427,9 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.ignoreTransitiveRels = options.hasCustomOption("no-transitive");
 
   params.useSATConstraints = options.getBool("-sat");
-  if (options.getBool("-unsat")) {
+  const int unsatLevel = options.getInt("-unsat");
+  params.unsatLevel = unsatLevel;
+  if (unsatLevel > 0) {
     params.useUNSATConstraints = true;
     params.useSATConstraints = true;
     params.applySatsuma = true;

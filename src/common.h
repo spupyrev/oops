@@ -217,6 +217,15 @@ bool equal_unsorted(const std::vector<T>& vec1, const std::vector<T>& vec2) {
 }
 
 template <typename T>
+bool overlap(const std::vector<T>& vec1, const std::vector<T>& vec2) {
+  for (const auto& v1 : vec1) {
+    if (contains(vec2, v1)) 
+      return true;
+  }
+  return false;
+}
+
+template <typename T>
 double average(const std::vector<T>& vec) {
   if (vec.empty())
     return 0;

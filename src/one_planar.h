@@ -215,6 +215,7 @@ struct Params {
   std::string swapConstraints = "";
   std::string partialConstraints = "";
   std::string sepCycleConstraints = "";
+  int unsatLevel = 0;
 
   std::string custom = "";
   bool ignoreTransitiveRels = false;
@@ -348,7 +349,7 @@ struct MClause {
 };
 
 // Optimized dedup for MClause vectors: use hash-set for large vectors,
-inline void sort_unique_fast(std::vector<MClause>& vec) {
+inline void make_vec_unique_fast(std::vector<MClause>& vec) {
   const size_t n = vec.size();
   if (n <= 64) {
     sort_unique(vec);
@@ -554,7 +555,7 @@ class SATModel {
     for (auto& c : clauses) {
       c.sort();
     }
-    sort_unique_fast(clauses);
+    make_vec_unique_fast(clauses);
   }
 
   void initClauses(Solver& solver) {

@@ -996,7 +996,7 @@ void encodeStackConstraints(SATModel& model, const InputGraph& graph) {
   }
 }
 
-void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int verbose) {
+void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const Params& params) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -1012,13 +1012,22 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
   /////////////////////////////////////////////////////////////////////////////////
   // custom constraints
   /////////////////////////////////////////////////////////////////////////////////
-  // auto addOrder = [&](const std::vector<int>& order) {
-  //   for (size_t i = 0; i < order.size(); i++) {
-  //     for (size_t j = i + 1; j < order.size(); j++) {
-  //       model.addClause(MClause(model.getRelVar(order[i], order[j], true)));
-  //     }
-  //   }
-  // };
+  auto addOrder = [&](const std::vector<int>& order) {
+    for (size_t i = 0; i < order.size(); i++) {
+      for (size_t j = i + 1; j < order.size(); j++) {
+        model.addClause(MClause(model.getRelVar(order[i], order[j], true)));
+      }
+    }
+  };
+  // Example: -custom=order:0,1,2,3,4
+  if (params.custom != "") {
+    const auto customOrder = SplitNotNull(params.custom, ":");
+    if (customOrder.size() == 2 && customOrder[0] == "order") {
+      const std::vector<int> partialOrder = SplitNotNullInt(customOrder[1], ",");
+      addOrder(partialOrder);
+      LOG_IF(params.verbose, "added partial vertex order: %s", to_string(partialOrder).c_str());
+    }
+  }
   // auto addGroup = [&](const std::vector<int>& group) {
   //   for (int x = 0; x < n; x++) {
   //     if (contains(group, x)) 
@@ -1063,14 +1072,17 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const int ver
       adjJ.push_back(i);
       adjJ.push_back(j);
       if (equal_unsorted(adjI, adjJ)) {
-        LOG_IF(verbose >= 3, "identified equal adjacencies for vertices %d and %d: (%s) vs (%s)", i, j, to_string(adj[i]).c_str(), to_string(adj[j]).c_str());
+        LOG_IF(
+          params.verbose >= 3, 
+          "identified equal adjacencies for vertices %d and %d: (%s) vs (%s)", 
+          i, j, to_string(adj[i]).c_str(), to_string(adj[j]).c_str());
         model.addClause(MClause(model.getRelVar(i, j, true)));
         numExtraConstraints++;
       }
     }
   }
 
-  LOG_IF(verbose && numExtraConstraints > 0, "added %d symmetry-breaking constraints", numExtraConstraints);
+  LOG_IF(params.verbose && numExtraConstraints > 0, "added %d symmetry-breaking constraints", numExtraConstraints);
 }
 
 /// Encode stack-planarity
@@ -1119,7 +1131,7 @@ void encodeStackPlanar(
   encodeForbiddenTuples(model, graph, params.verbose);
 
   // Symmetry
-  encodeStackSymmetry(model, graph, params.verbose);
+  encodeStackSymmetry(model, graph, params);
 }
 
 /// Extract a result from the SAT encoding for move-based planarity

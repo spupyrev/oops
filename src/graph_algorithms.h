@@ -59,12 +59,19 @@ int computeGirth(const int n, const std::vector<EdgeTy>& edges);
 bool hasReducibleSubgraph(const AdjListTy& adjList);
 
 /// Count the number of edge-disjoint paths between s and t that avoid "removed" vertices and edges
-int countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
-                           const std::vector<int>& removedVertices, 
-                           const std::vector<EdgeTy>& removedEdges,
-                           const int ub);
+size_t countEdgeDisjointPaths(const int s, const int t, const AdjListTy& adjList, 
+                              const std::vector<int>& removedVertices, 
+                              const std::vector<EdgeTy>& removedEdges,
+                              const size_t ub);
 
-// Calls lambda onCycle({x, ..., y}) for every simple cycle of size 3/4/5. Forbidden vertices may not appear in the cycle.
+/// Count the number of edge-disjoint paths between `sources` and `targets` that avoid "removed" vertices and edges
+size_t countEdgeDisjointPaths(const std::vector<int>& sources, const std::vector<int>& targets,
+                              const AdjListTy& adjList, 
+                              const std::vector<int>& removedVertices, 
+                              const std::vector<EdgeTy>& removedEdges,
+                              const size_t ub);
+
+// Calls lambda onCycle({x, ..., y}) for every simple cycle of size 3/4/5/6/7/8. Forbidden vertices may not appear in the cycle.
 // Returns early if onCycle returns true.
 using CycleCallback = std::function<bool(const std::vector<int>&)>;
 void forEachCycle(const AdjListTy& adjList, const int cycleLength,
