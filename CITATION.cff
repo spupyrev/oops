@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the associated paper."
+type: software
+title: "OOPS: Optimized One-Planarity Solver via SAT"
+authors:
+  - family-names: "Pupyrev"
+    given-names: "Sergey"
+repository-code: "https://github.com/spupyrev/oops"
+url: "https://github.com/spupyrev/oops"
+license: "MIT"
+preferred-citation:
+  type: conference-paper
+  title: "OOPS: Optimized One-Planarity Solver via SAT"
+  authors:
+    - family-names: "Pupyrev"
+      given-names: "Sergey"
+  year: 2025
+  conference:
+    name: "33rd International Symposium on Graph Drawing and Network Visualization (GD 2025)"
+    series: "Leibniz International Proceedings in Informatics (LIPIcs)"
+    volume: 357
+    editors:
+      - family-names: "Dujmović"
+        given-names: "Vida"
+      - family-names: "Montecchiani"
+        given-names: "Fabrizio"
+  publisher:
+    name: "Schloss Dagstuhl -- Leibniz-Zentrum für Informatik"
+    location: "Dagstuhl, Germany"
+  pages: "14:1-14:19"
+  doi: "10.4230/LIPIcs.GD.2025.14"
