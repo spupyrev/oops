@@ -78,7 +78,7 @@ void prepareOptions(CMDOptions& options) {
 
   // Experimental
   options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
-  options.addAllowedOption("-skip-reducible-subgraphs", "false", "[Experimental] Skip reducible subgraphs");
+  options.addAllowedOption("-skip-reducible", "false", "[Experimental] Skip reducible subgraphs");
   options.addAllowedOption("-custom", "", "Custom options");
 }
 
@@ -525,9 +525,12 @@ void testOnePlanar(CMDOptions& options) {
 
     auto processGraph = [&](const std::string& graphName, const AdjListTy& graphAdj) -> void {
       // special case for cubic graphs
-      if (options.getBool("-skip-reducible-subgraphs") && hasReducibleSubgraph(graphAdj)) {
-        if (verbose)
+      if (options.getBool("-skip-reducible") && hasReducibleSubgraph(graphAdj)) {
+        if (verbose) {
           LOG(TextColor::green, "the graph contains a reducible subgraph");
+          InputGraph graph(n, edges, directions);
+          printInput(options.getStr("-o"), graphName, graph, verbose);
+        }
         numSkipped++;
         return;
       } 

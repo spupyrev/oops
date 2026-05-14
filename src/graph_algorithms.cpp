@@ -558,54 +558,6 @@ int computeGirth(const int n, const std::vector<EdgeTy>& edges) {
   return best > 0 ? best : 1;
 }  
 
-bool hasReducibleSubgraph(const AdjListTy& adjList) {
-  const int n = (int)adjList.size();
-  // this is working only for cubic graph
-  for (int i = 0; i < n; i++) {
-    if (adjList[i].size() != 3)
-      return false;
-  }
-
-  auto connected = [&](const int u, const int v) -> bool {
-    return adjList[u][0] == v || adjList[u][1] == v || adjList[u][2] == v;
-  };
-  auto remaining = [&](const int u, const int v1, const int v2) -> int {
-    for (int x : adjList[u]) {
-      if (x != v1 && x != v2)
-        return x;
-    }
-    ERROR("error");
-    return -1;
-  };
-
-  for (int i = 0; i < n; i++) {
-    for (size_t i1 = 0; i1 < adjList[i].size(); i1++) {
-      for (size_t i2 = i1 + 1; i2 < adjList[i].size(); i2++) {
-        const int j = adjList[i][i1];
-        const int k = adjList[i][i2];
-        if (!connected(j, k))
-          continue;
-
-        const int x = remaining(i, j, k);
-        const int remJ = remaining(j, i, k);
-        const int remK = remaining(k, i, j);
-
-        // found a triangle connected to three distinct outer-vertices
-        if (x != remJ && x != remK && remJ != remK)
-          return true;
-
-        // found two attached triangles
-        if (x == remJ) {
-          const int remX = remaining(x, i, j);
-          if (remX != remK)
-            return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
 bool dfs_maxflow(int now, int t, std::vector<std::vector<int>>& g, std::vector<bool>& used, const AdjListTy& adjList) {
 	used[now] = true;
 	if (now == t) 
