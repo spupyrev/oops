@@ -2,12 +2,11 @@
 #include "logging.h"
 #include "one_planar.h"
 
-/// TODO: merge with similar impl
-struct SepCycleTraversal {
+struct SepCyclesStatic {
   static constexpr size_t MAX_CROSSINGS_FOR_3EQ = 2048;
   static constexpr size_t MAX_CROSSINGS_FOR_3GT = 1280;
 
-  SepCycleTraversal(SATModel& model, const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
+  SepCyclesStatic(SATModel& model, const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
     : model(model), graph(graph), params(params), n(graph.n), m((int)graph.edges.size()), 
       verbose(params.verbose), forbiddenTuples(tuples)
     {}
@@ -28,6 +27,9 @@ struct SepCycleTraversal {
     adjList = std::vector<std::vector<int>>(n, std::vector<int>());
     isCrossEdge = std::vector<std::vector<bool>>(n, std::vector<bool>(n, false));
     isKiteEdge = std::vector<std::vector<int>>(n, std::vector<int>(n, 0));
+    cycleBlocked = std::vector<char>(n, 0);
+    cycleUsed = std::vector<char>(n, 0);
+    cycleBuffer.reserve(10);
 
     // init free edges
     for (const auto& [u, v] : graph.edges) {
@@ -276,9 +278,18 @@ private:
     unmarkKiteEdge(u, x);
   }
 
-  bool isFreeEdge(int u, int v) {
+  bool isFreeEdge(int u, int v) const {
     return !isCrossEdge[u][v] && !isKiteEdge[u][v];
   };
+
+  bool isCurrentEdge(int u, int v) const {
+    return isEdge[u][v] || isKiteEdge[u][v] > 0;
+  }
+
+  int edgeDegreeBound(const EdgeTy& edge) const {
+    const auto [u, v] = edge;
+    return std::min(graph.degree(u) - 1, graph.degree(v) - 1);
+  }
 
   /// Find all separating cycles: paths from x to y avoiding vertices {x, y, u, v}
   /// A path may contain as many kite/cross edges as possible but only one free edge
@@ -287,22 +298,32 @@ private:
     const size_t numTakenCrossings = takenCrossings.size();
     CHECK(numTakenCrossings == 2 || numTakenCrossings == 3);
     bool foundSepCycle = false;
+    const size_t uvDegreeBound = std::min(graph.degree(u) - 1, graph.degree(v) - 1);
+    const bool canUseCrossingFlow = (numTakenCrossings == 2 || params.unsatLevel >= 2);
+    size_t crossingFlowFreeBound = 0;
+    for (const auto& [e1, e2] : takenCrossings) {
+      crossingFlowFreeBound += size_t(std::max(edgeDegreeBound(graph.edges[e1]), edgeDegreeBound(graph.edges[e2])));
+    }
 
-    auto processCycle = [&](const std::vector<int>& cycle) -> bool {
-      CHECK(cycle.front() == x && cycle.back() == y && cycle.size() >= 3);
-      size_t numFree = 0;
-      size_t numCross = 0;
-      for (size_t i = 0; i < cycle.size(); i++) {
-        const int v1 = cycle[i];
-        const int v2 = cycle[(i + 1) % cycle.size()];
-        numFree += size_t(isFreeEdge(v1, v2));
-        numCross += size_t(isCrossEdge[v1][v2]);
-      }
+    auto shouldPrune = [&](size_t numFree, size_t numCross, int remainingEdges) -> bool {
+      if (numFree < uvDegreeBound)
+        return false;
+      if (!canUseCrossingFlow)
+        return true;
+      if (numFree >= crossingFlowFreeBound)
+        return true;
+      if (numCross > numTakenCrossings)
+        return true;
+      return numCross + size_t(remainingEdges) < numTakenCrossings;
+    };
+
+    auto processCycle = [&](size_t numFree, size_t numCross) -> bool {
+      CHECK(cycleBuffer.front() == x && cycleBuffer.back() == y && cycleBuffer.size() >= 3);
 
       // Search for paths from crossing edge pairs (2 or 3 crossings)
       if ((numTakenCrossings == 2 || numTakenCrossings == 3) && numCross == numTakenCrossings) {
         if (numTakenCrossings == 2 || params.unsatLevel >= 2) {
-          if (hasManyDisjointPaths(takenCrossings, cycle, numFree)) {
+          if (hasManyDisjointPaths(takenCrossings, cycleBuffer, int(numFree))) {
             foundSepCycle = true;
             return true; // stop processing
           }
@@ -310,10 +331,10 @@ private:
       }
 
       // Check if there are many edge-disjoint paths from u to v disjoint from the cycle
-      if (numFree >= (size_t)std::min(graph.degree(u) - 1, graph.degree(v) - 1))
+      if (numFree >= uvDegreeBound)
         return false; // do not stop processing
-      const auto crossCycleEdges = getCrossCycleEdges(cycle, takenCrossings);
-      const size_t numPaths = countEdgeDisjointPaths({u}, {v}, graph.adj, cycle, crossCycleEdges, numFree + 1);
+      const auto crossCycleEdges = getCrossCycleEdges(cycleBuffer, takenCrossings);
+      const size_t numPaths = countEdgeDisjointPaths({u}, {v}, graph.adj, cycleBuffer, crossCycleEdges, numFree + 1);
       if (numPaths > numFree) {
         foundSepCycle = true;
         return true; // stop processing
@@ -321,27 +342,58 @@ private:
       return false;
     };
 
-    const std::vector<int> avoidedVertices = {x, y, u, v};
-    // First, check cycle (x -- c -- y)
-    forEachCycle(adjList, 3, x, y, avoidedVertices, processCycle);
-    if (foundSepCycle)
-      return true;
+    const int maxCycleLen = (numTakenCrossings == 2 ? 8 : 4);
+    const int maxDepth = maxCycleLen - 2;
 
-    // Second, check cycle (x -- c1 -- c2 -- y)
-    forEachCycle(adjList, 4, x, y, avoidedVertices, processCycle);
-    if (foundSepCycle)
-      return true;
+    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 1;
+    cycleUsed[x] = 1;
+    cycleBuffer.clear();
+    cycleBuffer.push_back(x);
 
-    // Third, check larger cycles in certain cases
-    if (numTakenCrossings == 2 || numTakenCrossings == 3 /* || true*/) {
-      for (size_t cycleLen = 5; cycleLen <= 8; cycleLen++) {
-        forEachCycle(adjList, cycleLen, x, y, avoidedVertices, processCycle);
-        if (foundSepCycle)
+    auto dfs = [&](auto&& self, int current, int depth, size_t numFree, size_t numCross) -> bool {
+      if (depth >= 1 && isCurrentEdge(current, y)) {
+        const size_t finalFree = numFree + size_t(isFreeEdge(current, y));
+        const size_t finalCross = numCross + size_t(isCrossEdge[current][y]);
+        if (!shouldPrune(finalFree, finalCross, 0)) {
+          cycleBuffer.push_back(y);
+          const bool stop = processCycle(finalFree, finalCross);
+          cycleBuffer.pop_back();
+          if (stop)
+            return true;
+        }
+      }
+
+      if (depth == maxDepth)
+        return false;
+
+      for (int next : adjList[current]) {
+        if (cycleBlocked[next] || cycleUsed[next])
+          continue;
+
+        const size_t nextFree = numFree + size_t(isFreeEdge(current, next));
+        const size_t nextCross = numCross + size_t(isCrossEdge[current][next]);
+        const int remainingEdges = maxDepth - (depth + 1) + 1;
+        if (shouldPrune(nextFree, nextCross, remainingEdges))
+          continue;
+
+        cycleUsed[next] = 1;
+        cycleBuffer.push_back(next);
+        const bool stop = self(self, next, depth + 1, nextFree, nextCross);
+        cycleBuffer.pop_back();
+        cycleUsed[next] = 0;
+        if (stop)
           return true;
       }
-    }
+      return false;
+    };
 
-    return false;
+    const bool found = dfs(dfs, x, 0, size_t(isFreeEdge(y, x)), size_t(isCrossEdge[y][x]));
+
+    cycleBuffer.clear();
+    cycleUsed[x] = 0;
+    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 0;
+
+    return foundSepCycle || found;
   }
 
   /// Check if there are more than `numFree` edge-disjoint paths from u to v disjoint from the cycle.
@@ -418,34 +470,25 @@ private:
   int findEqualFlow(int x, int y, int u, int v, const std::vector<std::pair<int, int>> &takenCrossings) {
     CHECK(takenCrossings.size() == 1 || takenCrossings.size() == 2);
     int numAddedClauses = 0;
+    const int degreeBound = std::min(graph.degree(u) - 1, graph.degree(v) - 1);
 
-    auto processCycle = [&](const std::vector<int>& cycle) -> bool {
-      CHECK(cycle.front() == x && cycle.back() == y);
-      int numFree = 0;
-      bool hasCrossableEdge = false;
-      for (size_t i = 0; i + 1 < cycle.size(); i++) {
-        const int v1 = cycle[i];
-        const int v2 = cycle[i + 1];
-        numFree += int(isFreeEdge(v1, v2));
-        if (isEdge[v1][v2] && isFreeEdge(v1, v2))
-          hasCrossableEdge = true;
-      }
-
+    auto processCycle = [&](int numFree, bool hasCrossableEdge) {
+      CHECK(cycleBuffer.front() == x && cycleBuffer.back() == y);
       if (!hasCrossableEdge)
-        return false; // do not stop processing
-      if (numFree > std::min(graph.degree(u) - 1, graph.degree(v) - 1))
-        return false; // do not stop processing
+        return;
+      if (numFree > degreeBound)
+        return;
 
-      const auto crossCycleEdges = getCrossCycleEdges(cycle, takenCrossings);
+      const auto crossCycleEdges = getCrossCycleEdges(cycleBuffer, takenCrossings);
       // TOOD: might want to use "numFree"
       // const int flowLB = (takenCrossings.size() == 1 ? numFree : numFree + 1);
-      const int numPaths = countEdgeDisjointPaths(u, v, graph.adj, cycle, crossCycleEdges, numFree);
+      const int numPaths = countEdgeDisjointPaths(u, v, graph.adj, cycleBuffer, crossCycleEdges, numFree);
       if (numPaths == numFree) {
         CHECK(numPaths > 0);
         // found a clause
-        for (size_t i = 0; i + 1 < cycle.size(); i++) {
-          const int v1 = cycle[i];
-          const int v2 = cycle[i + 1];
+        for (size_t i = 0; i + 1 < cycleBuffer.size(); i++) {
+          const int v1 = cycleBuffer[i];
+          const int v2 = cycleBuffer[i + 1];
           if (!isEdge[v1][v2] || !isFreeEdge(v1, v2))
             continue;
           // the edge must cross smth
@@ -458,21 +501,53 @@ private:
           }
         }
       } 
-      return false; // do not stop processing
     };
 
-    const std::vector<int> avoidedVertices = {x, y, u, v};
-    // First, check cycle (x -- c -- y)
-    forEachCycle(adjList, 3, x, y, avoidedVertices, processCycle);
+    const int maxCycleLen = takenCrossings.size() == 1 ? std::min(8, degreeBound + 1) : 4;
+    const int maxDepth = maxCycleLen - 2;
 
-    // Second, check cycle (x -- c1 -- c2 -- y)
-    forEachCycle(adjList, 4, x, y, avoidedVertices, processCycle);
+    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 1;
+    cycleUsed[x] = 1;
+    cycleBuffer.clear();
+    cycleBuffer.push_back(x);
 
-    // Thritd, check 5-cycles when takenCrossings.size() == 1
-    // TODO: check always?
-    if (takenCrossings.size() == 1/* || true*/) {
-      forEachCycle(adjList, 5, x, y, avoidedVertices, processCycle);
-    }
+    auto dfs = [&](auto&& self, int current, int depth, int numFree, bool hasCrossableEdge) -> void {
+      if (depth >= 1 && isCurrentEdge(current, y)) {
+        const int finalFree = numFree + int(isFreeEdge(current, y));
+        const bool finalHasCrossableEdge =
+            hasCrossableEdge || (isEdge[current][y] && isFreeEdge(current, y));
+        if (finalFree <= degreeBound) {
+          cycleBuffer.push_back(y);
+          processCycle(finalFree, finalHasCrossableEdge);
+          cycleBuffer.pop_back();
+        }
+      }
+
+      if (depth == maxDepth)
+        return;
+
+      for (int next : adjList[current]) {
+        if (cycleBlocked[next] || cycleUsed[next])
+          continue;
+
+        const int nextFree = numFree + int(isFreeEdge(current, next));
+        if (nextFree > degreeBound)
+          continue;
+
+        cycleUsed[next] = 1;
+        cycleBuffer.push_back(next);
+        self(self, next, depth + 1, nextFree,
+             hasCrossableEdge || (isEdge[current][next] && isFreeEdge(current, next)));
+        cycleBuffer.pop_back();
+        cycleUsed[next] = 0;
+      }
+    };
+
+    dfs(dfs, x, 0, 0, false);
+
+    cycleBuffer.clear();
+    cycleUsed[x] = 0;
+    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 0;
 
     return numAddedClauses;
   }
@@ -540,6 +615,9 @@ private:
 
   std::vector<std::vector<bool>> isCrossEdge;
   std::vector<std::vector<int>> isKiteEdge;
+  std::vector<char> cycleBlocked;
+  std::vector<char> cycleUsed;
+  std::vector<int> cycleBuffer;
 
   // Debug
   int clauseIndex = 0;
@@ -551,7 +629,7 @@ void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const 
   const int numPairs = to_int(params.sepCycleConstraints);
   CHECK(2 <= numPairs && numPairs <= 3, "incorrect value of sepCycleConstraints");
 
-  SepCycleTraversal sct(model, graph, params, model.getForbiddenTuples());
+  SepCyclesStatic sct(model, graph, params, model.getForbiddenTuples());
   if (sct.init(numPairs)) {
     // forbidden pairs (2-clauses)
     const size_t numClauses2 = sct.build2Clauses();

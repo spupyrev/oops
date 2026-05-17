@@ -169,46 +169,52 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
       const int v = edges[d1 - n].second;
       const auto [x, y] = edges[d2 - n];
 
-      /// Returns true if the cycles forbids crossing (u, v) and the cycle
-      auto processCycle = [&](const std::vector<int>& cycle) -> bool {
-        CHECK(all_unique(cycle) && !contains(cycle, u) && !contains(cycle, v));
-        CHECK(cycle.size() >= 3);
-        for (size_t i = 0; i < cycle.size(); i++) {
-          const int v1 = cycle[i];
-          const int v2 = cycle[(i + 1) % cycle.size()];
-          CHECK(graph.adjacentVV(v1, v2));
-        }
+      auto hasSepCycle = [&](int x, int y, int u, int v) -> bool {
+        bool found = false;
+        /// Returns true if the cycle forbids crossing (u, v) and (x, y)
+        auto processCycle = [&](const std::vector<int>& cycle) -> bool {
+          CHECK(all_unique(cycle) && !contains(cycle, u) && !contains(cycle, v));
+          CHECK(cycle.size() >= 3);
+          for (size_t i = 0; i < cycle.size(); i++) {
+            const int v1 = cycle[i];
+            const int v2 = cycle[(i + 1) % cycle.size()];
+            CHECK(graph.adjacentVV(v1, v2));
+          }
 
-        const int numFree = (int)cycle.size() - 1;
-        // Stop early, if possible
-        if (numFree >= std::min(graph.degree(u) - 1, graph.degree(v) - 1))
+          const int numFree = (int)cycle.size() - 1;
+          // Stop early, if possible
+          if (numFree >= std::min(graph.degree(u) - 1, graph.degree(v) - 1))
+            return false;
+
+          // Check if there are many edge-disjoint paths from u to v disjoint from the cycle; one extra path is via edge (u, v)
+          std::vector<EdgeTy> forbiddenEdges = {EdgeTy(u, v)};
+          const int numPaths = countEdgeDisjointPaths(u, v, graph.adj, cycle, forbiddenEdges, numFree + 1);
+          if (numPaths > numFree) {
+            found = true;
+            return true;
+          }
           return false;
+        };
 
-        // Check if there are many edge-disjoint paths from u to v disjoint from the cycle; one extra path is via edge (u, v)
-        std::vector<EdgeTy> forbiddenEdges = {EdgeTy(u, v)};
-        const int numPaths = countEdgeDisjointPaths(u, v, graph.adj, cycle, forbiddenEdges, numFree + 1);
-        if (numPaths > numFree) {
-          crossablePairs[d1][d2] = false;
-          crossablePairs[d2][d1] = false;
-          numSepCyclesSkipped++;
+        const std::vector<int> avoidedVertices = {x, y, u, v};
+        // separating triangle
+        forEachCycle(graph.adj, 3, x, y, avoidedVertices, processCycle);
+        if (found)
           return true;
-        }
-        return false;
+        // separating 4-cycle
+        forEachCycle(graph.adj, 4, x, y, avoidedVertices, processCycle);
+        if (found)
+          return true;
+        // separating 5-cycle
+        forEachCycle(graph.adj, 5, x, y, avoidedVertices, processCycle);
+        return found;
       };
 
-      const std::vector<int> avoidedVertices = {x, y, u, v};
-      // separating triangle
-      forEachCycle(graph.adj, 3, x, y, avoidedVertices, processCycle);
-      // stop early if found a cycle
-      if (!crossablePairs[d1][d2])
-        continue;
-      // separating 4-cycle
-      forEachCycle(graph.adj, 4, x, y, avoidedVertices, processCycle);
-      // stop early if found a cycle
-      if (!crossablePairs[d1][d2])
-        continue;
-      // separating 5-cycle
-      forEachCycle(graph.adj, 5, x, y, avoidedVertices, processCycle);
+      if (hasSepCycle(x, y, u, v) || hasSepCycle(u, v, x, y)) {
+        crossablePairs[d1][d2] = false;
+        crossablePairs[d2][d1] = false;
+        numSepCyclesSkipped++;
+      }
     }
   }
 
@@ -1371,6 +1377,7 @@ void fillResultStack(
 Result runSolver(const Params& params, const InputGraph& graph) {
   CHECK(params.solverType == SolverType::STACK || params.solverType == SolverType::MOVE);
   const int verbose = params.verbose;
+  const auto startTimeEncoding = chrono::steady_clock::now();
 
   // Init the model
   SATModel model;
@@ -1403,6 +1410,12 @@ Result runSolver(const Params& params, const InputGraph& graph) {
     model.applyBreakID(verbose, solver);
   }
 
+  if (params.useSepCycleUP && params.modelFile == "" && params.resultFile == "") {
+    solver.setUserPropagator(createSepCyclesDynamic(model, graph, params));
+  }
+  const auto endTimeEncoding = chrono::steady_clock::now();
+  LOG_IF(verbose >= 1, "SAT encoding took %s", ms_to_str(startTimeEncoding, endTimeEncoding).c_str());
+
   if (params.modelFile != "") {
     LOG_IF(verbose, "encoded %'d variables and %'d constraints", model.varCount(), model.clauseCount());
     if (verbose >= 1) {
@@ -1431,6 +1444,7 @@ Result runSolver(const Params& params, const InputGraph& graph) {
       ret = l_Undef;
     }
   } else {
+    const auto startTimeSolving = chrono::steady_clock::now();
     solver.simplify();
     LOG_IF(verbose, "solving SAT model with %'d variables and %'d clauses...", solver.nVars(), solver.nClauses());
     if (verbose >= 1) {
@@ -1446,8 +1460,12 @@ Result runSolver(const Params& params, const InputGraph& graph) {
     } else {
       ret = solver.solve();
     }
+    const auto endTimeSolving = chrono::steady_clock::now();
+    LOG_IF(verbose >= 1, "SAT solver took %s", ms_to_str(startTimeSolving, endTimeSolving).c_str());
   }
   CHECK(ret == l_True || ret == l_False || ret == l_Undef, "an error within SAT solver");
+  LOG_IF(verbose, "SAT solving stats: starts = %'llu; conflicts = %'llu; decisions = %'llu; propagations = %'llu",
+         solver.starts, solver.conflicts, solver.decisions, solver.propagations);
 
   Result result;
   if (ret == l_True) {

@@ -67,6 +67,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-swap-constraints", "", "Add swap constraints: num_pairs/num_reorder");
   options.addAllowedOption("-partial-constraints", "", "Add partial constraints: num_pairs");
   options.addAllowedOption("-sep-cycles", "", "Add constraints based on separating cycles: num_pairs");
+  options.addAllowedOption("-up-sepcycles", "false", "Use sep-cycle user propagation");
 
   // External SAT solver
   options.addAllowedOption("-dimacs", "", "Output dimacs file");
@@ -225,7 +226,7 @@ ResultCodeTy isOnePlanar(
   auto startTimeSAT = chrono::steady_clock::now();
   Result result = runSolver(params, graph);
   auto endTimeSAT = chrono::steady_clock::now();
-  LOG_IF(verbose >= 1, "SAT solving took %s for %s [timeout = %d sec]", 
+  LOG_IF(verbose >= 1, "SAT encoding+solving took %s for %s [timeout = %d sec]", 
       ms_to_str(startTimeSAT, endTimeSAT).c_str(), 
       graphName.c_str(), 
       params.timeout
@@ -425,6 +426,7 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.sepCycleConstraints = options.getStr("-sep-cycles");
   params.custom = options.getStr("-custom");
   params.ignoreTransitiveRels = options.hasCustomOption("no-transitive");
+  params.useSepCycleUP = options.getBool("-up-sepcycles");
 
   params.useSATConstraints = options.getBool("-sat");
   const int unsatLevel = options.getInt("-unsat");
@@ -479,6 +481,8 @@ void initSATParams(CMDOptions& options, Params& params) {
   CHECK(!params.useUNSATConstraints || params.useSATConstraints, "`-unsat` constraints should be used with `-sat`");
   CHECK(!params.useIC || params.useSATConstraints, "`-useIC` constraints should be used with `-sat`");
   CHECK(!params.useNIC || params.useSATConstraints, "`-useNIC` constraints should be used with `-sat`");
+  CHECK(!params.useSepCycleUP || params.sepCycleConstraints != "",
+        "`-up-sepcycles` should be used with `-sep-cycles=2` or higher");
 }
 
 /// Gen a random 1-planar graph and verify the 1-planar SAT model

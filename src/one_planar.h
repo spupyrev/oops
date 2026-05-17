@@ -219,6 +219,7 @@ struct Params {
 
   std::string custom = "";
   bool ignoreTransitiveRels = false;
+  bool useSepCycleUP = false;
 
   std::string to_string() const {
     std::ostringstream ss;
@@ -558,6 +559,12 @@ class SATModel {
     make_vec_unique_fast(clauses);
   }
 
+  Simp21::Lit getSolverLit(const MVar& v) const {
+    CHECK(vars.count(v.id));
+    const auto var = vars.at(v.id);
+    return v.positive ? Simp21::mkLit(var) : ~Simp21::mkLit(var);
+  }
+
   void initClauses(Solver& solver) {
     Simp21::vec<Simp21::Lit> clause;
     for (auto& c : clauses) {
@@ -844,3 +851,7 @@ void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const Para
 void encodeStrictConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodePartialConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const Params& params);
+std::unique_ptr<Simp21::UserPropagator> createSepCyclesDynamic(
+    const SATModel& model,
+    const InputGraph& graph,
+    const Params& params);

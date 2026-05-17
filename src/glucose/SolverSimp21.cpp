@@ -130,6 +130,12 @@ Solver::Solver()
 
 Solver::~Solver() {}
 
+void Solver::setUserPropagator(std::unique_ptr<UserPropagator> propagator) {
+  assert(propagator != nullptr);
+  assert(user_propagator == nullptr);
+  user_propagator = std::move(propagator);
+}
+
 // simplify All
 CRef Solver::simplePropagate() {
   CRef confl = CRef_Undef;
@@ -660,6 +666,10 @@ void Solver::cancelUntil(int bLevel) {
     }
 
     add_tmp.clear();
+
+    if (user_propagator != nullptr) {
+      user_propagator->onBacktrack(bLevel);
+    }
   }
 }
 
@@ -1087,6 +1097,63 @@ void Solver::uncheckedEnqueue(Lit p, int level, CRef from) {
   assigns[x] = lbool(!sign(p));
   vardata[x] = mkVarData(from, level);
   trail.push_(p);
+
+  if (user_propagator != nullptr) {
+    user_propagator->onAssignment(p, level);
+  }
+}
+
+CRef Solver::addUserConflictClause(const std::vector<Lit>& literals) {
+  add_tmp.clear();
+  for (Lit lit : literals) {
+    assert(lit != lit_Undef && lit != lit_Error);
+    add_tmp.push(lit);
+  }
+
+  sort(add_tmp);
+
+  Lit previous = lit_Undef;
+  int j = 0;
+  for (int i = 0; i < add_tmp.size(); i++) {
+    if (add_tmp[i] == ~previous) {
+      return CRef_Undef; // tautological clause
+    }
+    if (add_tmp[i] != previous) {
+      previous = add_tmp[i];
+      add_tmp[j++] = add_tmp[i];
+    }
+  }
+  add_tmp.shrink(add_tmp.size() - j);
+
+  for (int i = 0; i < add_tmp.size(); i++) {
+    if (value(add_tmp[i]) == l_True) {
+      return CRef_Undef; // already satisfied under the current assignment
+    }
+  }
+
+  assert(add_tmp.size() >= 2);
+
+  CRef cr = ca.alloc(add_tmp, false);
+  clauses.push(cr);
+  attachClause(cr);
+  return cr;
+}
+
+CRef Solver::propagateUserConflict() {
+  if (user_propagator == nullptr) {
+    return CRef_Undef;
+  }
+
+  std::vector<Lit> conflict_clause;
+
+  if (!user_propagator->findConflict(conflict_clause)) {
+    return CRef_Undef;
+  }
+  for (Lit lit : conflict_clause) {
+    assert(value(lit) == l_False);
+  }
+
+  return addUserConflictClause(conflict_clause);
 }
 
 /*_________________________________________________________________________________________________
@@ -1207,6 +1274,10 @@ CRef Solver::propagate() {
     }
 
     ws.shrink(i - j);
+  }
+
+  if (confl == CRef_Undef && user_propagator != nullptr) {
+    confl = propagateUserConflict();
   }
 
   propagations += num_props;

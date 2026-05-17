@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <map>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +17,22 @@
 enum clause_Type { LONG = 0, REMOVED, MIDSZ, SMALL };
 
 namespace Simp21 {
+
+class UserPropagator {
+public:
+  virtual ~UserPropagator() = default;
+
+  virtual void onAssignment(Lit p, int decisionLevel) {
+    (void)p;
+    (void)decisionLevel;
+  }
+
+  virtual void onBacktrack(int decisionLevel) {
+    (void)decisionLevel;
+  }
+
+  virtual bool findConflict(std::vector<Lit>& conflict_clause) = 0;
+};
 
 class Solver {
 private:
@@ -85,6 +102,9 @@ public:
   bool solve(Lit p, Lit q);                    // Search for a model that respects two assumptions.
   bool solve(Lit p, Lit q, Lit r);             // Search for a model that respects three assumptions.
   bool okay() const;                           // FALSE means solver is in a conflicting state
+
+  // Optional problem-specific propagation.
+  void setUserPropagator(std::unique_ptr<UserPropagator> propagator);
 
   // Variable mode:
   //
@@ -274,6 +294,8 @@ protected:
   vec<Lit> add_tmp;
   vec<Lit> add_oc;
 
+  std::unique_ptr<UserPropagator> user_propagator;
+
   vec<uint64_t> seen2; // Mostly for efficient LBD computation. 'seen2[i]' will indicate if decision level or variable
                        // 'i' has been seen.
   uint64_t counter;    // Simple counter for marking purpose with 'seen2'.
@@ -297,6 +319,8 @@ protected:
                         CRef from = CRef_Undef); // Enqueue a literal. Assumes value of literal is undefined.
   bool enqueue(Lit p, CRef from = CRef_Undef);   // Test if fact 'p' contradicts current state, enqueue otherwise.
   CRef propagate();                              // Perform unit propagation. Returns possibly conflicting clause.
+  CRef propagateUserConflict();                  // Ask the registered user propagator for a conflict.
+  CRef addUserConflictClause(const std::vector<Lit>& literals);
   void cancelUntil(int level);                   // Backtrack until a certain level.
   void analyze(CRef confl, vec<Lit> &out_learnt, int &out_btlevel, int &out_lbd); // (bt = backtrack)
   void analyzeFinal(Lit p, vec<Lit> &out_conflict);   // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME
