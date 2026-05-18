@@ -35,9 +35,9 @@ public:
   ~SepCyclesDynamic() override {
     LOG_IF(verbose,
            "sep-cycle UP stats: calls=%'llu; clean-skips=%'llu; pending-calls=%'llu; "
-           "too-few-crossings=%'llu; small-assignment-searches=%'llu; checked=%'llu; conflicts=%'llu",
+           "small-assignment-skips=%'llu; checked=%'llu; conflicts=%'llu",
            numPropagationCalls, numCleanPropagationCalls, numPendingPropagationCalls,
-           numTooFewCrossingCalls, numSmallAssignmentSearches, numChecks, numConflicts);
+           numSmallAssignmentSkips, numChecks, numConflicts);
   }
 
   void onAssignment(Lit p, int decisionLevel) override {
@@ -67,7 +67,9 @@ public:
     removeBacktrackedUncrossedEdges(decisionLevel);
   }
 
-  bool findConflict(std::vector<Lit>& conflict_clause) override {
+  bool findConflict(std::vector<Lit>& clause) override {
+    clause.clear();
+
     numPropagationCalls++;
     if (pendingCrossingIds.empty()) {
       numCleanPropagationCalls++;
@@ -80,59 +82,32 @@ public:
     const int numActiveCross1False = (int)activeUncrossedEdgeIds.size();
     const bool smallAssignment = numActiveCross2 + numActiveCross1False <= 2;
     if (smallAssignment) {
-      numSmallAssignmentSearches++;
-    }
-
-    if (numActiveCross2 < MIN_ACTIVE_CROSS2 && !smallAssignment) {
-      numTooFewCrossingCalls++;
+      numSmallAssignmentSkips++;
       clearPendingCrossings();
       return false;
     }
+
     numChecks++;
 
     std::vector<Lit> reason;
-    std::vector<int> markedCrossings;
-    for (int crossingId : activeCrossingIds) {
-      const auto [e1, e2] = crossings[crossingId];
-      const auto [u, v] = graph.edges[e1];
-      const auto [x, y] = graph.edges[e2];
-      if (!canMarkCrossing(u, v, x, y)) {
-        for (int reasonCrossingId : activeCrossingIds) {
-          addCrossingReason(reason, reasonCrossingId);
-        }
-        break;
-      }
-      markCrossing(crossingId, u, v, x, y);
-      markedCrossings.push_back(crossingId);
+    if (findCurrentAssignmentClause(reason)) {
+      sort_unique(reason);
+      CHECK(reason.size() >= 3,
+            "sep-cycle UP found a binary reason; static preprocessing/static sep-cycle/equal-flow clauses should cover it");
+
+      clause = std::move(reason);
+
+      LOG_IF(verbose >= 2, "sep-cycle UP conflict with %d crossings", clause.size());
+      numConflicts++;
+      return true;
     }
 
-    if (reason.empty()) {
-      reason = findSepCycleConflict();
-      CHECK(reason.empty() || !smallAssignment,
-            "sep-cycle found with at most two active cross1=false/cross2 assignments");
-    }
-
-    for (auto it = markedCrossings.rbegin(); it != markedCrossings.rend(); ++it) {
-      unmarkCrossing(*it);
-    }
-
-    sort_unique(reason);
-    if (reason.empty()) {
-      clearPendingCrossings();
-      return false;
-    }
-    CHECK(reason.size() >= 3,
-          "sep-cycle UP found a binary reason; static preprocessing/static sep-cycle/equal-flow clauses should cover it");
-
-    conflict_clause = reason;
-
-    LOG_IF(verbose >= 2, "sep-cycle UP conflict with %d crossings", reason.size());
-    numConflicts++;
-    return true;
+    clearPendingCrossings();
+    return false;
   }
 
 private:
-  static constexpr int MIN_ACTIVE_CROSS2 = 2;
+  static constexpr int MAX_DYNAMIC_CYCLE_LEN = 8;
 
   void initPossibleCrossings() {
     for (int e1 = 0; e1 < m; e1++) {
@@ -200,6 +175,9 @@ private:
     crossEdgeProvider.assign(n * n, -1);
     kiteEdgeProviders.assign(n * n, std::vector<int>());
     edgeIdByKey.assign(n * n, -1);
+    cycleBlocked.assign(n, 0);
+    cycleUsed.assign(n, 0);
+    cycleBuffer.reserve(MAX_DYNAMIC_CYCLE_LEN);
 
     for (int edgeId = 0; edgeId < m; edgeId++) {
       const auto& [u, v] = graph.edges[edgeId];
@@ -312,6 +290,10 @@ private:
     return !isCrossEdge[u][v] && !isKiteEdge[u][v] && !isUncrossableEdge[u][v];
   }
 
+  bool isCurrentEdge(int u, int v) const {
+    return isEdge[u][v] || isKiteEdge[u][v] > 0;
+  }
+
   bool isEdgeOnCycle(const std::vector<int>& cycle, const EdgeTy& edge) const {
     for (size_t i = 0; i < cycle.size(); i++) {
       if (edge == make_edge(cycle[i], cycle[(i + 1) % cycle.size()])) {
@@ -371,17 +353,9 @@ private:
     }
   }
 
-  bool processCycle(int mainCrossingId, int u, int v,
-                    const std::vector<int>& cycle,
+  bool processCycle(int mainCrossingId, int u, int v, size_t numFree,
                     std::vector<Lit>& reason) const {
-    CHECK(cycle.size() >= 3);
-
-    size_t numFree = 0;
-    for (size_t i = 0; i < cycle.size(); i++) {
-      const int v1 = cycle[i];
-      const int v2 = cycle[(i + 1) % cycle.size()];
-      numFree += size_t(isFreeEdge(v1, v2));
-    }
+    CHECK(cycleBuffer.size() >= 3);
 
     if (numFree >= (size_t)std::min(graph.degree(u) - 1, graph.degree(v) - 1)) {
       return false;
@@ -389,9 +363,10 @@ private:
 
     std::vector<Lit> candidateReason;
     addCrossingReason(candidateReason, mainCrossingId);
-    addCycleProviders(cycle, candidateReason);
-    const auto crossCycleEdges = getCrossCycleEdges(cycle, candidateReason);
-    const size_t numPaths = countEdgeDisjointPaths({u}, {v}, graph.adj, cycle, crossCycleEdges, numFree + 1);
+    addCycleProviders(cycleBuffer, candidateReason);
+    const auto crossCycleEdges = getCrossCycleEdges(cycleBuffer, candidateReason);
+    const size_t numPaths = countEdgeDisjointPaths({u}, {v}, graph.adj, cycleBuffer, crossCycleEdges, numFree + 1);
+
     if (numPaths > numFree) {
       CHECK((int)activeCrossingIds.size() + (int)activeUncrossedEdgeIds.size() > 2,
             "sep-cycle found with at most two active cross1=false/cross2 assignments");
@@ -402,36 +377,102 @@ private:
     return false;
   }
 
-  bool findSepCycleForCrossing(int mainCrossingId, int x, int y, int u, int v, std::vector<Lit>& reason) const {
-    auto process = [&](const std::vector<int>& cycle) -> bool {
-      return processCycle(mainCrossingId, u, v, cycle, reason);
+  bool findSepCycleForCrossing(int mainCrossingId, int x, int y, int u, int v,
+                               int maxCycleLen, std::vector<Lit>& reason) {
+    const size_t degreeBound = size_t(std::min(graph.degree(u) - 1, graph.degree(v) - 1));
+    const int maxDepth = maxCycleLen - 2;
+
+    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 1;
+    cycleUsed[x] = 1;
+    cycleBuffer.clear();
+    cycleBuffer.push_back(x);
+
+    auto dfs = [&](auto&& self, int current, int depth, size_t numFree) -> bool {
+      if (depth >= 1 && isCurrentEdge(current, y)) {
+        const size_t finalFree = numFree + size_t(isFreeEdge(current, y));
+        if (finalFree < degreeBound) {
+          cycleBuffer.push_back(y);
+          const bool stop = processCycle(mainCrossingId, u, v, finalFree, reason);
+          cycleBuffer.pop_back();
+          if (stop)
+            return true;
+        }
+      }
+
+      if (depth == maxDepth)
+        return false;
+
+      for (int next : adjList[current]) {
+        if (cycleBlocked[next] || cycleUsed[next])
+          continue;
+
+        const size_t nextFree = numFree + size_t(isFreeEdge(current, next));
+        if (nextFree >= degreeBound)
+          continue;
+
+        cycleUsed[next] = 1;
+        cycleBuffer.push_back(next);
+        const bool stop = self(self, next, depth + 1, nextFree);
+        cycleBuffer.pop_back();
+        cycleUsed[next] = 0;
+        if (stop)
+          return true;
+      }
+      return false;
     };
 
-    const std::vector<int> avoidedVertices = {x, y, u, v};
-    for (int cycleLen = 3; cycleLen <= 8; cycleLen++) {
-      forEachCycle(adjList, cycleLen, x, y, avoidedVertices, process);
-      if (!reason.empty()) {
-        return true;
-      }
-    }
-    return false;
+    const bool found = dfs(dfs, x, 0, size_t(isFreeEdge(y, x)));
+
+    cycleBuffer.clear();
+    cycleUsed[x] = 0;
+    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 0;
+
+    return found;
   }
 
-  std::vector<Lit> findSepCycleConflict() const {
-    std::vector<Lit> reason;
+  bool findSepCycleClause(int maxCycleLen, std::vector<Lit>& reason) {
     for (int crossingId : pendingCrossingIds) {
       const auto [e1, e2] = crossings[crossingId];
       const auto [u, v] = graph.edges[e1];
       const auto [x, y] = graph.edges[e2];
 
-      if (findSepCycleForCrossing(crossingId, x, y, u, v, reason)) {
-        return reason;
+      if (findSepCycleForCrossing(crossingId, x, y, u, v, maxCycleLen, reason)) {
+        return true;
       }
-      if (findSepCycleForCrossing(crossingId, u, v, x, y, reason)) {
-        return reason;
+      if (findSepCycleForCrossing(crossingId, u, v, x, y, maxCycleLen, reason)) {
+        return true;
       }
     }
-    return {};
+    return !reason.empty();
+  }
+
+  bool findCurrentAssignmentClause(std::vector<Lit>& reason) {
+    std::vector<int> markedCrossings;
+    bool incompatibleCrossings = false;
+    for (int crossingId : activeCrossingIds) {
+      const auto [e1, e2] = crossings[crossingId];
+      const auto [u, v] = graph.edges[e1];
+      const auto [x, y] = graph.edges[e2];
+      if (!canMarkCrossing(u, v, x, y)) {
+        incompatibleCrossings = true;
+        for (int reasonCrossingId : activeCrossingIds) {
+          addCrossingReason(reason, reasonCrossingId);
+        }
+        break;
+      }
+      markCrossing(crossingId, u, v, x, y);
+      markedCrossings.push_back(crossingId);
+    }
+
+    if (reason.empty() && !incompatibleCrossings) {
+      findSepCycleClause(MAX_DYNAMIC_CYCLE_LEN, reason);
+    }
+
+    for (auto it = markedCrossings.rbegin(); it != markedCrossings.rend(); ++it) {
+      unmarkCrossing(*it);
+    }
+
+    return !reason.empty();
   }
 
 private:
@@ -446,8 +487,7 @@ private:
   uint64_t numPropagationCalls = 0;
   uint64_t numCleanPropagationCalls = 0;
   uint64_t numPendingPropagationCalls = 0;
-  uint64_t numTooFewCrossingCalls = 0;
-  uint64_t numSmallAssignmentSearches = 0;
+  uint64_t numSmallAssignmentSkips = 0;
   uint64_t numChecks = 0;
   uint64_t numConflicts = 0;
 
@@ -466,6 +506,9 @@ private:
   std::vector<int> crossEdgeProvider;
   std::vector<std::vector<int>> kiteEdgeProviders;
   std::vector<int> edgeIdByKey;
+  std::vector<char> cycleBlocked;
+  std::vector<char> cycleUsed;
+  std::vector<int> cycleBuffer;
 };
 
 } // namespace

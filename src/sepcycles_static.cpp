@@ -3,7 +3,7 @@
 #include "one_planar.h"
 
 struct SepCyclesStatic {
-  static constexpr size_t MAX_CROSSINGS_FOR_3EQ = 2048;
+  static constexpr size_t MAX_CROSSINGS_FOR_3EQ = 1280;
   static constexpr size_t MAX_CROSSINGS_FOR_3GT = 1280;
 
   SepCyclesStatic(SATModel& model, const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
