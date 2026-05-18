@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 using namespace std;
 using namespace Simp21;
@@ -596,6 +597,7 @@ void Solver::removeClause(CRef cr) {
   Clause &c = ca[cr];
 
   detachClause(cr);
+  user_conflict_clause_refs.erase(cr);
 
   // Don't leave pointers to free'd memory!
   if (locked(c)) {
@@ -1135,6 +1137,7 @@ CRef Solver::addUserConflictClause(const std::vector<Lit>& literals) {
 
   CRef cr = ca.alloc(add_tmp, false);
   clauses.push(cr);
+  user_conflict_clause_refs.insert(cr);
   attachClause(cr);
   return cr;
 }
@@ -1537,6 +1540,8 @@ lbool Solver::search(int &nof_conflicts) {
     CRef confl = propagate();
 
     if (confl != CRef_Undef) {
+      const bool user_conflict = user_conflict_clause_refs.find(confl) != user_conflict_clause_refs.end();
+
       // CONFLICT
       if (VSIDS) {
         if (--timer == 0 && var_decay < 0.95) {
@@ -1560,7 +1565,7 @@ lbool Solver::search(int &nof_conflicts) {
         return l_False;
       }
 
-      if (data.bOnlyOneLitFromHighest) {
+      if (data.bOnlyOneLitFromHighest && !user_conflict) {
         chrono_lim--;
         cancelUntil(data.nHighestLevel - 1);
         continue;
@@ -1907,14 +1912,20 @@ void Solver::relocAll(ClauseAllocator &to) {
 
   // All original:
   int i, j;
+  std::set<CRef> relocated_user_conflict_clause_refs;
 
   for (i = j = 0; i < clauses.size(); i++)
     if (ca[clauses[i]].mark() != 1) {
+      const CRef old_ref = clauses[i];
       ca.reloc(clauses[i], to);
+      if (user_conflict_clause_refs.find(old_ref) != user_conflict_clause_refs.end()) {
+        relocated_user_conflict_clause_refs.insert(clauses[i]);
+      }
       clauses[j++] = clauses[i];
     }
 
   clauses.shrink(i - j);
+  user_conflict_clause_refs = std::move(relocated_user_conflict_clause_refs);
 }
 
 void Solver::garbageCollect() {

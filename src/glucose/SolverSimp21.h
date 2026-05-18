@@ -295,6 +295,7 @@ protected:
   vec<Lit> add_oc;
 
   std::unique_ptr<UserPropagator> user_propagator;
+  std::set<CRef> user_conflict_clause_refs;
 
   vec<uint64_t> seen2; // Mostly for efficient LBD computation. 'seen2[i]' will indicate if decision level or variable
                        // 'i' has been seen.
