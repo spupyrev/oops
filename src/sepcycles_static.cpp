@@ -3,8 +3,9 @@
 #include "one_planar.h"
 
 struct SepCyclesStatic {
-  static constexpr size_t MAX_CROSSINGS_FOR_3EQ = 1280;
+  static constexpr size_t MAX_CROSSINGS_FOR_3EQ = 1400;
   static constexpr size_t MAX_CROSSINGS_FOR_3GT = 1280;
+  static constexpr size_t MAX_CROSSINGS_FOR_2GT = 3840;
 
   SepCyclesStatic(SATModel& model, const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
     : model(model), graph(graph), params(params), n(graph.n), m((int)graph.edges.size()), 
@@ -43,6 +44,11 @@ struct SepCyclesStatic {
 
   /// Find pairs of crossings that cannot happen in a 1-planar drawing
   size_t build2Clauses() {
+    if (possibleCrossings.size() > MAX_CROSSINGS_FOR_2GT) {
+      LOG_IF(verbose, "  skipped building sep-cycles 2-clauses due to too many possible_crossings");
+      return 0;
+    }
+
     size_t numClauses2 = 0;
     size_t numEqFlowClauses2 = 0;
     size_t numEqFlowClauses3 = 0;

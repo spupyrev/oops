@@ -27,7 +27,7 @@ Build from the repository root:
 make -j
 ```
 
-UNSAT benchmark cases:
+### UNSAT benchmark cases:
 
 ```bash
   ./oops -i=data/named_paper.cfg -verbose=1 -unsat=1 -part=13 -timeout=600
@@ -47,7 +47,25 @@ UNSAT benchmark cases:
 | 23   | Brinkmann | 133 sec         |  7 sec                               |
 | 30   | Holt      |  10 min         |  5 sec                               |
 
-SAT benchmark cases:
+### More UNSAT test cases:
+
+```bash
+  ./oops -i=data/list1_unsat.cfg -verbose=1 -unsat=1 -part=62 -timeout=60
+  ./oops -i=data/list1_unsat.cfg -verbose=1 -unsat=1 -part=74 -timeout=60
+  ./oops -i=data/list1_unsat.cfg -verbose=1 -unsat=1 -part=90 -timeout=60
+  ./oops -i=data/list1_unsat.cfg -verbose=1 -unsat=1 -part=267 -timeout=60
+  ./oops -i=data/list1_unsat.cfg -verbose=1 -unsat=1 -part=272 -timeout=60
+```
+
+| Part | Graph     | solver time (no -up-sepcycles) | solver time (with -up-sepcycles) |
+|------|-----------|--------------------------------|----------------------------------|
+| 62   | g6_344    |  2 ms                          |  Time Limit Exceeded             |
+| 74   | g6_365    |  3 ms                          |  Time Limit Exceeded             |
+| 90   | g6_391    |  6 ms                          |  Time Limit Exceeded             |
+| 267  | g6_158    | 50 ms                          |  Time Limit Exceeded             |
+| 272  | g6_163    | 44 ms                          |  Time Limit Exceeded             |
+
+### SAT benchmark cases:
 
 ```bash
   ./oops -i=data/combo_sat.cfg -verbose=1 -unsat=1 -up-sepcycles -timeout=120
