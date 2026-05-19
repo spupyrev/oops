@@ -92,8 +92,10 @@ public:
     std::vector<Lit> reason;
     if (findCurrentAssignmentClause(reason)) {
       sort_unique(reason);
-      CHECK(reason.size() >= 3,
-            "sep-cycle UP found a binary reason; static preprocessing/static sep-cycle/equal-flow clauses should cover it");
+      CHECK(reason.size() >= 2,
+            "sep-cycle UP found a unit/empty reason; expected at least a binary conflict clause");
+      CHECK(reason.size() >= 3 || crossings.size() > MAX_CROSSINGS_FOR_2GT,
+            "sep-cycle UP found a binary reason even though static sep-cycle 2-clauses should be complete");
 
       clause = std::move(reason);
 

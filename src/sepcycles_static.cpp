@@ -5,7 +5,6 @@
 struct SepCyclesStatic {
   static constexpr size_t MAX_CROSSINGS_FOR_3EQ = 1400;
   static constexpr size_t MAX_CROSSINGS_FOR_3GT = 1280;
-  static constexpr size_t MAX_CROSSINGS_FOR_2GT = 3840;
 
   SepCyclesStatic(SATModel& model, const InputGraph& graph, const Params& params, ForbiddenTuples& tuples)
     : model(model), graph(graph), params(params), n(graph.n), m((int)graph.edges.size()), 
