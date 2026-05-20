@@ -212,7 +212,6 @@ struct LRPlanarity {
       const int v = dfs_stack.back();
       dfs_stack.pop_back();
       const EdgeTy& e = parent_edge[v];
-      EdgeData& eData = edgeData[e.first][e.second];
 
       for (size_t i = next_index[v]; i < adjs[v].size(); i++) {
         const int w = adjs[v][i];
@@ -249,6 +248,7 @@ struct LRPlanarity {
 
         // update lowpoints of parent edge e
         if (!e.is_none()) {
+          EdgeData& eData = edgeData[e.first][e.second];
           if (vwData.lowpt < eData.lowpt) {
             eData.lowpt2 = std::min(eData.lowpt, vwData.lowpt2);
             eData.lowpt = vwData.lowpt;
@@ -277,7 +277,6 @@ struct LRPlanarity {
       const int v = dfs_stack.back();
       dfs_stack.pop_back();
       const EdgeTy& e = parent_edge[v];
-      EdgeData& eData = edgeData[e.first][e.second];
       // to indicate whether to skip the final block after the for loop
       bool skip_final = false;
 
@@ -304,6 +303,7 @@ struct LRPlanarity {
         // integrate new return edges
         if (vwData.lowpt < height[v]) {
           if (w == ordered_adjs[v][0]) {  // e_i has return edge
+            EdgeData& eData = edgeData[e.first][e.second];
             eData.lowpt_edge = vwData.lowpt_edge;
           } else {  // add constraints of e_i
             if (!add_constraints(vw, e)) {
