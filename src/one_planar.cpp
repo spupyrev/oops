@@ -1428,7 +1428,9 @@ void fillResultStack(
       int edge;
     };
 
-    for (const auto& [e1, e2] : result.crossings) {
+    for (const auto& crossing : result.crossings) {
+      const int e1 = crossing.first;
+      const int e2 = crossing.second;
       const auto [u, v] = edges[e1];
       const auto [x, y] = edges[e2];
       const int d1 = e1 + n;
