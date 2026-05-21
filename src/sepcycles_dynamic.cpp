@@ -311,6 +311,29 @@ private:
     }
   }
 
+  bool hasCrossingReason(const std::vector<Lit>& reason, int crossingId) const {
+    if (crossingId < 0)
+      return false;
+    const int litKey = toInt(~cross2Lit(crossingId));
+    for (Lit lit : reason) {
+      if (toInt(lit) == litKey)
+        return true;
+    }
+    return false;
+  }
+
+  void addKiteEdgeReason(std::vector<Lit>& reason, int key) const {
+    const auto& providers = kiteEdgeProviders[key];
+    if (providers.empty())
+      return;
+
+    for (int crossingId : providers) {
+      if (hasCrossingReason(reason, crossingId))
+        return;
+    }
+    addCrossingReason(reason, providers.back());
+  }
+
   void addUncrossableEdgeReason(std::vector<Lit>& reason, int u, int v) const {
     if (!isUncrossableEdge[u][v] || isCrossEdge[u][v] || isKiteEdge[u][v]) {
       return;
@@ -348,10 +371,7 @@ private:
       const int key = edgeKey(u, v);
 
       addCrossingReason(reason, crossEdgeProvider[key]);
-      // TODO: a single kite-edge provider is sufficient for the reason.
-      for (int reasonCrossingId : kiteEdgeProviders[key]) {
-        addCrossingReason(reason, reasonCrossingId);
-      }
+      addKiteEdgeReason(reason, key);
       addUncrossableEdgeReason(reason, u, v);
     }
   }

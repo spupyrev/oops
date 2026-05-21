@@ -49,11 +49,11 @@ make -j
 
 | Part | Graph     | solver time (no -up-sepcycles) | solver time (with -up-sepcycles) |
 |------|-----------|--------------------------------|----------------------------------|
-| 13   | Hoffman   |  13 sec                        | 576 ms                           |
-| 18   | Robertson |  98 sec                        |   7 sec                          |
-| 22   | Folkman   |  62 sec                        |  25 sec                          |
-| 23   | Brinkmann | 134 sec                        |   6 sec                          |
-| 30   | Holt      |  Timeout (540 sec)             |   6 sec                          |
+| 13   | Hoffman   |  19 sec                        | 655 ms                           |
+| 18   | Robertson | 103 sec                        |   7 sec                          |
+| 22   | Folkman   |  69 sec                        |  32 sec                          |
+| 23   | Brinkmann | 231 sec                        |   8 sec                          |
+| 30   | Holt      |   7 min                        |   6 sec                          |
 
 ### UNSAT benchmark cases (list1_unsat.cfg):
 
@@ -67,11 +67,11 @@ make -j
 
 | Part | Graph     | solver time (no -up-sepcycles) | solver time (with -up-sepcycles) |
 |------|-----------|--------------------------------|----------------------------------|
-| 62   | g6_344    |  3 ms                          |  2 ms                            |
-| 74   | g6_365    |  3 ms                          |  3 ms                            |
-| 90   | g6_391    |  6 ms                          |  7 ms                            |
-| 267  | g6_158    | 49 ms                          | 41 ms                            |
-| 272  | g6_163    | 43 ms                          | 33 ms                            |
+| 62   | g6_344    |  3 ms                          |  3 ms                            |
+| 74   | g6_365    |  5 ms                          |  5 ms                            |
+| 90   | g6_391    |  4 ms                          |  5 ms                            |
+| 267  | g6_158    | 59 ms                          | 23 ms                            |
+| 272  | g6_163    | 23 ms                          | 25 ms                            |
 
 ### UNSAT benchmark cases (rome50_unsat.cfg):
 
@@ -86,9 +86,9 @@ make -j
 
 | Part | Graph                | result/time (no UP) | result/time (with UP) |
 |------|----------------------|---------------------|-----------------------|
-| 15   | grafo7753.40.graphml | Timeout (181 sec)   | Timeout (179 sec)     |
-| 4    | grafo3365.43.graphml | UNSAT (111 sec)     | UNSAT (96 sec)        |
-| 6    | grafo6547.38.graphml | UNSAT (71 sec)      | UNSAT (49 sec)        |
+| 15   | grafo7753.40.graphml | Timeout (179 sec)   | Timeout (179 sec)     |
+| 4    | grafo3365.43.graphml | UNSAT (136 sec)     | UNSAT (127 sec)       |
+| 6    | grafo6547.38.graphml | UNSAT (145 sec)     | UNSAT (70 sec)        |
 
 ### UNSAT benchmark cases (unsat.cfg):
 
@@ -101,8 +101,8 @@ make -j
 
 | Part | Graph           | result/time (no UP) | result/time (with UP) |
 |------|-----------------|---------------------|-----------------------|
-| 27   | g.31.9.graphml  | Timeout (299 sec)   | Timeout (178 sec)     |
-| 26   | g.47.27.graphml | UNSAT (21 sec)      | UNSAT (45 sec)        |
+| 27   | g.31.9.graphml  | Timeout (176 sec)   | Timeout (186 sec)     |
+| 26   | g.47.27.graphml | UNSAT (34 sec)      | UNSAT (82 sec)        |
 
 
 ### SAT benchmark cases:
@@ -130,11 +130,11 @@ make -j
 
 | Config         | Part  | Graph                    | no UP        | with UP       |
 |----------------|-------|--------------------------|--------------|---------------|
-| list1_sat.cfg  | 2195  | list_2000_graphs.g6_552  | SAT (23 sec) | SAT (88 sec)  |
-| sat.cfg        | 73    | grafo4911.57.graphml     | SAT (126 sec) | SAT (125 sec) |
-| sat.cfg        | 78    | g.59.0.graphml           | SAT (32 sec) | Timeout (189 sec) |
-| sat.cfg        | 95    | TC_minus_0_17            | SAT (58 sec) | SAT (85 sec)  |
-| combo_sat.cfg  | 21511 | cub30-gir7.g6_544        | SAT (54 sec) | SAT (78 sec)  |
+| list1_sat.cfg  | 2195  | list_2000_graphs.g6_552  | SAT (10 sec) | SAT (34 sec)  |
+| sat.cfg        | 73    | grafo4911.57.graphml     | SAT (141 sec) | SAT (159 sec) |
+| sat.cfg        | 78    | g.59.0.graphml           | Timeout (191 sec) | Timeout (182 sec) |
+| sat.cfg        | 95    | TC_minus_0_17            | SAT (141 sec) | SAT (105 sec) |
+| combo_sat.cfg  | 21511 | cub30-gir7.g6_544        | SAT (141 sec) | Timeout (179 sec) |
 
 
 Be mindful of the runtimes: some tests take substantial amount of time, so constantly
