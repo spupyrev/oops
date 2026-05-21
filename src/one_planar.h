@@ -237,6 +237,8 @@ struct Params {
     ss << "; unsat=" << int(useUNSATConstraints);
     ss << "; IC=" << int(useIC);
     ss << "; NIC=" << int(useNIC);
+    if (strict)
+      ss << "; strict=1";
     ss << "]";
 
     return ss.str();
@@ -517,6 +519,12 @@ class SATModel {
     CHECK(coverVars[e][v] == -1);
     coverVars[e][v] = addVar();
     return coverVars[e][v];
+  }
+
+  bool hasCoverVar(int e, int v) const {
+    CHECK(0 <= e && e < (int)coverVars.size());
+    CHECK(0 <= v && v < (int)coverVars[e].size());
+    return coverVars[e][v] != -1;
   }
 
   MVar getCoverVar(int e, int v, bool positive) const {

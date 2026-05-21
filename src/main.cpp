@@ -427,6 +427,7 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.custom = options.getStr("-custom");
   params.ignoreTransitiveRels = options.hasCustomOption("no-transitive");
   params.useSepCycleUP = options.getBool("-up-sepcycles");
+  params.strict = options.getBool("-strict");
 
   params.useSATConstraints = options.getBool("-sat");
   const int unsatLevel = options.getInt("-unsat");
@@ -441,6 +442,7 @@ void initSATParams(CMDOptions& options, Params& params) {
       params.partialConstraints = "3";
     if (params.sepCycleConstraints == "")
       params.sepCycleConstraints = "2";
+    params.strict = true;
   }
   if (options.getBool("-ic")) {
     params.useIC = true;
@@ -449,9 +451,6 @@ void initSATParams(CMDOptions& options, Params& params) {
   if (options.getBool("-nic")) {
     params.useNIC = true;
     params.useSATConstraints = true;
-  }
-  if (options.getBool("-strict")) {
-    params.strict = true;
   }
 
   if (options.getStr("-solver") == "move") {
@@ -483,6 +482,7 @@ void initSATParams(CMDOptions& options, Params& params) {
   CHECK(!params.useNIC || params.useSATConstraints, "`-useNIC` constraints should be used with `-sat`");
   CHECK(!params.useSepCycleUP || params.sepCycleConstraints != "",
         "`-up-sepcycles` should be used with `-sep-cycles=2` or higher");
+  CHECK(!params.useSepCycleUP || params.strict, "`-up-sepcycles` should be used with `-strict`");
 }
 
 /// Gen a random 1-planar graph and verify the 1-planar SAT model

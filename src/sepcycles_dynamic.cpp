@@ -348,6 +348,7 @@ private:
       const int key = edgeKey(u, v);
 
       addCrossingReason(reason, crossEdgeProvider[key]);
+      // TODO: a single kite-edge provider is sufficient for the reason.
       for (int reasonCrossingId : kiteEdgeProviders[key]) {
         addCrossingReason(reason, reasonCrossingId);
       }
@@ -423,7 +424,9 @@ private:
       return false;
     };
 
-    const bool found = dfs(dfs, x, 0, size_t(isFreeEdge(y, x)));
+    CHECK(isCrossEdge[y][x],
+          "main crossing edge (%d,%d) should be marked crossed", y, x);
+    const bool found = dfs(dfs, x, 0, 0);
 
     cycleBuffer.clear();
     cycleUsed[x] = 0;
@@ -450,25 +453,21 @@ private:
 
   bool findCurrentAssignmentClause(std::vector<Lit>& reason) {
     std::vector<int> markedCrossings;
-    bool incompatibleCrossings = false;
     for (int crossingId : activeCrossingIds) {
       const auto [e1, e2] = crossings[crossingId];
       const auto [u, v] = graph.edges[e1];
       const auto [x, y] = graph.edges[e2];
       if (!canMarkCrossing(u, v, x, y)) {
-        incompatibleCrossings = true;
-        for (int reasonCrossingId : activeCrossingIds) {
-          addCrossingReason(reason, reasonCrossingId);
-        }
-        break;
+        CHECK(false,
+              "active cross2 assignments are incompatible before sep-cycle UP: "
+              "crossingId=%d, edges %d:(%d,%d) x %d:(%d,%d)",
+              crossingId, e1, u, v, e2, x, y);
       }
       markCrossing(crossingId, u, v, x, y);
       markedCrossings.push_back(crossingId);
     }
 
-    if (reason.empty() && !incompatibleCrossings) {
-      findSepCycleClause(MAX_DYNAMIC_CYCLE_LEN, reason);
-    }
+    findSepCycleClause(MAX_DYNAMIC_CYCLE_LEN, reason);
 
     for (auto it = markedCrossings.rbegin(); it != markedCrossings.rend(); ++it) {
       unmarkCrossing(*it);
