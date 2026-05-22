@@ -369,6 +369,9 @@ protected:
 
 public:
   int level(Var x) const;
+  // Public wrapper exposing varBumpActivity for callers that want to
+  // prioritise domain-specific decision variables.
+  void publicBumpActivity(Var v, double mult) { varBumpActivity(v, mult); }
 
 protected:
   template <class V> int computeLBD(const V &c) {

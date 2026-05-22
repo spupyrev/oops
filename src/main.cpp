@@ -68,6 +68,7 @@ void prepareOptions(CMDOptions& options) {
   options.addAllowedOption("-partial-constraints", "", "Add partial constraints: num_pairs");
   options.addAllowedOption("-sep-cycles", "", "Add constraints based on separating cycles: num_pairs");
   options.addAllowedOption("-up-sepcycles", "false", "Use sep-cycle user propagation");
+  options.addAllowedOption("-cross-priority", "false", "Bias CDCL to cross1/cross2 first; cross1=true preferred; phase_saving=0");
 
   // External SAT solver
   options.addAllowedOption("-dimacs", "", "Output dimacs file");
@@ -426,8 +427,11 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.sepCycleConstraints = options.getStr("-sep-cycles");
   params.custom = options.getStr("-custom");
   params.ignoreTransitiveRels = options.hasCustomOption("no-transitive");
-  params.useSepCycleUP = options.getBool("-up-sepcycles");
   params.strict = options.getBool("-strict");
+  params.useSepCycleUP = options.getBool("-up-sepcycles");
+  if (options.getBool("-cross-priority") || params.useSepCycleUP) {
+    params.crossPriority = true;
+  }
 
   params.useSATConstraints = options.getBool("-sat");
   const int unsatLevel = options.getInt("-unsat");
@@ -480,6 +484,8 @@ void initSATParams(CMDOptions& options, Params& params) {
   CHECK(!params.useUNSATConstraints || params.useSATConstraints, "`-unsat` constraints should be used with `-sat`");
   CHECK(!params.useIC || params.useSATConstraints, "`-useIC` constraints should be used with `-sat`");
   CHECK(!params.useNIC || params.useSATConstraints, "`-useNIC` constraints should be used with `-sat`");
+  CHECK(!params.crossPriority || params.useUNSATConstraints,
+        "`-cross-priority` should be used with `-unsat=1` or higher");
   CHECK(!params.useSepCycleUP || params.sepCycleConstraints != "",
         "`-up-sepcycles` should be used with `-sep-cycles=2` or higher");
   CHECK(!params.useSepCycleUP || params.strict, "`-up-sepcycles` should be used with `-strict`");

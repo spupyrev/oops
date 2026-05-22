@@ -222,6 +222,10 @@ struct Params {
   std::string custom = "";
   bool ignoreTransitiveRels = false;
   bool useSepCycleUP = false;
+  // Bias CDCL toward branching on cross1/cross2 vars first, with cross1=true
+  // preferred. Disables phase saving so the polarity bias persists across
+  // restarts. Strong on g.31.9-class instances; mixed on rome-style ones.
+  bool crossPriority = false;
 
   std::string to_string() const {
     std::ostringstream ss;

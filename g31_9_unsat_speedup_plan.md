@@ -3,7 +3,7 @@
 ## Project Goal
 
 ```bash
-./oops -i=data/unsat.cfg -verbose=1 -unsat=1 -part=27 -up-sepcycles -timeout=600
+./oops -i=data/unsat.cfg -verbose=1 -unsat=1 -part=27 -up-sepcycles-timeout=600
 ```
 
 must finish with UNSAT for `g.31.9.graphml` within 600 seconds of raw SAT solver time.
@@ -44,16 +44,16 @@ make -j
   ./oops -i=data/named_paper.cfg -verbose=1 -unsat=1 -part=23 -timeout=600
   ./oops -i=data/named_paper.cfg -verbose=1 -unsat=1 -part=30 -timeout=600
 ```
-[optionally add `-up-sepcycles` as an option for an alternative solving strategy]
+[add `-up-sepcycles` as an option for an alternative solving strategy]
 
 
 | Part | Graph     | solver time (no -up-sepcycles) | solver time (with -up-sepcycles) |
 |------|-----------|--------------------------------|----------------------------------|
-| 13   | Hoffman   |  19 sec                        | 655 ms                           |
-| 18   | Robertson | 103 sec                        |   7 sec                          |
-| 22   | Folkman   |  69 sec                        |  32 sec                          |
-| 23   | Brinkmann | 231 sec                        |   8 sec                          |
-| 30   | Holt      |   7 min                        |   6 sec                          |
+| 13   | Hoffman   |  19 sec                        | 467 ms                           |
+| 18   | Robertson | 103 sec                        |   3 sec                          |
+| 22   | Folkman   |  69 sec                        |  34 sec                          |
+| 23   | Brinkmann | 231 sec                        |   4 sec                          |
+| 30   | Holt      |   7 min                        |   5 sec                          |
 
 ### UNSAT benchmark cases (list1_unsat.cfg):
 
@@ -67,11 +67,11 @@ make -j
 
 | Part | Graph     | solver time (no -up-sepcycles) | solver time (with -up-sepcycles) |
 |------|-----------|--------------------------------|----------------------------------|
-| 62   | g6_344    |  3 ms                          |  3 ms                            |
-| 74   | g6_365    |  5 ms                          |  5 ms                            |
-| 90   | g6_391    |  4 ms                          |  5 ms                            |
-| 267  | g6_158    | 59 ms                          | 23 ms                            |
-| 272  | g6_163    | 23 ms                          | 25 ms                            |
+| 62   | g6_344    |  3 ms                          |  2 ms                            |
+| 74   | g6_365    |  5 ms                          |  3 ms                            |
+| 90   | g6_391    |  4 ms                          |  3 ms                            |
+| 267  | g6_158    | 59 ms                          | 14 ms                            |
+| 272  | g6_163    | 23 ms                          | 20 ms                            |
 
 ### UNSAT benchmark cases (rome50_unsat.cfg):
 
@@ -86,9 +86,9 @@ make -j
 
 | Part | Graph                | result/time (no UP) | result/time (with UP) |
 |------|----------------------|---------------------|-----------------------|
-| 15   | grafo7753.40.graphml | Timeout (179 sec)   | Timeout (179 sec)     |
-| 4    | grafo3365.43.graphml | UNSAT (136 sec)     | UNSAT (127 sec)       |
-| 6    | grafo6547.38.graphml | UNSAT (145 sec)     | UNSAT (70 sec)        |
+| 15   | grafo7753.40.graphml | Timeout (179 sec)   | UNSAT (5 min)         |
+| 4    | grafo3365.43.graphml | UNSAT (136 sec)     | UNSAT (128 sec)       |
+| 6    | grafo6547.38.graphml | UNSAT (145 sec)     | UNSAT (73 sec)        |
 
 ### UNSAT benchmark cases (unsat.cfg):
 
@@ -101,8 +101,8 @@ make -j
 
 | Part | Graph           | result/time (no UP) | result/time (with UP) |
 |------|-----------------|---------------------|-----------------------|
-| 27   | g.31.9.graphml  | Timeout (176 sec)   | Timeout (186 sec)     |
-| 26   | g.47.27.graphml | UNSAT (34 sec)      | UNSAT (82 sec)        |
+| 27   | g.31.9.graphml  | Timeout (176 sec)   | UNSAT (8 min)         |
+| 26   | g.47.27.graphml | UNSAT (34 sec)      | UNSAT (32 sec)        |
 
 
 ### SAT benchmark cases:
@@ -140,38 +140,6 @@ make -j
 Be mindful of the runtimes: some tests take substantial amount of time, so constantly
 running tests might quickly exceed the allocated 24h of development time.
 
-## Available Levers
-
-This is a list of possible directions to explore. Do not limit yourself to the list, explore
-all options. It is very likely that these ideas alone are not sufficient to reach the goal.
-
-1. Improve UP strategy [-up-sepcycles]
-   SAT search control: Decide which variables Glucose branches on and how strongly `cross2`
-   participates in the decision heuristic. This is based on an earlier observation that the
-   solver spends too much search away from useful crossing choices.
-
-   See Direction 1/2/3 below as potential next steps.
-
-  Do not treat UP as the whole project. UP is one lever. The larger problem is making CDCL
-  search the right crossing space.
-
-2. Explore alternative SAT solvers.
-   Check ../sat_solvers/ folder with possible alternatives. We can easily test alternatives
-   via dumping CNF to dimacs files (-dimacs=...), and running a solver on the dump.
-
-3. Improving existing SAT encoding.
-   It is hard but not impossible to add more constraints/variables to the model. In
-   particular, adding 2-clauses (or 1-clauses!) would be very useful, as it
-   directly reduces
-   the search space.
-   Added constraints/variables should be sound, and based on a theoretical proof that the
-   resulting encoding is correct.
-
-4. Incremental solving.
-   One idea that has not been explored yet: Start with an encoding, run the solver for some
-   period of time, then stop and analyze learnt clauses. If there are new 1-clauses and
-   2-clauses (and perhaps, some 3-clauses), it might be worth re-starting the solver from
-   scratch by adding the BASE encoding with these extra small clauses.
 
 ## Process
 
