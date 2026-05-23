@@ -49,8 +49,8 @@ struct SepCyclesStatic {
     }
 
     size_t numClauses2 = 0;
-    size_t numEqFlowClauses2 = 0;
-    size_t numEqFlowClauses3 = 0;
+    size_t numTightSeparatorClauses2 = 0;
+    size_t numTightSeparatorClauses3 = 0;
 
     // the main crossing
     for (size_t cross0 = 0; cross0 < possibleCrossings.size(); cross0++) {
@@ -63,8 +63,8 @@ struct SepCyclesStatic {
       markCrossing(u, v, x, y);
 
       std::vector<std::pair<int, int>> takenCrossings0 = {{e1_cross0, e2_cross0}};
-      numEqFlowClauses2 += findEqualFlow(x, y, u, v, takenCrossings0);
-      numEqFlowClauses2 += findEqualFlow(u, v, x, y, takenCrossings0);
+      numTightSeparatorClauses2 += findTightSeparator(x, y, u, v, takenCrossings0);
+      numTightSeparatorClauses2 += findTightSeparator(u, v, x, y, takenCrossings0);
 
       // secondary crossings
       for (size_t cross1 = 0; cross1 < possibleCrossings.size(); cross1++) {
@@ -89,15 +89,15 @@ struct SepCyclesStatic {
 
         // need to search cycles both via (x, y) and via (u, v)
         std::vector<std::pair<int, int>> takenCrossings = {{e1_cross0, e2_cross0}, {e1_cross1, e2_cross1}};
-        if (findSepCycle(x, y, u, v, takenCrossings) || findSepCycle(u, v, x, y, takenCrossings)) {
+        if (findViolatedSeparator(x, y, u, v, takenCrossings) || findViolatedSeparator(u, v, x, y, takenCrossings)) {
           // save the 2-clause
           numClauses2++;
           forbiddenTuples.insert(crossPair);
         }
 
         if (possibleCrossings.size() < MAX_CROSSINGS_FOR_3EQ) {
-          numEqFlowClauses3 += findEqualFlow(x, y, u, v, takenCrossings);
-          numEqFlowClauses3 += findEqualFlow(u, v, x, y, takenCrossings);
+          numTightSeparatorClauses3 += findTightSeparator(x, y, u, v, takenCrossings);
+          numTightSeparatorClauses3 += findTightSeparator(u, v, x, y, takenCrossings);
         }
 
         unmarkCrossing(u2, v2, x2, y2);
@@ -106,8 +106,8 @@ struct SepCyclesStatic {
       unmarkCrossing(u, v, x, y);
     }
 
-    LOG_IF(verbose, "  added %'9d equal-flow 2-clauses", numEqFlowClauses2);
-    LOG_IF(verbose, "  added %'9d equal-flow 3-clauses", numEqFlowClauses3);
+    LOG_IF(verbose, "  added %'9d tight-separator 2-clauses", numTightSeparatorClauses2);
+    LOG_IF(verbose, "  added %'9d tight-separator 3-clauses", numTightSeparatorClauses3);
 
     LOG_IF(verbose && clauseIndex, "num_extra_clauses: %d", clauseIndex);
     return numClauses2;
@@ -194,7 +194,7 @@ struct SepCyclesStatic {
           // need to search cycles both via (x, y) and via (u, v)
           CHECK(all_unique({e1, e2, e1_cr0, e2_cr0, e1_cr1, e2_cr1}));
           const std::vector<std::pair<int,int>> takenCrossings = {{e1,e2}, {e1_cr0,e2_cr0}, {e1_cr1,e2_cr1}};
-          if (findSepCycle(x, y, u, v, takenCrossings) || findSepCycle(u, v, x, y, takenCrossings)) {
+          if (findViolatedSeparator(x, y, u, v, takenCrossings) || findViolatedSeparator(u, v, x, y, takenCrossings)) {
             // save the 3-clause
             numClauses3++;
             forbiddenTuples.insert(triple);
@@ -299,7 +299,7 @@ private:
   /// Find all separating cycles: paths from x to y avoiding vertices {x, y, u, v}
   /// A path may contain as many kite/cross edges as possible but only one free edge
   /// If a path contains one crossed edge, then disjoint paths cannot use the second one
-  bool findSepCycle(int x, int y, int u, int v, const std::vector<std::pair<int, int>> &takenCrossings) {
+  bool findViolatedSeparator(int x, int y, int u, int v, const std::vector<std::pair<int, int>> &takenCrossings) {
     const size_t numTakenCrossings = takenCrossings.size();
     CHECK(numTakenCrossings == 2 || numTakenCrossings == 3);
     bool foundSepCycle = false;
@@ -472,7 +472,7 @@ private:
     return true;
   }
 
-  int findEqualFlow(int x, int y, int u, int v, const std::vector<std::pair<int, int>> &takenCrossings) {
+  int findTightSeparator(int x, int y, int u, int v, const std::vector<std::pair<int, int>> &takenCrossings) {
     CHECK(takenCrossings.size() == 1 || takenCrossings.size() == 2);
     int numAddedClauses = 0;
     const int degreeBound = std::min(graph.degree(u) - 1, graph.degree(v) - 1);
@@ -486,7 +486,7 @@ private:
 
       const auto crossCycleEdges = getCrossCycleEdges(cycleBuffer, takenCrossings);
       // TOOD: might want to use "numFree"
-      // const int flowLB = (takenCrossings.size() == 1 ? numFree : numFree + 1);
+      // const int pathDemandLB = (takenCrossings.size() == 1 ? numFree : numFree + 1);
       const int numPaths = countEdgeDisjointPaths(u, v, graph.adj, cycleBuffer, crossCycleEdges, numFree);
       if (numPaths == numFree) {
         CHECK(numPaths > 0);
@@ -498,12 +498,7 @@ private:
             continue;
           // the edge must cross smth
           numAddedClauses++;
-          if (takenCrossings.size() == 1) {
-            addEqFlowClause(takenCrossings[0], v1, v2);
-          } else {
-            CHECK(takenCrossings.size() == 2);
-            addEqFlowClause(takenCrossings[0], takenCrossings[1], v1, v2);
-          }
+          addTightSeparatorClause(takenCrossings, v1, v2);
         }
       } 
     };
@@ -585,24 +580,16 @@ private:
     return crossCycleEdges;
   }
 
-  void addEqFlowClause(std::pair<int, int> cr1, int u, int v) {
-    const auto [e1, e2] = cr1;
+  void addTightSeparatorClause(const std::vector<std::pair<int, int>>& takenCrossings, int u, int v) {
+    CHECK(takenCrossings.size() == 1 || takenCrossings.size() == 2);
     const int divUV = graph.findDivIndex(u, v);
-    model.addClause({
-        model.getCross2Var(e1 + n, e2 + n, false), 
-        model.getCross1Var(divUV, true)
-    });
-  }
-
-  void addEqFlowClause(std::pair<int, int> cr1, std::pair<int, int> cr2, int u, int v) {
-    const auto [e1, e2] = cr1;
-    const auto [e3, e4] = cr2;
-    const int divUV = graph.findDivIndex(u, v);
-    model.addClause({
-        model.getCross2Var(e1 + n, e2 + n, false), 
-        model.getCross2Var(e3 + n, e4 + n, false), 
-        model.getCross1Var(divUV, true)
-    });
+    std::vector<MVar> clause;
+    clause.reserve(takenCrossings.size() + 1);
+    for (const auto& [e1, e2] : takenCrossings) {
+      clause.push_back(model.getCross2Var(e1 + n, e2 + n, false));
+    }
+    clause.push_back(model.getCross1Var(divUV, true));
+    model.addClause(clause);
   }
 
 private:
