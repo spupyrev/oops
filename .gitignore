@@ -2,7 +2,7 @@
 *.code-workspace
 TODOs.md
 log_*
-last_*
+last*
 *.svg
 /*.gml
 /*.png
