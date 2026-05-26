@@ -71,7 +71,7 @@ size_t countEdgeDisjointPaths(const std::vector<int>& sources, const std::vector
                               const std::vector<EdgeTy>& removedEdges,
                               const size_t ub);
 
-// Calls lambda onCycle({x, ..., y}) for every simple cycle of size 3/4/5/6/7/8. Forbidden vertices may not appear in the cycle.
+// Calls lambda onCycle({x, ..., y}) for every simple cycle of the given size. Forbidden vertices may not appear in the cycle.
 // Returns early if onCycle returns true.
 using CycleCallback = std::function<bool(const std::vector<int>&)>;
 void forEachCycle(const AdjListTy& adjList, const int cycleLength,

@@ -197,16 +197,11 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
         };
 
         const std::vector<int> avoidedVertices = {x, y, u, v};
-        // separating triangle
-        forEachCycle(graph.adj, 3, x, y, avoidedVertices, processCycle);
-        if (found)
-          return true;
-        // separating 4-cycle
-        forEachCycle(graph.adj, 4, x, y, avoidedVertices, processCycle);
-        if (found)
-          return true;
-        // separating 5-cycle
-        forEachCycle(graph.adj, 5, x, y, avoidedVertices, processCycle);
+        for (int cycleLength = 3; cycleLength <= MAX_CYCLE_LEN_FOR_SEPCYCLES; cycleLength++) {
+          forEachCycle(graph.adj, cycleLength, x, y, avoidedVertices, processCycle);
+          if (found)
+            return true;
+        }
         return found;
       };
 

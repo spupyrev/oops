@@ -21,6 +21,9 @@ using namespace Simp21;
 using EdgeTy = std::pair<int, int>;
 
 constexpr size_t MAX_CROSSINGS_FOR_2GT = 3840;
+constexpr size_t MAX_CROSSINGS_FOR_3EQ = 1400;
+constexpr size_t MAX_CROSSINGS_FOR_3GT = 1280;
+constexpr int MAX_CYCLE_LEN_FOR_SEPCYCLES = 9;
 
 inline EdgeTy make_edge(const int u, const int v) {
   CHECK(u != v);

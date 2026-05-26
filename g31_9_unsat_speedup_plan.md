@@ -3,7 +3,7 @@
 ## Project Goal
 
 ```bash
-./oops -i=data/unsat.cfg -verbose=1 -unsat=1 -part=27 -up-sepcycles-timeout=600
+./oops -i=data/unsat.cfg -verbose=1 -unsat=1 -part=27 -up-sepcycles -timeout=600
 ```
 
 must finish with UNSAT for `g.31.9.graphml` within 600 seconds of raw SAT solver time.

@@ -656,13 +656,13 @@ size_t countEdgeDisjointPaths(const std::vector<int>& sources, const std::vector
   return maxflow;
 }
 
-// Calls lambda onCycle({x, ..., y}) for every simple cycle of small size. Forbidden vertices may not appear in the cycle.
+// Calls lambda onCycle({x, ..., y}) for every simple cycle of the given size. Forbidden vertices may not appear in the cycle.
 // Returns early if onCycle returns "true".
 void forEachCycle(const AdjListTy& adj, const int cycleLength,
                   const int x, const int y,
                   const std::vector<int>& forbidden,   
                   const CycleCallback& onCycle) {
-  CHECK(3 <= cycleLength && cycleLength <= 8, "Only cycle sizes 3/4/5/6/7/8 supported");
+  CHECK(cycleLength >= 3, "incorrect cycle size: %d", cycleLength);
 
   if (cycleLength == 3) {
     // (x, c, y)
@@ -733,133 +733,38 @@ void forEachCycle(const AdjListTy& adj, const int cycleLength,
     return;
   }
 
-  if (cycleLength == 6) {
-    // (x, c1, c2, c3, c4, y)
-    for (int c1 : adj[x]) {
-      if (y == c1 || x == c1)
-        continue;
-      if (contains(forbidden, c1)) 
-        continue;
-
-      for (int c2 : adj[c1]) {
-        if (y == c2 || x == c2 || c1 == c2)
-          continue;
-        if (contains(forbidden, c2)) 
-          continue;
-
-        for (int c3 : adj[c2]) {
-          if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
-            continue;
-          if (contains(forbidden, c3)) 
-            continue;
-
-          for (int c4 : adj[c3]) {
-            if (y == c4 || x == c4 || c1 == c4 || c2 == c4 || c3 == c4)
-              continue;
-            if (contains(forbidden, c4)) 
-              continue;
-            if (!contains(adj[y], c4)) 
-              continue;
-
-            if (onCycle({x, c1, c2, c3, c4, y})) 
-              return; // stop processing early
-          }
-        }
-      }
-    }
-    return;
+  std::vector<int> cycle{x};
+  std::vector<bool> used(adj.size(), false);
+  std::vector<bool> blocked(adj.size(), false);
+  used[x] = true;
+  for (int v : forbidden) {
+    CHECK(0 <= v && v < (int)adj.size());
+    blocked[v] = true;
   }
 
-  if (cycleLength == 7) {
-    // (x, c1, c2, c3, c4, c5, y)
-    for (int c1 : adj[x]) {
-      if (y == c1 || x == c1)
-        continue;
-      if (contains(forbidden, c1))
-        continue;
+  std::function<bool(int)> dfs = [&](const int currentVertex) {
+    if ((int)cycle.size() + 1 == cycleLength) {
+      if (!contains(adj[currentVertex], y))
+        return false;
 
-      for (int c2 : adj[c1]) {
-        if (y == c2 || x == c2 || c1 == c2)
-          continue;
-        if (contains(forbidden, c2))
-          continue;
-
-        for (int c3 : adj[c2]) {
-          if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
-            continue;
-          if (contains(forbidden, c3))
-            continue;
-
-          for (int c4 : adj[c3]) {
-            if (y == c4 || x == c4 || c1 == c4 || c2 == c4 || c3 == c4)
-              continue;
-            if (contains(forbidden, c4))
-              continue;
-
-            for (int c5 : adj[c4]) {
-              if (y == c5 || x == c5 || c1 == c5 || c2 == c5 || c3 == c5 || c4 == c5)
-                continue;
-              if (contains(forbidden, c5))
-                continue;
-              if (!contains(adj[y], c5))
-                continue;
-
-              if (onCycle({x, c1, c2, c3, c4, c5, y}))
-                return; // stop processing early
-            }
-          }
-        }
-      }
+      cycle.push_back(y);
+      const bool shouldStop = onCycle(cycle);
+      cycle.pop_back();
+      return shouldStop;
     }
-    return;
-  }
 
-  // cycleLength == 8
-  // (x, c1, c2, c3, c4, c5, c6, y)
-  for (int c1 : adj[x]) {
-    if (y == c1 || x == c1)
-      continue;
-    if (contains(forbidden, c1))
-      continue;
-
-    for (int c2 : adj[c1]) {
-      if (y == c2 || x == c2 || c1 == c2)
-        continue;
-      if (contains(forbidden, c2))
+    for (int nextVertex : adj[currentVertex]) {
+      if (nextVertex == y || used[nextVertex] || blocked[nextVertex])
         continue;
 
-      for (int c3 : adj[c2]) {
-        if (y == c3 || x == c3 || c1 == c3 || c2 == c3)
-          continue;
-        if (contains(forbidden, c3))
-          continue;
-
-        for (int c4 : adj[c3]) {
-          if (y == c4 || x == c4 || c1 == c4 || c2 == c4 || c3 == c4)
-            continue;
-          if (contains(forbidden, c4))
-            continue;
-
-          for (int c5 : adj[c4]) {
-            if (y == c5 || x == c5 || c1 == c5 || c2 == c5 || c3 == c5 || c4 == c5)
-              continue;
-            if (contains(forbidden, c5))
-              continue;
-
-            for (int c6 : adj[c5]) {
-              if (y == c6 || x == c6 || c1 == c6 || c2 == c6 || c3 == c6 || c4 == c6 || c5 == c6)
-                continue;
-              if (contains(forbidden, c6))
-                continue;
-              if (!contains(adj[y], c6))
-                continue;
-
-              if (onCycle({x, c1, c2, c3, c4, c5, c6, y}))
-                return; // stop processing early
-            }
-          }
-        }
-      }
+      used[nextVertex] = true;
+      cycle.push_back(nextVertex);
+      if (dfs(nextVertex))
+        return true;
+      cycle.pop_back();
+      used[nextVertex] = false;
     }
-  }
+    return false;
+  };
+  dfs(x);
 }
