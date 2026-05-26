@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string>
 #include <utility>
 
 using namespace std;
@@ -10,6 +12,7 @@ using namespace Simp21;
 
 /// Options:
 static const char *_cat = "CORE";
+static constexpr int64_t PROGRESS_INTERVAL_MS = 60000;
 
 static DoubleOption opt_step_size(_cat, "step-size", "Initial step size", 0.40, DoubleRange(0, false, 1, false));
 static DoubleOption opt_step_size_dec(_cat, "step-size-dec", "Step size decrement", 0.000001,
@@ -70,6 +73,60 @@ static inline double pow95_u32(uint32_t age) {
   if (age < (uint32_t)POW95_TABLE_SIZE) return pow95_table[age];
   return std::pow(0.95, (double)age);
 }
+
+static std::string format_duration_ms(int64_t ms) {
+  const int64_t sec = ms / 1000;
+  char buf[64];
+
+  if (sec < 60) {
+    std::snprintf(buf, sizeof(buf), "%llds", (long long)sec);
+  } else if (sec < 3600) {
+    const int64_t min = sec / 60;
+    const int64_t rem = sec % 60;
+    if (rem == 0)
+      std::snprintf(buf, sizeof(buf), "%lldm", (long long)min);
+    else
+      std::snprintf(buf, sizeof(buf), "%lldm%02llds", (long long)min, (long long)rem);
+  } else {
+    const int64_t hours = sec / 3600;
+    const int64_t min = (sec % 3600) / 60;
+    std::snprintf(buf, sizeof(buf), "%lldh%02lldm", (long long)hours, (long long)min);
+  }
+
+  return std::string(buf);
+}
+
+static std::string format_count(double value) {
+  char buf[64];
+
+  if (value >= 1000000000.0) {
+    std::snprintf(buf, sizeof(buf), "%.1fB", value / 1000000000.0);
+  } else if (value >= 1000000.0) {
+    std::snprintf(buf, sizeof(buf), "%.1fM", value / 1000000.0);
+  } else if (value >= 1000.0) {
+    std::snprintf(buf, sizeof(buf), "%.0fk", value / 1000.0);
+  } else {
+    std::snprintf(buf, sizeof(buf), "%.0f", value);
+  }
+
+  return std::string(buf);
+}
+
+static std::string format_count_precise(double value) {
+  char buf[64];
+
+  if (value >= 1000000000.0) {
+    std::snprintf(buf, sizeof(buf), "%.1fB", value / 1000000000.0);
+  } else if (value >= 1000000.0) {
+    std::snprintf(buf, sizeof(buf), "%.1fM", value / 1000000.0);
+  } else if (value >= 1000.0) {
+    std::snprintf(buf, sizeof(buf), "%.1fk", value / 1000.0);
+  } else {
+    std::snprintf(buf, sizeof(buf), "%.0f", value);
+  }
+
+  return std::string(buf);
+}
 //=================================================================================================
 
 // Constructor/Destructor:
@@ -126,10 +183,68 @@ Solver::Solver()
   max_trail = 0;
   timeout_ms = -1;
   start_time = std::chrono::system_clock::now();
+  resetProgress();
   init_pow95_table();
 }
 
 Solver::~Solver() {}
+
+void Solver::resetProgress() {
+  const auto now = std::chrono::steady_clock::now();
+  progress_start_time = now;
+  last_progress_time = now;
+  last_progress_conflicts = conflicts;
+  next_progress_check_conflicts = conflicts + 4096;
+  progress_num_vars = nVars();
+  progress_num_clauses = nClauses();
+}
+
+void Solver::maybePrintProgress() {
+  if (verbosity < 1 || conflicts < next_progress_check_conflicts) {
+    return;
+  }
+
+  next_progress_check_conflicts = conflicts + 4096;
+  const auto now = std::chrono::steady_clock::now();
+  const int64_t since_last_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_progress_time).count();
+
+  if (since_last_ms < PROGRESS_INTERVAL_MS) {
+    return;
+  }
+
+  const int64_t elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now - progress_start_time).count();
+  const double since_last_sec = since_last_ms / 1000.0;
+  const double conflicts_per_sec =
+      since_last_sec > 0 ? (conflicts - last_progress_conflicts) / since_last_sec : 0.0;
+  const int root_fixed = decisionLevel() == 0 ? nAssigns() : trail_lim[0];
+  const double root_fixed_percent = progress_num_vars > 0 ? 100.0 * root_fixed / progress_num_vars : 0.0;
+  const double learnt_percent = progress_num_clauses > 0 ? 100.0 * nLearnts() / progress_num_clauses : 0.0;
+  const std::string elapsed = format_duration_ms(elapsed_ms);
+  const std::string work = format_count((double)conflicts);
+  const std::string speed = format_count(conflicts_per_sec);
+  const std::string root_fixed_count = format_count((double)root_fixed);
+  const std::string vars_count = format_count_precise((double)progress_num_vars);
+  const std::string learnts_count = format_count((double)nLearnts());
+  const std::string clauses_count = format_count((double)progress_num_clauses);
+
+  if (timeout_ms > 0) {
+    const double timeout_percent = 100.0 * elapsed_ms / timeout_ms;
+    std::fprintf(stderr,
+                 "  progress: %7s (%3.0f%%) elapsed; conflicts=%6s (+%4s/s); root vars fixed=%5s/%5s (%4.1f%%); learnt clauses=%6s/%6s (%3.0f%%)\n",
+                 elapsed.c_str(), timeout_percent, work.c_str(), speed.c_str(), root_fixed_count.c_str(),
+                 vars_count.c_str(), root_fixed_percent, learnts_count.c_str(), clauses_count.c_str(), learnt_percent);
+  } else {
+    std::fprintf(stderr,
+                 "  progress: %7s elapsed; conflicts=%6s (+%4s/s); root vars fixed=%5s/%5s (%4.1f%%); learnt clauses=%6s/%6s (%3.0f%%)\n",
+                 elapsed.c_str(), work.c_str(), speed.c_str(), root_fixed_count.c_str(), vars_count.c_str(),
+                 root_fixed_percent, learnts_count.c_str(), clauses_count.c_str(), learnt_percent);
+  }
+
+  last_progress_time = now;
+  last_progress_conflicts = conflicts;
+}
 
 void Solver::setUserPropagator(std::unique_ptr<UserPropagator> propagator) {
   assert(propagator != nullptr);
@@ -1552,6 +1667,7 @@ lbool Solver::search(int &nof_conflicts) {
       }
 
       conflicts++;
+      maybePrintProgress();
       nof_conflicts--;
 
       if (nof_conflicts < -100000) {
@@ -1787,6 +1903,7 @@ lbool Solver::solve_() {
 
   lbd_sum = 0;
   solves++;
+  resetProgress();
   max_learnts = nClauses() * learntsize_factor;
   learntsize_adjust_confl = learntsize_adjust_start_confl;
   learntsize_adjust_cnt = (int)learntsize_adjust_confl;

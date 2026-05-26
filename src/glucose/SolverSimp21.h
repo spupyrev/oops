@@ -311,6 +311,15 @@ protected:
   int64_t propagation_budget; // -1 means no budget.
   bool asynch_interrupt;
 
+  // Progress reporting:
+  //
+  std::chrono::steady_clock::time_point progress_start_time;
+  std::chrono::steady_clock::time_point last_progress_time;
+  uint64_t last_progress_conflicts = 0;
+  uint64_t next_progress_check_conflicts = 0;
+  int progress_num_vars = 0;
+  int progress_num_clauses = 0;
+
   // Main internal methods:
   //
   void insertVarOrder(Var x); // Insert a variable in the decision order priority queue.
@@ -366,6 +375,8 @@ protected:
 
   // Timeout:
   bool isTimeout() const;
+  void resetProgress();
+  void maybePrintProgress();
 
 public:
   int level(Var x) const;
