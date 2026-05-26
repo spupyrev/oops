@@ -109,8 +109,6 @@ public:
   }
 
 private:
-  static constexpr int MAX_DYNAMIC_CYCLE_LEN = 8;
-
   void initPossibleCrossings() {
     for (int e1 = 0; e1 < m; e1++) {
       for (int e2 = e1 + 1; e2 < m; e2++) {
@@ -175,11 +173,13 @@ private:
     isUncrossableEdge.assign(n, std::vector<bool>(n, false));
     uncrossableEdgeCount.assign(m, 0);
     crossEdgeProvider.assign(n * n, -1);
+    crossingTwin.assign(n, std::vector<EdgeTy>(n, EdgeTy(-1, -1)));
     kiteEdgeProviders.assign(n * n, std::vector<int>());
     edgeIdByKey.assign(n * n, -1);
-    cycleBlocked.assign(n, 0);
-    cycleUsed.assign(n, 0);
-    cycleBuffer.reserve(MAX_DYNAMIC_CYCLE_LEN);
+    isVertexOnCycle.assign(n, 0);
+    isVertexBlocked.assign(n, 0);
+    cycleBuffer.reserve(MAX_CYCLE_LEN_FOR_SEPCYCLES);
+    distQueue.reserve(n);
 
     for (int edgeId = 0; edgeId < m; edgeId++) {
       const auto& [u, v] = graph.edges[edgeId];
@@ -197,6 +197,11 @@ private:
       return v * n + u;
     }
     return u * n + v;
+  }
+
+  void setCrossingTwin(int u, int v, const EdgeTy& twin) {
+    crossingTwin[u][v] = twin;
+    crossingTwin[v][u] = twin;
   }
 
   bool canMarkCrossing(int u, int v, int x, int y) const {
@@ -258,6 +263,8 @@ private:
     isCrossEdge[y][x] = true;
     crossEdgeProvider[edgeKey(u, v)] = crossingId;
     crossEdgeProvider[edgeKey(x, y)] = crossingId;
+    setCrossingTwin(u, v, make_edge(x, y));
+    setCrossingTwin(x, y, make_edge(u, v));
 
     // Same orientation convention as SepCyclesStatic: u--x--v--y.
     markKiteEdge(crossingId, u, x);
@@ -274,6 +281,8 @@ private:
     CHECK(isCrossEdge[u][v] && isCrossEdge[x][y]);
     CHECK(crossEdgeProvider[edgeKey(u, v)] == crossingId);
     CHECK(crossEdgeProvider[edgeKey(x, y)] == crossingId);
+    CHECK(crossingTwin[u][v] == make_edge(x, y));
+    CHECK(crossingTwin[x][y] == make_edge(u, v));
 
     isCrossEdge[u][v] = false;
     isCrossEdge[v][u] = false;
@@ -281,6 +290,8 @@ private:
     isCrossEdge[y][x] = false;
     crossEdgeProvider[edgeKey(u, v)] = -1;
     crossEdgeProvider[edgeKey(x, y)] = -1;
+    setCrossingTwin(u, v, EdgeTy(-1, -1));
+    setCrossingTwin(x, y, EdgeTy(-1, -1));
 
     unmarkKiteEdge(crossingId, y, u);
     unmarkKiteEdge(crossingId, v, y);
@@ -292,8 +303,9 @@ private:
     return !isCrossEdge[u][v] && !isKiteEdge[u][v] && !isUncrossableEdge[u][v];
   }
 
-  bool isCurrentEdge(int u, int v) const {
-    return isEdge[u][v] || isKiteEdge[u][v] > 0;
+  // Upper bound on paths that can enter/leave an edge without using the edge itself.
+  int edgeDegreeBound(int u, int v) const {
+    return std::min(graph.degree(u) - 1, graph.degree(v) - 1);
   }
 
   bool isEdgeOnCycle(const std::vector<int>& cycle, const EdgeTy& edge) const {
@@ -351,6 +363,7 @@ private:
       const EdgeTy edge2 = graph.edges[e2];
       const bool edge1OnCycle = isEdgeOnCycle(cycle, edge1);
       const bool edge2OnCycle = isEdgeOnCycle(cycle, edge2);
+      CHECK(!edge1OnCycle || !edge2OnCycle);
       if (edge1OnCycle) {
         crossCycleEdges.push_back(edge2);
         addCrossingReason(reason, crossingId);
@@ -376,21 +389,47 @@ private:
     }
   }
 
-  bool processCycle(int mainCrossingId, int u, int v, size_t numFree,
-                    std::vector<Lit>& reason) const {
-    CHECK(cycleBuffer.size() >= 3);
+  // Constant data for one DFS from x to y. The edge (x,y) is already a marked
+  // crossing edge; the DFS path from x to y, together with (y,x), forms the
+  // candidate separator.
+  struct SeparatorDfsContext {
+    const std::vector<int>& distToY;
+    int mainCrossingId;
+    int x;
+    int y;
+    int u;
+    int v;
+    int pathUpperBound;
+  };
 
-    if (numFree >= (size_t)std::min(graph.degree(u) - 1, graph.degree(v) - 1)) {
-      return false;
-    }
+  // Mutable data carried by recursive DFS calls.
+  struct SeparatorDfsState {
+    int remainingRecDepth;
+    int numFreeEdgesOnCycle;
+  };
+
+  // Reject a partial path once there can no longer be enough disjoint paths
+  // crossing the separator to make it overfull.
+  bool shouldPruneSeparatorDfs(const SeparatorDfsContext& context, const SeparatorDfsState& state) const {
+    return state.numFreeEdgesOnCycle >= context.pathUpperBound;
+  }
+
+  // An overfull separator is a cycle whose free edges are fewer than the number
+  // of edge-disjoint paths forced to cross it.
+  bool processOverfullSeparatorCycle(const SeparatorDfsContext& context,
+                                     const SeparatorDfsState& state,
+                                     std::vector<Lit>& reason) const {
+    CHECK(cycleBuffer.front() == context.x && cycleBuffer.back() == context.y && cycleBuffer.size() >= 3);
+    CHECK(state.numFreeEdgesOnCycle < context.pathUpperBound);
 
     std::vector<Lit> candidateReason;
-    addCrossingReason(candidateReason, mainCrossingId);
+    addCrossingReason(candidateReason, context.mainCrossingId);
     addCycleProviders(cycleBuffer, candidateReason);
     const auto crossCycleEdges = getCrossCycleEdges(cycleBuffer, candidateReason);
-    const size_t numPaths = countEdgeDisjointPaths({u}, {v}, graph.adj, cycleBuffer, crossCycleEdges, numFree + 1);
+    const size_t numPaths = countEdgeDisjointPaths(
+        {context.u}, {context.v}, graph.adj, cycleBuffer, crossCycleEdges, state.numFreeEdgesOnCycle + 1);
 
-    if (numPaths > numFree) {
+    if (numPaths > (size_t)state.numFreeEdgesOnCycle) {
       CHECK((int)activeCrossingIds.size() + (int)activeUncrossedEdgeIds.size() > 2,
             "sep-cycle found with at most two active cross1=false/cross2 assignments");
       reason = std::move(candidateReason);
@@ -400,57 +439,127 @@ private:
     return false;
   }
 
+  // Extend the current x-to-y path. Edges in adjList are original graph edges plus
+  // pseudo-kite edges introduced by currently marked crossings.
+  bool findSeparatorsRec(int currentVertex,
+                         const SeparatorDfsContext& context,
+                         const SeparatorDfsState& state,
+                         std::vector<Lit>& reason) {
+    // Reaching y closes the separator; cycleBuffer is the path and the closing
+    // edge (y,x) is the represented crossing edge.
+    if (currentVertex == context.y) {
+      CHECK(cycleBuffer.size() >= 3);
+      CHECK(cycleBuffer.front() == context.x && cycleBuffer.back() == context.y);
+      return processOverfullSeparatorCycle(context, state, reason);
+    }
+
+    if (state.remainingRecDepth == 0)
+      return false;
+
+    for (const int nextVertex : adjList[currentVertex]) {
+      // Blocked vertices are either already on the current cycle or endpoints
+      // of twin crossing edges that the cycle is not allowed to touch.
+      if (isVertexBlocked[nextVertex])
+        continue;
+      if (nextVertex == context.y && cycleBuffer.size() < 2)
+        continue;
+
+      // After taking currentVertex -> nextVertex, there must still be enough
+      // depth left to reach y. distToY ignores dynamic DFS blocks, so failing
+      // this test means no valid constrained continuation can exist.
+      const int nextRemainingRecDepth = nextVertex == context.y ? 0 : state.remainingRecDepth - 1;
+      if (context.distToY[nextVertex] > nextRemainingRecDepth)
+        continue;
+
+      SeparatorDfsState nextState = state;
+      nextState.remainingRecDepth = nextRemainingRecDepth;
+      nextState.numFreeEdgesOnCycle += isFreeEdge(currentVertex, nextVertex);
+
+      int blockedU = -1;
+      int blockedV = -1;
+      if (isCrossEdge[currentVertex][nextVertex]) {
+        const auto [u, v] = crossingTwin[currentVertex][nextVertex];
+        CHECK(u != -1 && v != -1);
+        blockedU = u;
+        blockedV = v;
+        // If the cycle uses one edge of a crossing, it may not also visit an
+        // endpoint of the twin edge.
+        if (isVertexOnCycle[blockedU] || isVertexOnCycle[blockedV])
+          continue;
+      }
+
+      if (shouldPruneSeparatorDfs(context, nextState))
+        continue;
+
+      // Commit the step only after pruning, so rejected states do not mutate
+      // the global DFS buffers.
+      if (blockedU != -1) {
+        isVertexBlocked[blockedU]++;
+        isVertexBlocked[blockedV]++;
+      }
+
+      isVertexOnCycle[nextVertex] = 1;
+      isVertexBlocked[nextVertex]++;
+      cycleBuffer.push_back(nextVertex);
+      const bool stop = findSeparatorsRec(nextVertex, context, nextState, reason);
+      cycleBuffer.pop_back();
+      isVertexBlocked[nextVertex]--;
+      isVertexOnCycle[nextVertex] = 0;
+      if (blockedU != -1) {
+        isVertexBlocked[blockedU]--;
+        isVertexBlocked[blockedV]--;
+      }
+      if (stop)
+        return true;
+    }
+    return false;
+  }
+
   bool findSepCycleForCrossing(int mainCrossingId, int x, int y, int u, int v,
                                int maxCycleLen, std::vector<Lit>& reason) {
-    const size_t degreeBound = size_t(std::min(graph.degree(u) - 1, graph.degree(v) - 1));
-    const int maxDepth = maxCycleLen - 2;
+    CHECK(isCrossEdge[x][y] && isKiteEdge[x][y] == 0,
+          "main crossing edge (%d,%d) should be marked crossed", x, y);
+    const int maxDepth = maxCycleLen - 1;
+    const int pathUpperBound = edgeDegreeBound(u, v);
 
-    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 1;
-    cycleUsed[x] = 1;
+    isVertexOnCycle[x] = 1;
+    isVertexBlocked[x]++;
+    isVertexBlocked[u]++;
+    isVertexBlocked[v]++;
     cycleBuffer.clear();
     cycleBuffer.push_back(x);
 
-    auto dfs = [&](auto&& self, int current, int depth, size_t numFree) -> bool {
-      if (depth >= 1 && isCurrentEdge(current, y)) {
-        const size_t finalFree = numFree + size_t(isFreeEdge(current, y));
-        if (finalFree < degreeBound) {
-          cycleBuffer.push_back(y);
-          const bool stop = processCycle(mainCrossingId, u, v, finalFree, reason);
-          cycleBuffer.pop_back();
-          if (stop)
-            return true;
-        }
-      }
-
-      if (depth == maxDepth)
-        return false;
-
-      for (int next : adjList[current]) {
-        if (cycleBlocked[next] || cycleUsed[next])
+    // Precompute how many DFS steps are needed to reach y from each vertex.
+    // The graph here is the current adjList: original edges plus pseudo-kite
+    // edges for currently active crossings. We cap distances at maxDepth + 1
+    // because larger values are all equivalent for pruning.
+    distToYBuffer.assign(n, maxDepth + 1);
+    distToYBuffer[y] = 0;
+    distQueue.clear();
+    distQueue.push_back(y);
+    for (size_t i = 0; i < distQueue.size(); i++) {
+      const int cur = distQueue[i];
+      if (distToYBuffer[cur] == maxDepth)
+        continue;
+      for (const int next : adjList[cur]) {
+        if (isVertexBlocked[next] && next != y)
           continue;
-
-        const size_t nextFree = numFree + size_t(isFreeEdge(current, next));
-        if (nextFree >= degreeBound)
+        if (distToYBuffer[next] <= distToYBuffer[cur] + 1)
           continue;
-
-        cycleUsed[next] = 1;
-        cycleBuffer.push_back(next);
-        const bool stop = self(self, next, depth + 1, nextFree);
-        cycleBuffer.pop_back();
-        cycleUsed[next] = 0;
-        if (stop)
-          return true;
+        distToYBuffer[next] = distToYBuffer[cur] + 1;
+        distQueue.push_back(next);
       }
-      return false;
-    };
+    }
 
-    CHECK(isCrossEdge[y][x],
-          "main crossing edge (%d,%d) should be marked crossed", y, x);
-    const bool found = dfs(dfs, x, 0, 0);
+    const SeparatorDfsContext context = {distToYBuffer, mainCrossingId, x, y, u, v, pathUpperBound};
+    const SeparatorDfsState initialState = {maxDepth, 0};
+    const bool found = findSeparatorsRec(x, context, initialState, reason);
 
     cycleBuffer.clear();
-    cycleUsed[x] = 0;
-    cycleBlocked[x] = cycleBlocked[y] = cycleBlocked[u] = cycleBlocked[v] = 0;
+    isVertexOnCycle[x] = 0;
+    isVertexBlocked[x]--;
+    isVertexBlocked[u]--;
+    isVertexBlocked[v]--;
 
     return found;
   }
@@ -487,7 +596,7 @@ private:
       markedCrossings.push_back(crossingId);
     }
 
-    findSepCycleClause(MAX_DYNAMIC_CYCLE_LEN, reason);
+    findSepCycleClause(MAX_CYCLE_LEN_FOR_SEPCYCLES, reason);
 
     for (auto it = markedCrossings.rbegin(); it != markedCrossings.rend(); ++it) {
       unmarkCrossing(*it);
@@ -525,11 +634,14 @@ private:
   std::vector<std::vector<bool>> isUncrossableEdge;
   std::vector<int> uncrossableEdgeCount;
   std::vector<int> crossEdgeProvider;
+  std::vector<std::vector<EdgeTy>> crossingTwin;
   std::vector<std::vector<int>> kiteEdgeProviders;
   std::vector<int> edgeIdByKey;
-  std::vector<char> cycleBlocked;
-  std::vector<char> cycleUsed;
+  std::vector<char> isVertexOnCycle;
+  std::vector<int> isVertexBlocked;
   std::vector<int> cycleBuffer;
+  std::vector<int> distToYBuffer;
+  std::vector<int> distQueue;
 };
 
 } // namespace

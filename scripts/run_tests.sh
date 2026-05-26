@@ -80,6 +80,7 @@ assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -breakID"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/test1.cfg -unsat=1 -sat -satsuma"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=move"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=stack"
+assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -unsat=1 -up-sepcycles"
 
 # brute-force
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=brute-force"
@@ -97,8 +98,8 @@ assert_pass "grep -Fq '1-planar = 15' /tmp/last.log"
 assert_pass "grep -Fq 'non-1-planar = 0' /tmp/last.log"
 assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/small_cn_sat.cfg -unsat=2 -skewness=0 -max-n=14 -colors=0 2> /tmp/last.log"
 assert_pass "grep -Fq '1-planar = 13' /tmp/last.log"
-
-# test sparsify
+assert_pass "${OP} -verbose=0 -i=${DATA_DIR}/small_cn_sat.cfg -unsat=1 -skewness=0 -colors=no -up-sepcycles 2> /tmp/last.log"
+assert_pass "grep -Fq '1-planar = 31' /tmp/last.log"
 
 # timeout
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test8.cfg -timeout=3 2> /tmp/last.log"
