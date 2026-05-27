@@ -99,7 +99,7 @@ public:
 
       clause = std::move(reason);
 
-      LOG_IF(verbose >= 2, "sep-cycle UP conflict with %d crossings", clause.size());
+      LOG_IF(verbose >= 3, "sep-cycle UP conflict with %d crossings", clause.size());
       numConflicts++;
       return true;
     }

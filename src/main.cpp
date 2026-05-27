@@ -122,6 +122,7 @@ bool skipTestingBySize(const InputGraph& graph, const int verbose, ResultCodeTy&
     if (x > y) std::swap(x, y);
     // if 2 <= x <= y, then there are at most 2n + 4x - 12 edges
     if (x >= 2 && m > 2 * n + 4 * x - 12) {
+      LOG_IF(verbose, "the bipartite graph is not 1-planar due to edge density (%d > %d)", m, 2 * n + 4 * x - 12);
       resultCode = ResultCodeTy::UNSAT;
       return true;
     }
@@ -131,6 +132,7 @@ bool skipTestingBySize(const InputGraph& graph, const int verbose, ResultCodeTy&
   if (girth >= 4) {
     // girth-4 1-planar graphs have at most 3n-6 edges
     if (n >= 4 && m > 3 * n - 6) {
+      LOG_IF(verbose, "the girth-4 graph is not 1-planar due to edge density (%d > %d)", m, m > 3 * n - 6);
       resultCode = ResultCodeTy::UNSAT;
       return true;
     }
@@ -138,6 +140,7 @@ bool skipTestingBySize(const InputGraph& graph, const int verbose, ResultCodeTy&
   if (girth >= 5) {
     // girth-5 1-planar graphs have at most 12/5 * n edges
     if (n >= 4 && m > (12 * n + 4) / 5) {
+      LOG_IF(verbose, "the girth-5 graph is not 1-planar due to edge density (%d > %d)", m, (12 * n + 4) / 5);
       resultCode = ResultCodeTy::UNSAT;
       return true;
     }
