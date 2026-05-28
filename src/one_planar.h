@@ -866,6 +866,7 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
 void encodeK4Constraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeStrictConstraints(SATModel& model, const InputGraph& graph, const Params& params);
+void encodeStrictSymmetricConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodePartialConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 std::unique_ptr<Simp21::UserPropagator> createSepCyclesDynamic(

@@ -747,6 +747,110 @@ void encodeStrictConstraints(SATModel& model, const InputGraph& graph, const Par
   );
 }
 
+/// Symmetric strict crossing encoding.  This creates both endpoint-separation
+/// views for every candidate pair and defines one pair-local R from both views,
+/// preserving automorphisms that swap the two candidate crossing edges.
+void encodeStrictSymmetricConstraints(SATModel& model, const InputGraph& graph, const Params& params) {
+  const int n = graph.n;
+  const auto& edges = graph.edges;
+  const int m = (int)edges.size();
+  const int numVertices = n + m;
+
+  int numVars = 0;
+  int numClauses = 0;
+
+  auto addCover = [&](int e, int z) {
+    CHECK(0 <= e && e < m);
+    CHECK(0 <= z && z < n);
+    const auto [u, v] = edges[e];
+    CHECK(z != u && z != v);
+    CHECK(!model.hasCoverVar(e, z));
+    model.addCoverVar(e, z);
+    model.addClause({
+      model.getRelVar(u, z, true),
+      model.getRelVar(v, z, true),
+      model.getCoverVar(e, z, false)
+    });
+    model.addClause({
+      model.getRelVar(u, z, true),
+      model.getRelVar(v, z, false),
+      model.getCoverVar(e, z, true)
+    });
+    model.addClause({
+      model.getRelVar(u, z, false),
+      model.getRelVar(v, z, true),
+      model.getCoverVar(e, z, true)
+    });
+    model.addClause({
+      model.getRelVar(u, z, false),
+      model.getRelVar(v, z, false),
+      model.getCoverVar(e, z, false)
+    });
+    numVars++;
+    numClauses += 4;
+  };
+
+  auto ensureEndpointCovers = [&](int e, int z1, int z2) {
+    if (!model.hasCoverVar(e, z1))
+      addCover(e, z1);
+    if (!model.hasCoverVar(e, z2))
+      addCover(e, z2);
+  };
+
+  auto addEndpointSeparationDefinition = [&](int e, int z1, int z2, MVar R, MVar notR) {
+    const MVar P = model.getCoverVar(e, z1, true);
+    const MVar notP = model.getCoverVar(e, z1, false);
+    const MVar Q = model.getCoverVar(e, z2, true);
+    const MVar notQ = model.getCoverVar(e, z2, false);
+
+    model.addClause({P, Q, notR});
+    model.addClause({P, notQ, R});
+    model.addClause({notP, Q, R});
+    model.addClause({notP, notQ, notR});
+    numClauses += 4;
+  };
+
+  for (int d1 = n; d1 < numVertices; d1++) {
+    for (int d2 = d1 + 1; d2 < numVertices; d2++) {
+      if (!canBeMerged(d1, d2, n, edges))
+        continue;
+
+      const int e1 = d1 - n;
+      const int e2 = d2 - n;
+      const auto [u1, v1] = edges[e1];
+      const auto [u2, v2] = edges[e2];
+
+      ensureEndpointCovers(e1, u2, v2);
+      ensureEndpointCovers(e2, u1, v1);
+
+      const MVar notX = model.getCross2Var(d1, d2, false);
+      const MVar A = model.getCoverVar(e1, d1, true);
+      const MVar notA = model.getCoverVar(e1, d1, false);
+      const MVar B = model.getCoverVar(e2, d2, true);
+      const MVar notB = model.getCoverVar(e2, d2, false);
+
+      const int aux = model.addAuxVar();
+      const MVar R = model.getAuxVar(aux, true);
+      const MVar notR = model.getAuxVar(aux, false);
+
+      addEndpointSeparationDefinition(e1, u2, v2, R, notR);
+      addEndpointSeparationDefinition(e2, u1, v1, R, notR);
+
+      model.addClause({notX, notA, B, R});
+      model.addClause({notX, A, notB, R});
+      model.addClause({notX, notA, notB, notR});
+      numVars++;
+      numClauses += 3;
+    }
+  }
+
+  LOG_IF(
+    params.verbose,
+    "strict-symmetric constraints: added %d new vars and %d clauses",
+    numVars, numClauses
+  );
+}
+
 /// C=0 <=> IC; C=1 <=> NIC; C=2 <=> 1-planar
 void encodeICConstraints(SATModel& model, const InputGraph& graph, const int verbose, const int C) {
   CHECK(0 <= C && C <= 3);
