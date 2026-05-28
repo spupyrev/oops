@@ -32,6 +32,9 @@ bool is2Connected(const int n, const std::vector<EdgeTy>& edges);
 /// Check if the graph is bipartite
 bool isBipartite(const int n, const std::vector<EdgeTy>& edges);
 
+/// Same as above but returns the parts
+bool isBipartite(int n, const std::vector<EdgeTy>& edges, std::vector<int>& part1, std::vector<int>& part2);
+
 /// Same as above but returns the sizes of the parts
 bool isBipartite(int n, const std::vector<EdgeTy>& edges, int &leftSize, int &rightSize);
 

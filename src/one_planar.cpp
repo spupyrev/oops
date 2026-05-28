@@ -33,6 +33,39 @@ bool violateDensity(int div_e, int div_f, const InputGraph& graph) {
   return false;
 }
 
+/// Check if a crossing plus the bipartition-preserving kite edges violate bipartite density
+bool violateBipartiteDensity(
+    int div_e, int div_f, const InputGraph& graph, 
+    const std::vector<int>& bipColor, int x) {
+  const int n = graph.n;
+  const int m = (int)graph.edges.size();
+  CHECK(n >= 4);
+  CHECK(div_e >= n && div_f >= n);
+  CHECK(n == (int)bipColor.size());
+
+  const auto [e_first, e_second] = graph.edges[div_e - n];
+  const auto [f_first, f_second] = graph.edges[div_f - n];
+  const std::vector<EdgeTy> k4 = {
+    {e_first, f_first},
+    {e_first, f_second},
+    {e_second, f_first},
+    {e_second, f_second}
+  };
+  int extraEdges = 0;
+  for (const auto& [s, t] : k4) {
+    if (bipColor[s] != bipColor[t] && !graph.adjacentVV(s, t)) {
+      extraEdges++;
+    }
+  }
+  if (m + extraEdges > 3 * n - 8 - n % 2) {
+    return true;
+  }
+  if (x >= 2 && m + extraEdges > 2 * n + 4 * x - 12) {
+    return true;
+  }
+  return false;
+}
+
 /// Check if vertices x and a can be swapped so as to eliminate a crossing between edges (x, y) and (a, b)
 bool canSwapToReduceCrossings(int x, int y, int a, int b, const InputGraph& graph) {
   const auto& adj = graph.adj;
@@ -105,6 +138,36 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
       }
       crossablePairs[d1][d2] = true;
       crossablePairs[d2][d1] = true;
+    }
+  }
+
+  // Skip denisty violaters for bipartite graphs
+  int numBipartiteDensitySkipped = 0;
+  std::vector<int> part1;
+  std::vector<int> part2;
+  const bool bipartite = isBipartite(n, edges, part1, part2);
+  if (bipartite) {
+    std::vector<int> bipColor(n, -1);
+    for (int v : part1)
+      bipColor[v] = 0;
+    for (int v : part2)
+      bipColor[v] = 1;
+
+    int x = (int)part1.size();
+    int y = (int)part2.size();
+    CHECK(x > 0 && y > 0);
+    if (x > y) std::swap(x, y);
+
+    for (int d1 = n; d1 < numVertices; d1++) {
+      for (int d2 = d1 + 1; d2 < numVertices; d2++) {
+        if (!crossablePairs[d1][d2])
+          continue;
+        if (violateBipartiteDensity(d1, d2, graph, bipColor, x)) {
+          crossablePairs[d1][d2] = false;
+          crossablePairs[d2][d1] = false;
+          numBipartiteDensitySkipped++;
+        }
+      }
     }
   }
 
@@ -229,6 +292,9 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
     );
     LOG("  %d (%.2lf%%) due to density", 
       numDensitySkipped, 100.0 * numDensitySkipped / double(possiblePairs)
+    );
+    LOG("  %d (%.2lf%%) due to bipartite density",
+      numBipartiteDensitySkipped, 100.0 * numBipartiteDensitySkipped / double(possiblePairs)
     );
     LOG("  %d (%.2lf%%) due to degree-3", 
       numDegree3Skipped, 100.0 * numDegree3Skipped / double(possiblePairs)
