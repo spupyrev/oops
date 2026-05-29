@@ -1,7 +1,7 @@
 #pragma once
 
-#include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <iostream>
 #include <memory>
 #include <regex>
@@ -12,23 +12,35 @@
 /// A header-only implementation of parsing command-line options
 class CMDOptions {
  private:
+  // Custom usage text printed before the option list.
   std::string usageMessage;
-  std::unordered_map<std::string, std::string> options;
 
-  std::unordered_map<std::string, std::string> allowedOptions;
-  std::vector<std::string> allowedOptionsOrder;
+  // Valid option names and their help text.
+  std::unordered_map<std::string, std::string> knownOptions;
+
+  // Registration order used to print help consistently.
+  std::vector<std::string> optionOrder;
+
+  // Values explicitly provided by parse() or setters; defaults are stored separately.
+  std::unordered_map<std::string, std::string> values;
+
+  // Fallback values for options not present in values.
   std::unordered_map<std::string, std::string> defaultValues;
-  std::unordered_map<std::string, std::vector<std::string> > allowedValues;
 
-  CMDOptions(const CMDOptions&);
-  CMDOptions& operator = (const CMDOptions&);
+  // Per-option whitelist of accepted values or regular expressions.
+  std::unordered_map<std::string, std::vector<std::string> > allowedValuesByOption;
+
+  CMDOptions(const CMDOptions&) = delete;
+  CMDOptions& operator = (const CMDOptions&) = delete;
   CMDOptions() {}
 
  public:
+  // Creates an options parser instance.
   static std::unique_ptr<CMDOptions> create() {
     return std::unique_ptr<CMDOptions>(new CMDOptions());
   }
 
+  // Parses command-line arguments and handles help requests.
   void parse(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
       std::string s(argv[i]);
@@ -42,76 +54,101 @@ class CMDOptions {
     }
   }
 
+  // Sets the usage text printed before the option list.
   void setUsageMessage(const std::string& msg) {
     usageMessage = msg;
   }
 
-  void addAllowedOption(const std::string& optionName, const std::string& defaultValue, const std::string& description) {
-    addAllowedOption(optionName, description);
-    options[optionName] = defaultValue;
+  // Registers an option with a default value.
+  void registerOption(const std::string& optionName, const std::string& defaultValue, const std::string& description) {
+    registerOption(optionName, description);
     defaultValues[optionName] = defaultValue;
   }
 
-  void addAllowedOption(const std::string& optionName, const std::string& description) {
-    assert(!allowedOptions.count(optionName));
-    allowedOptions[optionName] = description;
-    allowedOptionsOrder.push_back(optionName);
+  // Registers a required option without a default value.
+  void registerOption(const std::string& optionName, const std::string& description) {
+    assert(!knownOptions.count(optionName));
+    knownOptions[optionName] = description;
+    optionOrder.push_back(optionName);
   }
 
-  void addAllowedValue(const std::string& optionName, const std::string& value) {
-    assert(allowedOptions.count(optionName));
-    allowedValues[optionName].push_back(value);
+  // Adds an accepted value or regular expression for an option.
+  void registerAllowedValue(const std::string& optionName, const std::string& value) {
+    assert(knownOptions.count(optionName));
+    allowedValuesByOption[optionName].push_back(value);
   }
 
+  // Sets an explicit string value for an option.
   void setStr(const std::string& optionName, const std::string& value) {
-    options[optionName] = value;
+    if (!knownOptions.count(optionName)) {
+      unrecognizedOption(optionName);
+    }
+
+    setOption(optionName, value);
   }
 
+  // Returns an option value as a string.
   std::string getStr(const std::string& optionName) const {
     return getOption(optionName);
   }
 
+  // Returns an option value as an integer.
   int getInt(const std::string& optionName) const {
     return std::stoi(getOption(optionName));
   }
 
+  // Sets an explicit integer value for an option.
   void setInt(const std::string& optionName, int value) {
-    if (!options.count(optionName)) {
+    if (!knownOptions.count(optionName)) {
       unrecognizedOption(optionName);
     }
 
-    assert(options.count(optionName));
     setOption(optionName, std::to_string(value));
   }
 
+  // Returns an option value as a boolean.
   bool getBool(const std::string& optionName) const {
-    if (!hasOption(optionName)) {
-      // check default value
-      return defaultValues.at(optionName) == "true" || defaultValues.at(optionName) == "1" || defaultValues.at(optionName) == "yes";
-    }
-    // if specified, everything is true except "false" or "0"
-    return getOption(optionName) != "false" && getOption(optionName) != "0" && getOption(optionName) != "no";
-  }
-
-  void setBool(const std::string& optionName, bool value) {
-    if (!options.count(optionName)) {
+    if (!knownOptions.count(optionName)) {
       unrecognizedOption(optionName);
     }
 
-    assert(options.count(optionName));
+    if (values.count(optionName)) {
+      std::string value = values.find(optionName)->second;
+      toLower(value);
+      // Explicit values are true except these false spellings.
+      return value != "false" && value != "0" && value != "no";
+    }
+
+    if (!defaultValues.count(optionName)) {
+      unspecifiedOption(optionName);
+    }
+
+    std::string value = defaultValues.find(optionName)->second;
+    toLower(value);
+    return value == "true" || value == "1" || value == "yes";
+  }
+
+  // Sets an explicit boolean value for an option.
+  void setBool(const std::string& optionName, bool value) {
+    if (!knownOptions.count(optionName)) {
+      unrecognizedOption(optionName);
+    }
+
     setOption(optionName, value ? "true" : "false");
   }
 
-  bool hasOption(const std::string& optionName) const {
-    if (!allowedOptions.count(optionName)) {
+  // Returns whether a known option was explicitly provided or set.
+  bool isSpecified(const std::string& optionName) const {
+    if (!knownOptions.count(optionName)) {
       unrecognizedOption(optionName);
     }
 
-    return options.count(optionName) > 0;
+    return values.count(optionName) > 0;
   }
 
-  bool hasCustomOption(const std::string& optionName) const {
-    return options.count(optionName) > 0;
+  // Returns whether a custom option was explicitly provided or set.
+  bool hasCustomValue(const std::string& optionName) const {
+    return values.count(optionName) > 0;
   }
 
 private:
@@ -127,9 +164,9 @@ private:
       }
       name = name.substr(2);
     } else {
-      if (!allowedOptions.count(name)) {
-        if (equalIndex == std::string::npos && allowedOptions.count("")) {
-          options[""] = name;
+      if (!knownOptions.count(name)) {
+        if (equalIndex == std::string::npos && knownOptions.count("")) {
+          values[""] = name;
           return;
         }
 
@@ -138,14 +175,10 @@ private:
     }
 
     std::string value = (equalIndex == std::string::npos ? "" : s.substr(equalIndex + 1));
-    
-    if (!options.count(name) || (defaultValues.count(name) && options[name] == defaultValues[name])) {
-      options[name] = value;
-    }
 
-    if (!allowedValues[name].empty()) {
+    if (!allowedValuesByOption[name].empty()) {
       bool found = false;
-      for (std::string& allowedValue : allowedValues[name]) {
+      for (std::string& allowedValue : allowedValuesByOption[name]) {
         // check exact match
         if (allowedValue == value) {
           found = true;
@@ -158,26 +191,40 @@ private:
         }
       }
       if (!found) {
-        invalidOption(name);
+        invalidOption(name, value);
       }
+    }
+
+    if (!values.count(name)) {
+      values[name] = value;
     }
   }
 
   std::string getOption(const std::string& optionName) const {
-    if (!options.count(optionName)) {
-      if (allowedOptions.count(optionName)) {
-        unspecifiedOption(optionName);
-      }
-
+    if (!knownOptions.count(optionName)) {
       unrecognizedOption(optionName);
     }
 
-    assert(options.count(optionName));
-    return (*options.find(optionName)).second;
+    if (values.count(optionName)) {
+      return values.find(optionName)->second;
+    }
+
+    if (defaultValues.count(optionName)) {
+      return defaultValues.find(optionName)->second;
+    }
+
+    unspecifiedOption(optionName);
+    return "";
   }
 
   void setOption(const std::string& optionName, const std::string& value) {
-    options[optionName] = value;
+    values[optionName] = value;
+  }
+
+  void toLower(std::string& value) const {
+    for (char& c : value) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
   }
 
   void unspecifiedOption(const std::string& optionName) const {
@@ -190,8 +237,8 @@ private:
     throw 1;
   }
 
-  void invalidOption(const std::string& optionName) const {
-    std::cout << "value \"" << getOption(optionName) << "\" is invalid for option \"" << optionName << "\"\n";
+  void invalidOption(const std::string& optionName, const std::string& value) const {
+    std::cout << "value \"" << value << "\" is invalid for option \"" << optionName << "\"\n";
     throw 1;
   }
 
@@ -204,8 +251,8 @@ private:
 
     std::cout << "Allowed options:";
 
-    for (auto opt : allowedOptionsOrder) {
-      std::string name = allowedOptions.find(opt)->first;
+    for (auto opt : optionOrder) {
+      std::string name = knownOptions.find(opt)->first;
 
       if (name.length() == 0) {
         continue;
@@ -214,8 +261,8 @@ private:
       std::cout << "\n";
       std::cout << "  " << name;
 
-      if (allowedValues.count(name)) {
-        auto av = allowedValues.find(name)->second;
+      if (allowedValuesByOption.count(name)) {
+        auto av = allowedValuesByOption.find(name)->second;
 
         if (!av.empty()) {
           std::cout << "=";
@@ -233,7 +280,7 @@ private:
       }
 
       std::cout << "\n";
-      std::cout << "  " << allowedOptions.find(opt)->second;
+      std::cout << "  " << knownOptions.find(opt)->second;
       if (defaultValues.count(opt)) {
         std::cout << " (default: " << defaultValues.find(opt)->second << ")";
       }

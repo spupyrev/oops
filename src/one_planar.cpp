@@ -538,8 +538,13 @@ void encodeCross1Constraints(SATModel& model, const InputGraph& graph, const Par
 
   if (!graph.isDirected()) {
     encodeCoverConstraints(model, graph, params);
-    if (params.strict) {
-      encodeStrictConstraints(model, graph, params);
+    if (params.strict > 0) {
+      if (params.strict == 1) {
+        encodeStrictConstraints(model, graph, params);
+      } else {
+        CHECK(params.strict == 2);
+        encodeStrictConstraintsOption4b(model, graph, params);
+      }
     }
   }
 }
@@ -750,7 +755,7 @@ void encodeStrictConstraints(SATModel& model, const InputGraph& graph, const Par
 /// Symmetric strict crossing encoding.  This creates both endpoint-separation
 /// views for every candidate pair and defines one pair-local R from both views,
 /// preserving automorphisms that swap the two candidate crossing edges.
-void encodeStrictSymmetricConstraints(SATModel& model, const InputGraph& graph, const Params& params) {
+void encodeStrictConstraintsOption4b(SATModel& model, const InputGraph& graph, const Params& params) {
   const int n = graph.n;
   const auto& edges = graph.edges;
   const int m = (int)edges.size();
@@ -1586,7 +1591,7 @@ void fillResultStack(
     }
   }
 
-  if (params.strict) {
+  if (params.strict > 0) {
     struct IncidentEndpoint {
       int pos;
       int vertex;

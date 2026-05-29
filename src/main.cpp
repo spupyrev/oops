@@ -23,65 +23,68 @@ void prepareOptions(CMDOptions& options) {
   options.setUsageMessage("Usage: oops -i=[input_graph] [options]");
 
   // IO
-  options.addAllowedOption("-i", "File name with input graph(s); supported formats are dot/gml/graphml/s6/g6");
-  options.addAllowedOption("-o", "", "File name to output solution; supported formats are txt/dot/gml/svg");
-  options.addAllowedOption("-directed", "false", "Whether the input graph is directed");
+  options.registerOption("-i", "File name with input graph(s); supported formats are dot/gml/graphml/s6/g6");
+  options.registerOption("-o", "", "File name to output solution; supported formats are txt/dot/gml/svg");
+  options.registerOption("-directed", "false", "Whether the input graph is directed");
 
   // Filters
-  options.addAllowedOption("-part", "", "The part of the input to process in the form of part_idx/num_parts");
-  options.addAllowedOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
-  options.addAllowedOption("-min-n", "-1", "The minimum number of vertices in the processed graph");
-  options.addAllowedOption("-max-m", "-1", "The maximum number of edges in the processed graph");
-  options.addAllowedOption("-min-m", "-1", "The minimum number of edges in the processed graph");
-  options.addAllowedOption("-max-degree", "-1", "Max vertex degree in the processed graph");
-  options.addAllowedOption("-skip-planar", "false", "Whether to skip planar input instances");
+  options.registerOption("-part", "", "The part of the input to process in the form of part_idx/num_parts");
+  options.registerOption("-max-n", "-1", "The maximum number of vertices in the processed graph");
+  options.registerOption("-min-n", "-1", "The minimum number of vertices in the processed graph");
+  options.registerOption("-max-m", "-1", "The maximum number of edges in the processed graph");
+  options.registerOption("-min-m", "-1", "The minimum number of edges in the processed graph");
+  options.registerOption("-max-degree", "-1", "Max vertex degree in the processed graph");
+  options.registerOption("-skip-planar", "false", "Whether to skip planar input instances");
 
   // Debug
-  options.addAllowedOption("-verbose", "0", "Verbosity level");
-  options.addAllowedOption("-seed", "0", "Random seed");
-  options.addAllowedOption("-colors", "true", "Use colored output");
-  options.addAllowedOption("-skip-solve", "false", "Whether to skip a solver");
-  options.addAllowedOption("-stop-on", "", "Stop the execution when a graph of the specified type is encountered");
-  options.addAllowedValue("-stop-on", "planar");
-  options.addAllowedValue("-stop-on", "1-planar");
-  options.addAllowedValue("-stop-on", "non-1-planar");
-  options.addAllowedOption("-always-create-solution", "false", "Force creating a solution");
+  options.registerOption("-verbose", "0", "Verbosity level");
+  options.registerOption("-seed", "0", "Random seed");
+  options.registerOption("-colors", "true", "Use colored output");
+  options.registerOption("-skip-solve", "false", "Whether to skip a solver");
+  options.registerOption("-stop-on", "", "Stop the execution when a graph of the specified type is encountered");
+  options.registerAllowedValue("-stop-on", "planar");
+  options.registerAllowedValue("-stop-on", "1-planar");
+  options.registerAllowedValue("-stop-on", "non-1-planar");
+  options.registerOption("-always-create-solution", "false", "Force creating a solution");
 
   // Solver options
-  options.addAllowedOption("-solver", "stack", "Type of the solver to use");
-  options.addAllowedValue("-solver", "stack");
-  options.addAllowedValue("-solver", "move");
-  options.addAllowedValue("-solver", "brute-force");
-  options.addAllowedOption("-skewness", "1", "Maximum value of skewness");
-  options.addAllowedOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
-  options.addAllowedOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
-  options.addAllowedOption("-timeout", "0", "Maximum time (in seconds) to solve SAT");
-  options.addAllowedOption("-sparsify", "false", "Try to eliminate crossings in the resulting solution");
+  options.registerOption("-solver", "stack", "Type of the solver to use");
+  options.registerAllowedValue("-solver", "stack");
+  options.registerAllowedValue("-solver", "move");
+  options.registerAllowedValue("-solver", "brute-force");
+  options.registerOption("-skewness", "1", "Maximum value of skewness");
+  options.registerOption("-satsuma", "false", "Whether to apply Satsuma symmetry detection");
+  options.registerOption("-breakID", "false", "Whether to apply BreakID symmetry detection");
+  options.registerOption("-timeout", "0", "Maximum time (in seconds) to solve SAT");
+  options.registerOption("-sparsify", "false", "Try to eliminate crossings in the resulting solution");
 
   // Constraints
-  options.addAllowedOption("-ic", "false", "Enforce IC constraints");
-  options.addAllowedOption("-nic", "false", "Enforce NIC constraints");
-  options.addAllowedOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
-  options.addAllowedOption("-unsat", "0", "Add auxiliary constraints to speedup finding non-1-planar instances");
-  options.addAllowedOption("-strict", "false", "Enforce strict 1-planarity (no unnecessary crossings)");
-  options.addAllowedOption("-swap-constraints", "", "Add swap constraints: num_pairs/num_reorder");
-  options.addAllowedOption("-partial-constraints", "", "Add partial constraints: num_pairs");
-  options.addAllowedOption("-sep-cycles", "", "Add constraints based on separating cycles: num_pairs");
-  options.addAllowedOption("-up-sepcycles", "false", "Use sep-cycle user propagation");
-  options.addAllowedOption("-cross-priority", "false", "Bias CDCL to cross1/cross2 first; cross1=true preferred; phase_saving=0");
+  options.registerOption("-ic", "false", "Enforce IC constraints");
+  options.registerOption("-nic", "false", "Enforce NIC constraints");
+  options.registerOption("-sat", "true", "Add auxiliary constraints to speedup finding 1-planar instances");
+  options.registerOption("-unsat", "0", "Add auxiliary constraints to speedup finding non-1-planar instances");
+  options.registerOption("-strict", "0", "Strict encoding to use: 0=off, 1=asymmetric, 2=symmetric");
+  options.registerAllowedValue("-strict", "0");
+  options.registerAllowedValue("-strict", "1");
+  options.registerAllowedValue("-strict", "2");
+  options.registerOption("-swap-constraints", "", "Add swap constraints: num_pairs/num_reorder");
+  options.registerOption("-partial-constraints", "", "Add partial constraints: num_pairs");
+  options.registerOption("-sep-cycles", "", "Add constraints based on separating cycles: num_pairs");
+  options.registerOption("-up-sepcycles", "false", "Use sep-cycle user propagation");
+  options.registerOption("-cross-priority", "false", "Bias CDCL to cross1/cross2 first; cross1=true preferred; phase_saving=0");
 
   // External SAT solver
-  options.addAllowedOption("-dimacs", "", "Output dimacs file");
-  options.addAllowedOption("-dimacs-result", "", "Input dimacs file with a solution");
+  options.registerOption("-dimacs", "", "Output dimacs file");
+  options.registerOption("-dimacs-result", "", "Input dimacs file with a solution");
 
   // Graph generation
-  options.addAllowedOption("-graphs", "1", "How many graphs to generate");
-  options.addAllowedOption("-n", "20", "The number of vertices in the generated graph");
+  options.registerOption("-graphs", "1", "How many graphs to generate");
+  options.registerOption("-n", "20", "The number of vertices in the generated graph");
 
   // Experimental
-  options.addAllowedOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
-  options.addAllowedOption("-skip-reducible", "false", "[Experimental] Skip reducible subgraphs");
-  options.addAllowedOption("-custom", "", "Custom options");
+  options.registerOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
+  options.registerOption("-skip-reducible", "false", "[Experimental] Skip reducible subgraphs");
+  options.registerOption("-custom", "", "Custom options");
 }
 
 /// Check if 1-planarity test can be skipped because of graphs size or density
@@ -90,13 +93,13 @@ bool skipTestingBySize(const InputGraph& graph, const int verbose, ResultCodeTy&
   const int m = (int)graph.edges.size();
   // check planarity
   if (n < 5 || m < 9) {
-    LOG_IF(verbose, "the graph is planar due to size");
+    LOG_IF(verbose, "  the graph is planar due to size");
     resultCode = ResultCodeTy::SAT;
     return true;
   }
   // check 1-planarity
   if (n < 7 || m < 18) {
-    LOG_IF(verbose, "the graph is 1-planar due to size");
+    LOG_IF(verbose, "  the graph is 1-planar due to size");
     resultCode = ResultCodeTy::SAT;
     return true;
   }
@@ -416,21 +419,21 @@ void genDirections(CMDOptions& options, const int n, std::vector<EdgeTy>& edges,
 
 /// Create parameters for SAT solving
 void initSATParams(CMDOptions& options, Params& params) {
-  params.verbose = options.getInt("-verbose");;
-  params.timeout = options.getInt("-timeout");;
-  // params.directed = options.getBool("-directed");
-  params.applyBreakID = options.getBool("-breakID");
-  params.applySatsuma = options.getBool("-satsuma");
+  params.verbose = options.getInt("-verbose");
+  params.timeout = options.getInt("-timeout");
   params.modelFile = options.getStr("-dimacs");
   params.resultFile = options.getStr("-dimacs-result");
 
+  // params.directed = options.getBool("-directed");
+  params.applyBreakID = options.getBool("-breakID");
+  params.applySatsuma = options.getBool("-satsuma");
   params.forbidCrossings = options.getBool("-forbid-crossings");
   params.swapConstraints = options.getStr("-swap-constraints");
   params.partialConstraints = options.getStr("-partial-constraints");
   params.sepCycleConstraints = options.getStr("-sep-cycles");
   params.custom = options.getStr("-custom");
-  params.ignoreTransitiveRels = options.hasCustomOption("no-transitive");
-  params.strict = options.getBool("-strict");
+  params.ignoreTransitiveRels = options.hasCustomValue("no-transitive");
+  params.strict = options.getInt("-strict");
   params.useSepCycleUP = options.getBool("-up-sepcycles");
   if (options.getBool("-cross-priority") || params.useSepCycleUP) {
     params.crossPriority = true;
@@ -442,14 +445,18 @@ void initSATParams(CMDOptions& options, Params& params) {
   if (unsatLevel > 0) {
     params.useUNSATConstraints = true;
     params.useSATConstraints = true;
-    params.applySatsuma = true;
-    if (params.swapConstraints == "")
+    if (!options.isSpecified("-satsuma"))
+      params.applySatsuma = true;
+    if (!options.isSpecified("-swap-constraints"))
       params.swapConstraints = "2/2";
-    if (params.partialConstraints == "")
+    if (!options.isSpecified("-partial-constraints"))
       params.partialConstraints = "3";
-    if (params.sepCycleConstraints == "")
+    if (!options.isSpecified("-sep-cycles"))
       params.sepCycleConstraints = "2";
-    params.strict = true;
+    if (!options.isSpecified("-strict"))
+      params.strict = 1;
+    if (!options.isSpecified("-up-sepcycles") && params.strict > 0)
+      params.useSepCycleUP = true;
   }
   if (options.getBool("-ic")) {
     params.useIC = true;
@@ -483,15 +490,15 @@ void initSATParams(CMDOptions& options, Params& params) {
   }
 
   //CHECK(!params.directed || params.useMovePlanarity, "directed edges should be used with move-planarity");
-  CHECK(!params.useIC || !params.useNIC, "cannot simultanosly use IC and NIC modes");
+  CHECK(!params.useIC || !params.useNIC, "cannot simultaneously use IC and NIC modes");
   CHECK(!params.useUNSATConstraints || params.useSATConstraints, "`-unsat` constraints should be used with `-sat`");
-  CHECK(!params.useIC || params.useSATConstraints, "`-useIC` constraints should be used with `-sat`");
-  CHECK(!params.useNIC || params.useSATConstraints, "`-useNIC` constraints should be used with `-sat`");
+  CHECK(!params.useIC || params.useSATConstraints, "`-ic` constraints should be used with `-sat`");
+  CHECK(!params.useNIC || params.useSATConstraints, "`-nic` constraints should be used with `-sat`");
   CHECK(!params.crossPriority || params.useUNSATConstraints,
         "`-cross-priority` should be used with `-unsat=1` or higher");
   CHECK(!params.useSepCycleUP || params.sepCycleConstraints != "",
         "`-up-sepcycles` should be used with `-sep-cycles=2` or higher");
-  CHECK(!params.useSepCycleUP || params.strict, "`-up-sepcycles` should be used with `-strict`");
+  CHECK(!params.useSepCycleUP || params.strict > 0, "`-up-sepcycles` should be used with `-strict=1` or `-strict=2`");
 }
 
 /// Gen a random 1-planar graph and verify the 1-planar SAT model

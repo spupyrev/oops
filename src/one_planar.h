@@ -215,7 +215,7 @@ struct Params {
   bool useIC = false;
   bool useNIC = false;
 
-  bool strict = false;
+  int strict = 0;
   bool forbidCrossings = false;
   std::string swapConstraints = "";
   std::string partialConstraints = "";
@@ -244,8 +244,7 @@ struct Params {
     ss << "; unsat=" << int(useUNSATConstraints);
     ss << "; IC=" << int(useIC);
     ss << "; NIC=" << int(useNIC);
-    if (strict)
-      ss << "; strict=1";
+    ss << "; strict=" << strict;
     ss << "]";
 
     return ss.str();
@@ -866,7 +865,7 @@ void encodeSwapConstraints(SATModel& model, const InputGraph& graph, const Param
 void encodeK4Constraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeCoverConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeStrictConstraints(SATModel& model, const InputGraph& graph, const Params& params);
-void encodeStrictSymmetricConstraints(SATModel& model, const InputGraph& graph, const Params& params);
+void encodeStrictConstraintsOption4b(SATModel& model, const InputGraph& graph, const Params& params);
 void encodePartialConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 void encodeSepCyclesConstraints(SATModel& model, const InputGraph& graph, const Params& params);
 std::unique_ptr<Simp21::UserPropagator> createSepCyclesDynamic(
