@@ -455,7 +455,7 @@ void initSATParams(CMDOptions& options, Params& params) {
       params.sepCycleConstraints = "2";
     if (!options.isSpecified("-strict"))
       params.strict = 1;
-    if (!options.isSpecified("-up-sepcycles") && params.strict > 0)
+    if (!options.isSpecified("-up-sepcycles"))
       params.useSepCycleUP = true;
   }
   if (options.getBool("-ic")) {
