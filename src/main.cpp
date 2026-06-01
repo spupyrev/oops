@@ -435,14 +435,12 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.ignoreTransitiveRels = options.hasCustomValue("no-transitive");
   params.strict = options.getInt("-strict");
   params.useSepCycleUP = options.getBool("-up-sepcycles");
-  if (options.getBool("-cross-priority") || params.useSepCycleUP) {
-    params.crossPriority = true;
-  }
-
+  params.crossPriority = options.getBool("-cross-priority");
   params.useSATConstraints = options.getBool("-sat");
-  const int unsatLevel = options.getInt("-unsat");
-  params.unsatLevel = unsatLevel;
-  if (unsatLevel > 0) {
+  params.unsatLevel = options.getInt("-unsat");
+
+  // unsat > 0 is a shortcut for these constraints
+  if (params.unsatLevel > 0) {
     params.useUNSATConstraints = true;
     params.useSATConstraints = true;
     if (!options.isSpecified("-satsuma"))
@@ -457,6 +455,8 @@ void initSATParams(CMDOptions& options, Params& params) {
       params.strict = 1;
     if (!options.isSpecified("-up-sepcycles"))
       params.useSepCycleUP = true;
+    if (!options.isSpecified("-cross-priority"))
+      params.crossPriority = true;
   }
   if (options.getBool("-ic")) {
     params.useIC = true;

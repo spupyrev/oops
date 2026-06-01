@@ -1693,14 +1693,11 @@ Result runSolver(const Params& params, const InputGraph& graph) {
     solver.setUserPropagator(createSepCyclesDynamic(model, graph, params));
   }
 
-  // Cross-priority: bump activity on cross1/cross2 vars (CDCL branches on
-  // them first), set cross1 polarity to TRUE-first (try `edge crosses`),
-  // and disable phase saving so the polarity bias persists across restarts.
+  // Cross-priority: bump activity on cross1 vars (CDCL branches on them first), 
+  // and set cross1 polarity to TRUE-first (try `edge crosses`).
   if (params.crossPriority) {
-    solver.phase_saving = 0;
     const double crossBoost = 1e6;
     int bumpedCross1 = 0;
-    int bumpedCross2 = 0;
     const int n = graph.n;
     const int numVertices = n + (int)graph.edges.size();
     for (int divE = n; divE < numVertices; divE++) {
@@ -1711,17 +1708,7 @@ Result runSolver(const Params& params, const InputGraph& graph) {
       solver.setPolarity(v, false);
       bumpedCross1++;
     }
-    for (int i = n; i < numVertices; i++) {
-      for (int j = i + 1; j < numVertices; j++) {
-        if (!canBeMerged(i, j, graph))
-          continue;
-        const Simp21::Lit lit = model.getSolverLit(model.getCross2Var(i, j, true));
-        solver.publicBumpActivity(Simp21::var(lit), crossBoost);
-        bumpedCross2++;
-      }
-    }
-    LOG_IF(verbose, "cross-priority: bumped %d cross1 + %d cross2 vars; phase_saving=0",
-           bumpedCross1, bumpedCross2);
+    LOG_IF(verbose, "cross-priority: bumped %d cross1 vars", bumpedCross1);
   }
   const auto endTimeEncoding = chrono::steady_clock::now();
   LOG_IF(verbose >= 1, "SAT encoding took %s", ms_to_str(startTimeEncoding, endTimeEncoding).c_str());
