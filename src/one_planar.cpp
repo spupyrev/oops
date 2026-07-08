@@ -302,7 +302,7 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
     LOG("  %d (%.2lf%%) almost twins", 
       numAlmostTwinsSkipped, 100.0 * numAlmostTwinsSkipped / double(possiblePairs)
     );
-    LOG("  %d (%.2lf%%) due to separating cycles", 
+    LOG("  %d (%.2lf%%) due to separating cycles",
       numSepCyclesSkipped, 100.0 * numSepCyclesSkipped / double(possiblePairs)
     );
   }
@@ -1681,16 +1681,22 @@ Result runSolver(const Params& params, const InputGraph& graph) {
     model.applySatsuma(verbose, solver);
   }
 
+  // Attach the user propagator BEFORE adding clauses to the solver. addClause_
+  // enqueues unit clauses at level 0 and runs propagate() immediately; if the
+  // UP is attached after this, those onAssignment events are lost. E.g., when
+  // pruning leaves edge e with no crossable partner, cross1(e) ⇒ ⋁cross2(e,*)
+  // collapses into a unit ¬cross1(e), and the UP would otherwise never see the
+  // resulting cross1=false event and would not mark the edge uncrossable.
+  if (params.useSepCycleUP && params.modelFile == "" && params.resultFile == "") {
+    solver.setUserPropagator(createSepCyclesDynamic(model, graph, params));
+  }
+
   // Init a model
   model.initClauses(solver);
 
   if (params.applyBreakID) {
     LOG_IF(verbose, "applying BreakID for %'d variables and %'d constraints", model.varCount(), model.clauseCount());
     model.applyBreakID(verbose, solver);
-  }
-
-  if (params.useSepCycleUP && params.modelFile == "" && params.resultFile == "") {
-    solver.setUserPropagator(createSepCyclesDynamic(model, graph, params));
   }
 
   // Cross-priority: bump activity on cross1 vars (CDCL branches on them first), 

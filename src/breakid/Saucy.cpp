@@ -1414,7 +1414,8 @@ struct saucy *saucy_alloc(int n, unsigned int tlim) {
   s->count = ints(n + 1);
   s->ccount = zeros(n);
   s->clist = ints(n);
-  s->nextnon = ints(n + 1) + 1;
+  int* nextnon_base = ints(n + 1);
+  s->nextnon = nextnon_base + 1; /* nextnon[-1] is valid */
   s->prevnon = ints(n + 1);
   s->anctar = ints(n);
   s->start = ints(n);
@@ -1446,7 +1447,7 @@ struct saucy *saucy_alloc(int n, unsigned int tlim) {
   s->undiffnons = ints(n);
 
   if (s->ninduce && s->sinduce && s->left.cfront && s->left.clen && s->right.cfront && s->right.clen && s->stuff &&
-      s->bucket && s->count && s->ccount && s->clist && s->nextnon - 1 && s->prevnon && s->start && s->gamma &&
+      s->bucket && s->count && s->ccount && s->clist && nextnon_base && s->prevnon && s->start && s->gamma &&
       s->theta && s->left.unlab && s->right.lab && s->right.unlab && s->left.lab && s->splitwho && s->junk &&
       s->splitfrom && s->splitlev && s->thsize && s->unsupp && s->conncnts && s->anctar && s->diffmark && s->diffs &&
       s->indmark && s->thnext && s->thprev && s->threp && s->thfront && s->pairs && s->unpairs && s->diffnons &&
