@@ -1,0 +1,207 @@
+\documentclass[a4paper,USenglish,cleveref,nameinlink,autoref]{lipics-v2021}
+
+\usepackage{microtype}
+\usepackage{multirow}
+\usepackage{complexity}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[nocompress,noadjust]{cite}
+\usepackage[utf8]{inputenc}
+
+\theoremstyle{plain}
+\newtheorem{problem}{Problem}
+
+\title{Smallest Cubic Non-1-Planar Graph}
+
+\author{Sergey Pupyrev}{Menlo Park, CA, USA}{spupyrev@gmail.com}{https://orcid.org/0000-0003-4089-673X}{}
+
+\authorrunning{S. Pupyrev}
+
+\Copyright{Sergey Pupyrev}
+
+\ccsdesc[500]{Theory of computation~Design and analysis of algorithms}
+\ccsdesc[500]{Mathematics of computing~Graph theory}
+\keywords{beyond planarity, 1-planar graph, SAT}
+%
+%\supplementdetails[subcategory={Source Code}]{Software}{https://github.com/spupyrev/oops}
+
+\acknowledgements{}
+
+\hideLIPIcs
+\nolinenumbers
+
+\graphicspath{{pics/}}
+
+\definecolor{defblue}{rgb}{0.121,0.47,0.705}
+\definecolor{defred}{rgb}{0.7,0.37,0.37}
+\definecolor{defgreen}{rgb}{0.01,0.65,0.20}
+
+\newcommand{\df}[1]{\textcolor{defblue}{\emph{#1}}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcommand{\yes}{{\it \textcolor{defgreen}{yes}}}
+\newcommand{\no}{{\it \textcolor{defred}{no}}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    A graph
+    is 1-planar if it can be drawn in the plane such that each edge is crossed at most
+    once---a natural generalization of planar graphs that has received increasing
+    attention in graph drawing and beyond-planar graph theory.
+
+    We search for the smallest non-1-planar graph.
+\end{abstract}
+
+\section{Introduction}
+
+Arguably among the most natural applications of a tool for recognizing 1-planar graphs is
+finding the smallest non-1-planar instance in a family of graphs.
+A particularly challenging variant of the problem is to
+find the smallest 3-regular (cubic) graph that is not 1-planar. While it is easy to show
+(see e.g., \cite{DKMW08}) that large random cubic graphs are not 1-planar, the
+smallest such instance is unknown.
+
+\newtheorem*{problem1b}{Problem 1}
+\begin{problem1b}[\cite{11011110_cubic,mathse_cubic,oops}]
+    What is the smallest cubic non-1-planar graph?
+\end{problem1b}
+
+In an attempt to answer the question, Eppstein~\cite{11011110_cubic} manually constructed 1-planar
+drawings of several graphs and suggested that either the \texttt{Coxeter} graph or the \texttt{Tutte-Coxeter} graph
+is not 1-planar. As pointed out in \cite{oops}, the former is indeed 1-planar.
+The latter is conjectured to be non-1-planar in \cite{oops}.
+
+\section{Lower Bound}
+
+% TODO: reduction rules for 3 faces?
+
+We verify the 1-planarity of several families of cubic graphs; refer
+to \cref{table:cubic}. In particular, (i) all cubic graphs with up to $n=24$ vertices and (ii) all cubic bipartite graphs with up to $n=28$ vertices are 1-planar.
+Note that there are around $150{\times}10^6$ instances across (i) and (ii),
+and the total computation took $\approx$$1.5$ machine-months, averaging less than a second per instance. Thus, verifying the 1-planarity of all cubic graphs with $n<30$ remains a challenging task that will likely require novel ideas.
+
+\begin{table}[!h]
+    \small
+    \centering
+    \caption{Testing 1-planarity of cubic graphs with \texttt{OOPS} (Parallel).}
+    \label{table:cubic}
+    \begin{tabular}{|r|r|r|r||C{50pt}|}
+        \toprule
+        graph class & total count & total runtime & runtime per instance & all $1$-planar? \\
+        \midrule
+        $n=22$                    & $7,\!319,\!447$ & 5h 20m & 85 ms & \yes \\
+        $n=24$                    & $117,\!940,\!535$ & 6d 9h 40m & $150$ ms & \yes \\
+        \cmidrule{1-1}
+        bipartite $n=26$             & $245,\!627$ & 25m & $200$ ms & \yes \\
+        %girth$\ge 6$ $n=26$          & $181,\!227$ & $181,\!227$ & 4130 sec & $700$ ms & \yes \\
+        girth$\ge 5$ $n=26$          & $31,\!478,\!584$ & 3d 6h 20m & $290$ ms & \yes \\
+        $n=26$                    & $2,\!094,\!480,\!864$ & & & ? \\
+        \cmidrule{1-1}
+        bipartite $n=28$          & $2,\!291,\!589$ & 6h 55m & $340$ ms & \yes \\
+        girth$\ge 6$ $n=28$          & $4,\!624,\!501$ & 2d 23h 20m & $1700$ ms & \yes \\
+        $n=28$                    & $40,\!497,\!138,\!011$ & & & ? \\
+        \cmidrule{1-1}
+        bipartite $n=30$          & $23,\!466,\!857$ & & & ? \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The next table lists biconnected sub-cubic graphs.
+
+\begin{table}[!h]
+    \small
+    \centering
+    \caption{Testing 1-planarity of biconnected sub-cubic non-planar graphs;
+    created by \\ \texttt{geng -C -d3 -D3 | planarg -v}}
+    \label{table:subcubic}
+    \begin{tabular}{|r|l|r|r|r||C{50pt}|}
+        \toprule
+        graph size & params & total count & total runtime & mean runtime & all $1$-planar? \\
+        \midrule
+        $n=18$ & \texttt{geng -c -d3 -D3}               & $41,\!301$ & & & \yes \\
+        $n=18$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $7,\!734$ & & & ? \\
+        \cmidrule{1-1}
+        $n=20$ & \texttt{geng -c -d3 -D3}               & $510,\!489$ & & & \yes \\
+        $n=20$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $97,\!141$ & & & ? \\
+        \cmidrule{1-1}
+        $n=22$ & \texttt{geng -c -d3 -D3}               & $7,\!319,\!447$ & & & \yes \\
+        $n=22$ & \texttt{geng -c -t -d3 -D3}            & $1,\!435,\!720$ & & & ? \\
+        $n=22$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $1,\!432,\!712$ & & & ? \\
+        \cmidrule{1-1}
+        $n=24$ & \texttt{geng -c -d3 -D3}               & $117,\!940,\!535$ & & & \yes \\
+        $n=24$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $23,\!751,\!969$ & & & ? \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Our goal is to find the \df{smallest sub-cubic non-1-planar} graphs. In the following, we
+study properties of such instances. That is, a non-1-planar graph in which (i) the maximum vertex degree is $3$ and (ii) removing any vertex or any edge from the graph makes it 1-planar (or planar).
+
+\begin{lemma}
+    The smallest sub-cubic non-1-planar graph is biconnected.
+\end{lemma}
+
+\begin{proof}
+    A 1-planar drawing of a graph can be composed from 1-planar drawings of its biconnected components. Hence, if all such components are 1-planar, then the
+    graph itself is 1-planar too.
+\end{proof}
+
+\begin{lemma}
+    The smallest sub-cubic non-1-planar graph is cubic.
+\end{lemma}
+
+\begin{proof}
+    Assume for a contradiction that the smallest sub-cubic graph contains a
+    vertex of degree $2$; that is, $v \in V$ is connected to $u$ and $w$. Consider two
+    cases:
+    \begin{itemize}
+        \item edge $(u, w) \notin E$: Then we can remove $v$ from the graph and
+        insert a new edge $(u, w)$. The resulting graph $H$ is smaller and hence, is 1-planar. Take the drawing of $H$, remove the curve for $(u, w)$ and instead
+        re-insert a path $(u, v, w)$; one of the two edges, $(u, v)$ or $(v, w)$,
+        inherits (at most one) crossing of removed $(u, w)$, another one is crossing-free.
+
+        \item edge $(u, w) \in E$ and there exists $x \in V$ such that
+        $(u, x) \in E$ and $(w, x) \in E$: Then $x$ is a cut vertex (unless the graph is $K_4$), since it
+        disconnects $u, w, v$ from the result of the graph. By previous lemma, we
+        have a desired claim.
+
+        \item edge $(u, w) \in E$ and $u$ and $w$ have no common neighbors:
+        Then we can merge three vertices $u, v, w$ into a common one without creating
+        parallel edges. Then draw the result and re-insert the three vertices back.
+    \end{itemize}
+\end{proof}
+
+
+\begin{lemma}
+    The smallest cubic non-1-planar graph is triangle-free.
+\end{lemma}
+
+\begin{proof}
+    For a contradiction, assume $G$ has a triangle $u, v, w$.
+    Since \(G\) is cubic, each vertex in \(T\) has exactly one neighbor outside \(T\): let these be \(u^{\prime },v^{\prime },w^{\prime }\). Consider cases:
+
+    \begin{itemize}
+        \item If \(u^{\prime },v^{\prime },w^{\prime }\) are pairwise distinct, we can perform a reduction: contract the entire triangle \(T\) into a single vertex \(z\) connected to \(u^{\prime },v^{\prime },w^{\prime }\). The resulting graph \(H\) is a smaller cubic graph and thus 1-planar. We can easily re-insert
+        contracted vertices and edges back to the drawing without creating new crossings.
+
+        \item If \(u^{\prime },v^{\prime },w^{\prime }\) are all the same, then the
+        graph is $K_4$.
+
+        \item If $u^{\prime },v^{\prime }$ are the same and $w^{\prime }$ is different, then ...
+    \end{itemize}
+
+\end{proof}
+
+\section{Upper Bound}
+
+
+
+
+
+
+\bibliographystyle{plainurl}
+\bibliography{cubic}
+
+\end{document}

@@ -25,9 +25,9 @@ NUM_THREADS = 6
 
 N=10
 
-CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub30-gir7.g6 -timeout=180 -solver=stack -part=%(thread_id)d/%(num_threads)d"
+# CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub30-gir7.g6 -timeout=180 -solver=stack -part=%(thread_id)d/%(num_threads)d"
 # CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/ge18c.g6 -part=%(thread_id)d/%(num_threads)d"
-# CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cub22-gir6.g6 -cross2 -part=%(thread_id)d/%(num_threads)d"
+CMD="./oops -verbose=0 -i=/home/spupyrev/research/one_planar/data/cubic/cub18.g6 -part=%(thread_id)d/%(num_threads)d"
 ################################################################################
 
 

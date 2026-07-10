@@ -221,8 +221,8 @@ bool hasReducibleSubgraph(const AdjListTy& adjList) {
   // if (hasReducibleCutPair(adjList))
   //   return true;
 
-  if (hasReducibleCutTriples(adjList))
-    return true;
+  // if (hasReducibleCutTriples(adjList))
+  //   return true;
 
   return false;
 }
