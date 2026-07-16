@@ -2,6 +2,7 @@
 #include "logging.h"
 #include "graph_algorithms.h"
 
+#include <cstdlib>
 #include <functional>
 
 using namespace std;
@@ -105,6 +106,34 @@ bool canSwapToReduceCrossings(int x, int y, int a, int b, const InputGraph& grap
   }
 
   return false;
+}
+
+// Parse a -fix-cross1 argument: a ';'-separated list of unit literals, each
+// "u:v+" (edge {u,v} is crossed) or "u:v-" (uncrossed). Edges are named by
+// their vertex-label endpoints so the caller never depends on oops's internal
+// edge ordering. Returns pairs (edgeIndex, isPositive).
+inline std::vector<std::pair<int, bool>> parseFixCross1(
+    const std::string& arg, const InputGraph& graph) {
+  std::vector<std::pair<int, bool>> lits;
+  for (const auto& tok : SplitNotNull(arg, ";")) {
+    CHECK(tok.size() >= 4, "bad -fix-cross1 literal: '%s'", tok.c_str());
+    const char sign = tok.back();
+    CHECK(sign == '+' || sign == '-', "bad sign in -fix-cross1 literal '%s'", tok.c_str());
+    const auto uv = SplitNotNullInt(tok.substr(0, tok.size() - 1), ":");
+    CHECK(uv.size() == 2, "expected 'u:v+/-' in -fix-cross1 literal '%s'", tok.c_str());
+    const int u = uv[0], v = uv[1];
+    // Endpoints are in original (parent-graph) labels; translate to this graph's
+    // local indices. An edge lives in exactly one biconnected component, so a
+    // token for a different component maps out of range here -- skip it (it is
+    // fixed when that component is solved).
+    if (u >= (int)graph.origToLocal.size() || v >= (int)graph.origToLocal.size() ||
+        graph.origToLocal[u] == -1 || graph.origToLocal[v] == -1)
+      continue;
+    const int e = graph.findEdgeIndex(graph.origToLocal[u], graph.origToLocal[v]);
+    CHECK(e != -1, "no edge (%d, %d) in -fix-cross1 literal '%s'", u, v, tok.c_str());
+    lits.push_back({e, sign == '+'});
+  }
+  return lits;
 }
 
 // Pairs of edges that could be crossed; equivalently, pairs of division vertices that can be merged
@@ -306,6 +335,30 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
       numSepCyclesSkipped, 100.0 * numSepCyclesSkipped / double(possiblePairs)
     );
   }
+
+  // Cube-and-conquer: apply -fix-cross1 negative units into the crossablePairs
+  // matrix BEFORE any encoding. cross1(e)=false means edge e is uncrossed,
+  // hence every cross2 pair touching e must be false.
+  if (!params.fixCross1.empty()) {
+    int negRemoved = 0, negUnits = 0;
+    for (const auto& [e, positive] : parseFixCross1(params.fixCross1, graph)) {
+      if (positive) continue;
+      negUnits++;
+      const int d = e + n;
+      for (int dC = n; dC < numVertices; dC++) {
+        if (dC == d) continue;
+        if (crossablePairs[d][dC]) {
+          crossablePairs[d][dC] = false;
+          crossablePairs[dC][d] = false;
+          negRemoved++;
+        }
+      }
+    }
+    if (params.verbose > 0) {
+      LOG("fix-cross1 prune: %d cross2 entries removed from crossablePairs (from %d cross1=false units)",
+          negRemoved, negUnits);
+    }
+  }
 }
 
 /// Return true iff the two (division) vertices can be merged
@@ -488,10 +541,20 @@ void encodeCross1Constraints(SATModel& model, const InputGraph& graph, const Par
     model.addClause(clause);
   }
 
-  // Lexicographic crossings on degree-2
+  // Lexicographic crossings on degree-2.
+  // For a degree-2 vertex v with neighbors x<y this forces
+  // cross1(v,x) => cross1(v,y). It is a canonicalization ("WLOG, order the
+  // crossing status of v's two interchangeable edges by neighbor label"),
+  // sound only for a plain 1-planarity query where one representative per
+  // local-swap class suffices. Under -fix-cross1 the external assignment may
+  // demand the discarded representative (e.g. cross1(v,x)=true, cross1(v,y)=
+  // false), which a real drawing realizes but this clause forbids -> false
+  // UNSAT. So skip it whenever any cross1 fixing is present. (See the
+  // symmetry-invariance risk in docs/case_split_method.md 5(iii).)
   const auto& adj = graph.adj;
   int numDegree2Lex = 0;
-  for (int v = 0; v < n; v++) {
+  const bool noDeg2Lex = !params.fixCross1.empty();
+  for (int v = 0; !noDeg2Lex && v < n; v++) {
     if (adj[v].size() != 2)
       continue;
     int x = adj[v][0];
@@ -1286,9 +1349,17 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const Params&
   // LOG_IF(verbose > 0 && numCustom > 0, "added %d custom cross-2 constraints", numCustom);
   /////////////////////////////////////////////////////////////////////////////////
 
-  // vertex twins
+  // Vertex twins: for "true twin" vertices i,j (identical closed
+  // neighborhoods) force rel(i,j)=true. This is WLOG only when the rest of the
+  // formula is invariant under the i<->j swap. A -fix-cross1 assignment is
+  // injected without knowledge of this tie-break and can break that invariance
+  // (fixing an edge incident to exactly one of i,j), which then eliminates the
+  // one stack order a feasible drawing needs -> false UNSAT. So skip the twin
+  // tie-break entirely whenever any cross1 fixing is present. (See the
+  // symmetry-invariance risk in docs/case_split_method.md 5(iii).)
+  const bool skipTwins = !params.fixCross1.empty();
   const auto& adj = graph.adj;
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; !skipTwins && i < n; i++) {
     for (int j = i + 1; j < n; j++) {
       std::vector<int> adjI = adj[i];
       adjI.push_back(i);
@@ -1716,6 +1787,22 @@ Result runSolver(const Params& params, const InputGraph& graph) {
     }
     LOG_IF(verbose, "cross-priority: bumped %d cross1 vars", bumpedCross1);
   }
+
+  // -fix-cross1: ';'-separated unit literals "u:v+/-", each fixing cross1 of
+  // edge {u,v}. Added straight to the SAT side.
+  if (!params.fixCross1.empty()) {
+    const int n = graph.n;
+    int numAdded = 0;
+    for (const auto& [e, positive] : parseFixCross1(params.fixCross1, graph)) {
+      const MVar var = model.getCross1Var(e + n, positive);
+      Simp21::vec<Simp21::Lit> unit;
+      unit.push(model.getSolverLit(var));
+      solver.addClause_(unit);
+      numAdded++;
+    }
+    LOG_IF(verbose, "fix-cross1: added %d clauses", numAdded);
+  }
+
   const auto endTimeEncoding = chrono::steady_clock::now();
   LOG_IF(verbose >= 1, "SAT encoding took %s", ms_to_str(startTimeEncoding, endTimeEncoding).c_str());
 

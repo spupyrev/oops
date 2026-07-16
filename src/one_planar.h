@@ -43,12 +43,19 @@ struct InputGraph {
   std::vector<std::vector<int>> adj;
   // edge directions: empty for undirected, (true => first->second, false => second->first)
   std::vector<bool> directions;
+  // Maps an original (parent-graph) vertex index to this graph's local index, or
+  // -1 if the vertex is absent here. Identity for a top-level graph; a proper
+  // remap when this graph is a re-indexed biconnected component. Lets external
+  // (parent-label) inputs such as -fix-cross1 resolve to the right local edge.
+  std::vector<int> origToLocal;
 
   InputGraph() {}
 
   /// Create a graph for a given number of vertices and given edges
-  InputGraph(int n, const std::vector<EdgeTy>& edges, const std::vector<bool>& directions) : 
+  InputGraph(int n, const std::vector<EdgeTy>& edges, const std::vector<bool>& directions) :
       n(n), edges(edges), directions(directions) {
+    origToLocal.resize(n);
+    for (int i = 0; i < n; i++) origToLocal[i] = i;
     init();
   }
 
@@ -77,6 +84,7 @@ struct InputGraph {
       CHECK(index[u] < index[v], "u = %d; v = %d", u, v);
       edges.push_back({index[u], index[v]});
     }
+    origToLocal = index;
 
     init();
   }
@@ -229,6 +237,10 @@ struct Params {
   // preferred. Disables phase saving so the polarity bias persists across
   // restarts. Strong on g.31.9-class instances; mixed on rome-style ones.
   bool crossPriority = false;
+
+  // Fixed cross1 units: ';'-separated 'u:v+/-' (edge {u,v} crossed/uncrossed).
+  // Negative units also prune crossablePairs pre-encoding.
+  std::string fixCross1 = "";
 
   std::string to_string() const {
     std::ostringstream ss;

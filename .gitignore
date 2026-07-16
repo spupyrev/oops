@@ -10,6 +10,9 @@ oops
 *.o
 *.d
 *.op
+__pycache__/
+*.pyc
 speedup_plan.md
 oops_parallel_design_v3.md
 AGENTS.md
+CLAUDE.md

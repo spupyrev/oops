@@ -72,6 +72,7 @@ void prepareOptions(CMDOptions& options) {
   options.registerOption("-sep-cycles", "", "Add constraints based on separating cycles: num_pairs");
   options.registerOption("-up-sepcycles", "false", "Use sep-cycle user propagation");
   options.registerOption("-cross-priority", "false", "Bias CDCL to cross1/cross2 first; cross1=true preferred; phase_saving=0");
+  options.registerOption("-fix-cross1", "", "Fix cross1 vars: ';'-separated unit literals 'u:v+/-' (edge {u,v} crossed/uncrossed)");
 
   // External SAT solver
   options.registerOption("-dimacs", "", "Output dimacs file");
@@ -187,7 +188,7 @@ ResultCodeTy isOnePlanar(
       for (auto& compEdges : biComponents) {
         // create a graph for the component
         InputGraph compGraph(compEdges);
-        CHECK(compGraph.n == 2 || compGraph.minDegree() >= 2, 
+        CHECK(compGraph.n == 2 || compGraph.minDegree() >= 2,
           "the bi-connected component contains low-degree vertices");
         // start test for the component
         ResultCodeTy res = isOnePlanar(options, params, compGraph, false, graphName);
@@ -436,6 +437,7 @@ void initSATParams(CMDOptions& options, Params& params) {
   params.strict = options.getInt("-strict");
   params.useSepCycleUP = options.getBool("-up-sepcycles");
   params.crossPriority = options.getBool("-cross-priority");
+  params.fixCross1 = options.getStr("-fix-cross1");
   params.useSATConstraints = options.getBool("-sat");
   params.unsatLevel = options.getInt("-unsat");
 
