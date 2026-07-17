@@ -297,6 +297,7 @@ struct MVar {
   int id;
   bool positive;
 
+  MVar(): id(0), positive(false) {}
   MVar(int id, bool positive): id(id), positive(positive) {}
 
   bool operator != (const MVar& other) const {
@@ -312,18 +313,78 @@ struct MVar {
   }
 };
 
+// Small-buffer vector of MVars. Clauses almost always have 2-3 literals, so an
+// inline buffer avoids a heap allocation per clause (the dominant allocation in
+// the encoder). Larger clauses spill to the heap. MVar is trivially copyable, so
+// growth is a plain memcpy-style copy. Only the API used by MClause is provided.
+class MVarVec {
+  static constexpr int kInline = 4;
+  MVar inln_[kInline];
+  MVar* data_ = inln_;
+  int size_ = 0;
+  int cap_ = kInline;
+
+  void grow(int need) {
+    int nc = cap_ * 2;
+    while (nc < need) nc *= 2;
+    MVar* nd = new MVar[nc];
+    for (int i = 0; i < size_; i++) nd[i] = data_[i];
+    if (data_ != inln_) delete[] data_;
+    data_ = nd;
+    cap_ = nc;
+  }
+  void assign(const MVar* src, int n) {
+    if (n > cap_) grow(n);
+    for (int i = 0; i < n; i++) data_[i] = src[i];
+    size_ = n;
+  }
+
+public:
+  MVarVec() = default;
+  MVarVec(std::initializer_list<MVar> l) { assign(l.begin(), (int)l.size()); }
+  MVarVec(const std::vector<MVar>& v) { assign(v.data(), (int)v.size()); }
+  MVarVec(const MVarVec& o) { assign(o.data_, o.size_); }
+  MVarVec& operator=(const MVarVec& o) { if (this != &o) assign(o.data_, o.size_); return *this; }
+  MVarVec(MVarVec&& o) noexcept { *this = std::move(o); }
+  MVarVec& operator=(MVarVec&& o) noexcept {
+    if (this == &o) return *this;
+    if (data_ != inln_) delete[] data_;
+    if (o.data_ == o.inln_) {           // other is inline: copy elements
+      for (int i = 0; i < o.size_; i++) inln_[i] = o.inln_[i];
+      data_ = inln_; cap_ = kInline;
+    } else {                            // steal heap buffer
+      data_ = o.data_; cap_ = o.cap_;
+      o.data_ = o.inln_; o.cap_ = kInline;
+    }
+    size_ = o.size_; o.size_ = 0;
+    return *this;
+  }
+  ~MVarVec() { if (data_ != inln_) delete[] data_; }
+
+  int size() const { return size_; }
+  MVar& operator[](int i) { return data_[i]; }
+  const MVar& operator[](int i) const { return data_[i]; }
+  MVar* begin() { return data_; }
+  MVar* end() { return data_ + size_; }
+  const MVar* begin() const { return data_; }
+  const MVar* end() const { return data_ + size_; }
+  void push_back(const MVar& v) { if (size_ == cap_) grow(size_ + 1); data_[size_++] = v; }
+};
+
 struct MClause {
-  std::vector<MVar> vars;
+  MVarVec vars;
 
   MClause() {
   }
 
   MClause(const MVar& v1) {
-    vars = {v1};
+    vars.push_back(v1);
   }
 
-  MClause(const std::vector<MVar>& mvars) {
-    vars = mvars;
+  MClause(std::initializer_list<MVar> mvars): vars(mvars) {
+  }
+
+  MClause(const std::vector<MVar>& mvars): vars(mvars) {
   }
 
   void addVar(const MVar& v1) {
@@ -335,8 +396,8 @@ struct MClause {
   }
 
   bool operator < (const MClause& other) const {
-    const size_t size_min = std::min(vars.size(), other.vars.size());
-    for (size_t i = 0; i < size_min; i++) {
+    const int size_min = std::min(vars.size(), other.vars.size());
+    for (int i = 0; i < size_min; i++) {
       if (vars[i] != other.vars[i]) {
         return vars[i] < other.vars[i];
       }
@@ -363,7 +424,7 @@ struct MClause {
   bool equals(const MClause& other) const noexcept {
     if (vars.size() != other.vars.size())
       return false;
-    for (size_t i = 0; i < vars.size(); ++i) {
+    for (int i = 0; i < vars.size(); ++i) {
       if (vars[i].id != other.vars[i].id || vars[i].positive != other.vars[i].positive)
         return false;
     }
@@ -419,8 +480,11 @@ class SATModel {
 
   // relative order node-variables [node_i][node_j]
   std::vector<std::vector<int>> relVars;
-  // cross (merged) variables [division_node_index][division_node_index]
-  std::unordered_map<std::pair<int, int>, int, pair_hash> cross2Vars;
+  // cross (merged) variables [division_node_index][division_node_index].
+  // Flat matrix (like relVars) for O(1) lookup: getCross2Var is called in the
+  // O(numVertices^3) merge/K4 loops, so hashing a pair key showed up in profiles.
+  // Stored canonically with row < col; -1 means "no variable".
+  std::vector<std::vector<int>> cross2Vars;
   // cross variables [division_node_index]
   std::unordered_map<int, int> cross1Vars;
   // move variables [node_index][segment_index]
@@ -450,12 +514,12 @@ class SATModel {
     return curId - 1;
   }
 
-  void addClause(const std::vector<MVar>& mvars) {
+  void addClause(std::initializer_list<MVar> mvars) {
     clauses.emplace_back(mvars);
   }
 
   void addClause(MClause c) {
-    clauses.push_back(c);
+    clauses.push_back(std::move(c));
   }
 
   void reserveClauses(size_t numClauses) {
@@ -500,19 +564,23 @@ class SATModel {
     moveVars[pair] = var;
   }
 
+  void reserveCross2Vars(size_t numVertices) {
+    cross2Vars = std::vector<std::vector<int>>(numVertices, std::vector<int>(numVertices, -1));
+  }
+
   int addCross2Var(int i, int j) {
     CHECK(i != j);
-    const auto pair = i < j ? std::make_pair(i, j) : std::make_pair(j, i);
-    CHECK(cross2Vars.count(pair) == 0);
-    cross2Vars[pair] = addVar();
-    return cross2Vars[pair];
+    if (i > j) std::swap(i, j);
+    CHECK(cross2Vars[i][j] == -1);
+    cross2Vars[i][j] = addVar();
+    return cross2Vars[i][j];
   }
 
   MVar getCross2Var(int i, int j, bool positive) const {
     CHECK(i != j);
-    const auto pair = i < j ? std::make_pair(i, j) : std::make_pair(j, i);
-    CHECK(cross2Vars.count(pair));
-    return MVar(cross2Vars.at(pair), positive);
+    if (i > j) std::swap(i, j);
+    CHECK(cross2Vars[i][j] != -1);
+    return MVar(cross2Vars[i][j], positive);
   }
 
   MVar getCross1Var(int edge, bool positive) const {

@@ -262,6 +262,14 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
       const auto [x, y] = edges[d2 - n];
 
       auto hasSepCycle = [&](int x, int y, int u, int v) -> bool {
+        // processCycle can only succeed when numFree < min(deg(u)-1, deg(v)-1),
+        // and numFree = cycle.size()-1 >= 2 for any cycle (length >= 3). So the
+        // search can never find a separating cycle unless min(deg(u),deg(v)) >= 4.
+        // Skip the (expensive) cycle enumeration otherwise -- notably this makes
+        // the whole filter a no-op on 3-regular graphs, with no change in result.
+        if (std::min(graph.degree(u), graph.degree(v)) < 4)
+          return false;
+
         bool found = false;
         /// Returns true if the cycle forbids crossing (u, v) and (x, y)
         auto processCycle = [&](const std::vector<int>& cycle) -> bool {
@@ -382,6 +390,7 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const Par
 
   // Create variables for every pair of vertices
   model.reserveRelVars(numVertices);
+  model.reserveCross2Vars(numVertices);
   for (int i = 0; i < numVertices; i++) {
     for (int j = 0; j < numVertices; j++) {
       if (i == j)

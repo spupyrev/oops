@@ -719,13 +719,12 @@ private:
   void addTightSeparatorClause(const std::vector<std::pair<int, int>>& takenCrossings, int u, int v) {
     CHECK(takenCrossings.size() == 1 || takenCrossings.size() == 2);
     const int divUV = graph.findDivIndex(u, v);
-    std::vector<MVar> clause;
-    clause.reserve(takenCrossings.size() + 1);
+    MClause clause;
     for (const auto& [e1, e2] : takenCrossings) {
-      clause.push_back(model.getCross2Var(e1 + n, e2 + n, false));
+      clause.addVar(model.getCross2Var(e1 + n, e2 + n, false));
     }
-    clause.push_back(model.getCross1Var(divUV, true));
-    model.addClause(clause);
+    clause.addVar(model.getCross1Var(divUV, true));
+    model.addClause(std::move(clause));
   }
 
 private:

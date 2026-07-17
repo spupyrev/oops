@@ -127,8 +127,6 @@ class Clause {
     unsigned removable : 1;
     unsigned done : 1;
     unsigned size : 32;
-    unsigned szWithoutSelectors : 32;
-    unsigned simplified : 1;
   } header;
   union {
     Lit lit;
@@ -149,7 +147,6 @@ class Clause {
     header.size = ps.size();
     header.lbd = 0;
     header.removable = 1;
-    header.simplified = 0;
     header.done = 0;
 
     for (int i = 0; i < ps.size(); i++) {
@@ -225,11 +222,7 @@ public:
 
   Lit subsumes(const Clause &other) const;
   void strengthen(Lit p);
-  void setSizeWithoutSelectors(unsigned int n) { header.szWithoutSelectors = n; }
-  unsigned int sizeWithoutSelectors() const { return header.szWithoutSelectors; }
 
-  void setSimplified(bool b) { header.simplified = b; }
-  bool simplified() { return header.simplified; }
   void done(bool b) { header.done = b; }
   bool done() { return header.done; }
 };
@@ -294,9 +287,7 @@ public:
       to[cr].touched() = c.touched();
       to[cr].activity() = c.activity();
       to[cr].set_lbd(c.lbd());
-      to[cr].setSizeWithoutSelectors(c.sizeWithoutSelectors());
       to[cr].removable(c.removable());
-      to[cr].setSimplified(c.simplified());
       to[cr].done(c.done());
     } else if (to[cr].has_extra()) {
       to[cr].calcAbstraction();

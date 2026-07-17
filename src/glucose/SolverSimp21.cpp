@@ -1291,6 +1291,13 @@ CRef Solver::propagate() {
   watches.cleanAll();
   watches_bin.cleanAll();
 
+  // Cache the assignment array base. `assigns` is only written (never resized)
+  // during propagation, so the pointer is stable for the whole call; caching it
+  // lets the compiler skip reloading this->assigns.data on every watch inspected
+  // (the hottest loop in the solver). `val` mirrors value(Lit).
+  const lbool *const assignsData = (const lbool *)assigns;
+  auto val = [assignsData](Lit q) { return assignsData[var(q)] ^ sign(q); };
+
   while (qhead < trail.size()) {
     const Lit p = trail[qhead++]; // 'p' is enqueued fact to propagate.
     const Lit false_lit = ~p;
@@ -1299,13 +1306,13 @@ CRef Solver::propagate() {
     num_props++;
 
     // Propagate binary clauses first
-    const vec<Watcher> &ws_bin = watches_bin[p]; 
+    const vec<Watcher> &ws_bin = watches_bin[p];
     for (int k = 0; k < ws_bin.size(); k++) {
       const Lit the_other = ws_bin[k].blocker;
 
-      if (value(the_other) == l_False) {
+      if (val(the_other) == l_False) {
         return ws_bin[k].cref;
-      } else if (value(the_other) == l_Undef) {
+      } else if (val(the_other) == l_Undef) {
         uncheckedEnqueue(the_other, currLevel, ws_bin[k].cref);
       }
     }
@@ -1315,7 +1322,7 @@ CRef Solver::propagate() {
       const Lit blocker = i->blocker;
 
       // Try to avoid inspecting the clause:
-      if (value(blocker) == l_True) {
+      if (val(blocker) == l_True) {
         *j++ = *i++;
         continue;
       }
@@ -1325,7 +1332,7 @@ CRef Solver::propagate() {
       Clause &c = ca[cr];
 
       if (c[0] == false_lit) {
-        c[0] = c[1]; 
+        c[0] = c[1];
         c[1] = false_lit;
       }
 
@@ -1334,7 +1341,7 @@ CRef Solver::propagate() {
       const Lit first = c[0];
       Watcher w(cr, first);
 
-      if (first != blocker && value(first) == l_True) {
+      if (first != blocker && val(first) == l_True) {
         *j++ = w;
         continue;
       }
@@ -1342,7 +1349,7 @@ CRef Solver::propagate() {
       // Look for new watch:
       const int c_size = c.size();
       for (int k = 2; k < c_size; k++) {
-        if (value(c[k]) != l_False) {
+        if (val(c[k]) != l_False) {
           c[1] = c[k];
           c[k] = false_lit;
           watches[~c[1]].push(w);
@@ -1353,7 +1360,7 @@ CRef Solver::propagate() {
       // Did not find watch -- clause is unit under assignment:
       *j++ = w;
 
-      if (value(first) == l_False) {
+      if (val(first) == l_False) {
         confl = cr;
         qhead = trail.size();
 
