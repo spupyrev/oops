@@ -397,9 +397,9 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const Par
   // Ensure associativity for mergable vertices
   model.reserveClauses(numVertices * numVertices * numVertices + numVertices * numVertices);
   for (int i = n; i < numVertices; i++) {
-    for (int j = n; j < numVertices; j++) {
-      if (i == j)
-        continue;
+    // j > i: the clause {!rel(i,j), !rel(j,i)} is symmetric in i,j, so iterating
+    // the full range would emit each one twice.
+    for (int j = i + 1; j < numVertices; j++) {
       if (canBeMerged(i, j, n, edges)) {
         // !(i < j) or !(j < i)
         model.addClause({
@@ -413,17 +413,22 @@ void encodeRelativeVariables(SATModel& model, const InputGraph& graph, const Par
   // Ensure transitivity
   // TODO: make an option for prob
   if (!params.ignoreTransitiveRels) {
+    // For each unordered triple the six ordered permutations collapse to just
+    // two distinct clauses (the two cyclic classes); emit those directly rather
+    // than generating all six and relying on later dedup.
     for (int i = 0; i < numVertices; i++) {
-      for (int j = 0; j < numVertices; j++) {
-        for (int k = 0; k < numVertices; k++) {
-          if (i == j || i == k || j == k)
-            continue;
-
+      for (int j = i + 1; j < numVertices; j++) {
+        for (int k = j + 1; k < numVertices; k++) {
           // i <= j && j <= k => i < k
           model.addClause(MClause({
               model.getRelVar(j, i, true), 
               model.getRelVar(k, j, true), 
               model.getRelVar(i, k, true)
+          }));
+          model.addClause(MClause({
+              model.getRelVar(k, i, true),
+              model.getRelVar(j, k, true),
+              model.getRelVar(i, j, true)
           }));
         }
       }

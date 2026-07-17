@@ -371,38 +371,37 @@ struct MClause {
   }
 };
 
-// Optimized dedup for MClause vectors: use hash-set for large vectors,
+// Remove duplicate clauses in a single hash pass, compacting survivors in place.
+// The set stores pointers into `vec`, so no clause vector is copied. Only binary
+// clauses are ever emitted more than once; larger clauses come from
+// already-deduplicated sources, so we neither sort nor hash them (their literal
+// order does not affect the CNF). Duplicates are purely a performance concern --
+// a repeated clause is still correct -- so any that slip through are harmless.
 inline void make_vec_unique_fast(std::vector<MClause>& vec) {
+  struct PtrHash {
+    size_t operator()(const MClause* c) const noexcept { return c->hash(); }
+  };
+  struct PtrEq {
+    bool operator()(const MClause* a, const MClause* b) const noexcept { return a->equals(*b); }
+  };
+
   const size_t n = vec.size();
-  if (n <= 64) {
-    sort_unique(vec);
-    return;
+  tsl::robin_set<const MClause*, PtrHash, PtrEq> seen;
+  seen.reserve(n);
+  size_t w = 0;
+  for (size_t r = 0; r < n; r++) {
+    if (w != r) vec[w] = std::move(vec[r]);
+    MClause& c = vec[w];
+    if (c.vars.size() != 2) {
+      w++;
+      continue;
+    }
+    if (c.vars[1] < c.vars[0])
+      std::swap(c.vars[0], c.vars[1]);
+    if (seen.insert(&c).second)
+      w++;
   }
-
-  struct MClauseHash {
-    size_t operator()(const MClause& c) const noexcept {
-      return c.hash();
-    }
-  };
-
-  struct MClauseEq {
-    bool operator()(const MClause& a, const MClause& b) const noexcept {
-      return a.equals(b);
-    }
-  };
-
-  tsl::robin_set<MClause, MClauseHash, MClauseEq> seen;
-  seen.reserve(n * 2);
-  std::vector<MClause> out;
-  out.reserve(n);
-  for (auto& c : vec) {
-    auto it = seen.find(c);
-    if (it == seen.end()) {
-      seen.insert(c);
-      out.push_back(std::move(c));
-    }
-  }
-  vec.swap(out);
+  vec.resize(w);
 }
 
 class SATModel {
@@ -580,10 +579,7 @@ class SATModel {
       vars[i] = var;
       CHECK(0 <= vars[i] && vars[i] < curId);
     }
-    // sort & compress clauses
-    for (auto& c : clauses) {
-      c.sort();
-    }
+    // compress clauses (removes duplicate binary clauses; see make_vec_unique_fast)
     make_vec_unique_fast(clauses);
   }
 
