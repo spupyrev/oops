@@ -7,11 +7,29 @@ last*
 /*.gml
 /*.png
 oops
+/oops_*
 *.o
 *.d
 *.op
+*.od
+*.or
+
+# Python bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+
+# main_cubic.tex build products
+/main_cubic.aux
+/main_cubic.bbl
+/main_cubic.blg
+/main_cubic.fdb_latexmk
+/main_cubic.fls
+/main_cubic.log
+/main_cubic.out
+/main_cubic.pdf
+/main_cubic.synctex.gz
+/main_cubic.toc
+/main_cubic.vtc
 speedup_plan.md
 oops_parallel_design_v3.md
 AGENTS.md

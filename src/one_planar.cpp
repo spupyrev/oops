@@ -230,7 +230,7 @@ void initCrossablePairs(const Params& params, const InputGraph& graph) {
 
   // Disable crossings for almost-twins
   int numAlmostTwinsSkipped = 0;
-  if (!graph.isDirected()) {
+  if (!graph.isDirected() && !params.hasCross1Restrictions()) {
     for (int u = n; u < numVertices; u++) {
       for (int v = u + 1; v < numVertices; v++) {
         if (!crossablePairs[u][v])
@@ -567,7 +567,7 @@ void encodeCross1Constraints(SATModel& model, const InputGraph& graph, const Par
   // symmetry-invariance risk in docs/case_split_method.md 5(iii).)
   const auto& adj = graph.adj;
   int numDegree2Lex = 0;
-  const bool noDeg2Lex = !params.fixCross1.empty();
+  const bool noDeg2Lex = params.hasCross1Restrictions();
   for (int v = 0; !noDeg2Lex && v < n; v++) {
     if (adj[v].size() != 2)
       continue;
@@ -1369,9 +1369,10 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const Params&
   // injected without knowledge of this tie-break and can break that invariance
   // (fixing an edge incident to exactly one of i,j), which then eliminates the
   // one stack order a feasible drawing needs -> false UNSAT. So skip the twin
-  // tie-break entirely whenever any cross1 fixing is present. (See the
+  // tie-break whenever cross1 is fixed or the caller otherwise forbids input
+  // relabeling. (See the
   // symmetry-invariance risk in docs/case_split_method.md 5(iii).)
-  const bool skipTwins = !params.fixCross1.empty();
+  const bool skipTwins = params.hasCross1Restrictions();
   const auto& adj = graph.adj;
   for (int i = 0; !skipTwins && i < n; i++) {
     for (int j = i + 1; j < n; j++) {
@@ -1395,6 +1396,26 @@ void encodeStackSymmetry(SATModel& model, const InputGraph& graph, const Params&
   LOG_IF(params.verbose && numExtraConstraints > 0, "added %d symmetry-breaking constraints", numExtraConstraints);
 }
 
+/// Add the cross1 variables and implications needed to require selected edges
+/// to remain uncrossed in incremental cubic-verification queries.
+void encodeCubicVerification(
+    SATModel& model, const InputGraph& graph) {
+  const int n = graph.n;
+  const int m = (int)graph.edges.size();
+  const int numVertices = n + m;
+  for (int edge = n; edge < numVertices; edge++) {
+    model.addCross1Var(edge);
+    for (int other = n; other < numVertices; other++) {
+      if (edge == other || !canBeMerged(edge, other, graph))
+        continue;
+      model.addClause({
+          model.getCross1Var(edge, true),
+          model.getRelVar(edge, other, true),
+          model.getRelVar(other, edge, true)});
+    }
+  }
+}
+
 /// Encode stack-planarity
 void encodeStackPlanar(
     SATModel& model, 
@@ -1414,6 +1435,12 @@ void encodeStackPlanar(
   if (params.useUNSATConstraints) {
     CHECK(params.useSATConstraints);
     encodeCross1Constraints(model, graph, params);
+  }
+  if (params.cubicVerification) {
+    CHECK(params.unsatLevel == 0 && !params.useSATConstraints &&
+              !params.useUNSATConstraints,
+          "cubic verification requires -sat=0 and -unsat=0");
+    encodeCubicVerification(model, graph);
   }
   if (params.useIC) {
     CHECK(params.useSATConstraints);
@@ -1737,21 +1764,10 @@ void fillResultStack(
   }
 }
 
-/// Run a SAT solver for a given graph
-Result runSolver(const Params& params, const InputGraph& graph) {
-  CHECK(params.solverType == SolverType::STACK || params.solverType == SolverType::MOVE);
+void initSATSolver(
+    const Params& params, const InputGraph& graph,
+    SATModel& model, Solver& solver) {
   const int verbose = params.verbose;
-  const auto startTimeEncoding = chrono::steady_clock::now();
-
-  // Init the model
-  SATModel model;
-  if (params.solverType == SolverType::MOVE)
-    encodeMovePlanar(model, graph, params);
-  else
-    encodeStackPlanar(model, graph, params);
-
-  // Create a solver
-  Solver solver;
   solver.verbosity = verbose;
   if (params.timeout > 0) {
     solver.timeout_ms = 1000 * params.timeout;
@@ -1816,10 +1832,11 @@ Result runSolver(const Params& params, const InputGraph& graph) {
     }
     LOG_IF(verbose, "fix-cross1: added %d clauses", numAdded);
   }
+}
 
-  const auto endTimeEncoding = chrono::steady_clock::now();
-  LOG_IF(verbose >= 1, "SAT encoding took %s", ms_to_str(startTimeEncoding, endTimeEncoding).c_str());
-
+lbool solveSATModel(
+    const Params& params, SATModel& model, Solver& solver) {
+  const int verbose = params.verbose;
   if (params.modelFile != "") {
     LOG_IF(verbose, "encoded %'d variables and %'d constraints", model.varCount(), model.clauseCount());
     if (verbose >= 1) {
@@ -1870,6 +1887,30 @@ Result runSolver(const Params& params, const InputGraph& graph) {
   CHECK(ret == l_True || ret == l_False || ret == l_Undef, "an error within SAT solver");
   LOG_IF(verbose, "SAT solving stats: starts = %'llu; conflicts = %'llu; decisions = %'llu; propagations = %'llu",
          solver.starts, solver.conflicts, solver.decisions, solver.propagations);
+  return ret;
+}
+
+/// Run a SAT solver for a given graph
+Result runSolver(const Params& params, const InputGraph& graph) {
+  CHECK(params.solverType == SolverType::STACK || params.solverType == SolverType::MOVE);
+  const int verbose = params.verbose;
+  const auto startTimeEncoding = chrono::steady_clock::now();
+
+  // Init the model
+  SATModel model;
+  if (params.solverType == SolverType::MOVE)
+    encodeMovePlanar(model, graph, params);
+  else
+    encodeStackPlanar(model, graph, params);
+
+  // Create a solver
+  Solver solver;
+  initSATSolver(params, graph, model, solver);
+
+  const auto endTimeEncoding = chrono::steady_clock::now();
+  LOG_IF(verbose >= 1, "SAT encoding took %s", ms_to_str(startTimeEncoding, endTimeEncoding).c_str());
+
+  const lbool ret = solveSATModel(params, model, solver);
 
   Result result;
   if (ret == l_True) {

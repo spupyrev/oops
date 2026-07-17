@@ -18,6 +18,8 @@
 
 using namespace std;
 
+void verifyCubic(CMDOptions& options);
+
 /// Prepare command-line arguments
 void prepareOptions(CMDOptions& options) {
   options.setUsageMessage("Usage: oops -i=[input_graph] [options]");
@@ -71,7 +73,7 @@ void prepareOptions(CMDOptions& options) {
   options.registerOption("-partial-constraints", "", "Add partial constraints: num_pairs");
   options.registerOption("-sep-cycles", "", "Add constraints based on separating cycles: num_pairs");
   options.registerOption("-up-sepcycles", "false", "Use sep-cycle user propagation");
-  options.registerOption("-cross-priority", "false", "Bias CDCL to cross1/cross2 first; cross1=true preferred; phase_saving=0");
+  options.registerOption("-cross-priority", "false", "Bias CDCL to cross1/cross2 first; cross1=true preferred");
   options.registerOption("-fix-cross1", "", "Fix cross1 vars: ';'-separated unit literals 'u:v+/-' (edge {u,v} crossed/uncrossed)");
 
   // External SAT solver
@@ -85,6 +87,7 @@ void prepareOptions(CMDOptions& options) {
   // Experimental
   options.registerOption("-forbid-crossings", "false", "[Experimental] Forbid all crossings");
   options.registerOption("-skip-reducible", "false", "[Experimental] Skip reducible subgraphs");
+  options.registerOption("-verify-cubic", "false", "Verify the cubic-28 proof obligations");
   options.registerOption("-custom", "", "Custom options");
 }
 
@@ -496,6 +499,8 @@ void initSATParams(CMDOptions& options, Params& params) {
   CHECK(!params.useUNSATConstraints || params.useSATConstraints, "`-unsat` constraints should be used with `-sat`");
   CHECK(!params.useIC || params.useSATConstraints, "`-ic` constraints should be used with `-sat`");
   CHECK(!params.useNIC || params.useSATConstraints, "`-nic` constraints should be used with `-sat`");
+  CHECK(params.fixCross1.empty() || params.useUNSATConstraints,
+        "`-fix-cross1` should be used with `-unsat=1` or higher");
   CHECK(!params.crossPriority || params.useUNSATConstraints,
         "`-cross-priority` should be used with `-unsat=1` or higher");
   CHECK(!params.useSepCycleUP || params.sepCycleConstraints != "",
@@ -639,7 +644,10 @@ int main(int argc, char* argv[]) {
     options->parse(argc, argv);
     initLogger(options->getBool("-colors"));
 
-    testOnePlanar(*options);
+    if (options->getBool("-verify-cubic"))
+      verifyCubic(*options);
+    else
+      testOnePlanar(*options);
   } catch (int code) {
     return code;
   }

@@ -234,13 +234,17 @@ struct Params {
   bool ignoreTransitiveRels = false;
   bool useSepCycleUP = false;
   // Bias CDCL toward branching on cross1/cross2 vars first, with cross1=true
-  // preferred. Disables phase saving so the polarity bias persists across
-  // restarts. Strong on g.31.9-class instances; mixed on rome-style ones.
+  // preferred. Strong on g.31.9-class instances; mixed on rome-style ones.
   bool crossPriority = false;
 
   // Fixed cross1 units: ';'-separated 'u:v+/-' (edge {u,v} crossed/uncrossed).
   // Negative units also prune crossablePairs pre-encoding.
   std::string fixCross1 = "";
+  bool cubicVerification = false;
+
+  bool hasCross1Restrictions() const {
+    return !fixCross1.empty() || cubicVerification;
+  }
 
   std::string to_string() const {
     std::ostringstream ss;
@@ -929,6 +933,16 @@ class SATModel {
 bool canBeMerged(int u, int v, const int n, const std::vector<EdgeTy>& edges);
 bool canBeMerged(int u, int v, const InputGraph& graph);
 void initCrossablePairs(const Params& params, const InputGraph& graph);
+void encodeStackPlanar(
+    SATModel& model, const InputGraph& graph, const Params& params);
+void initSATSolver(
+    const Params& params, const InputGraph& graph,
+    SATModel& model, Solver& solver);
+lbool solveSATModel(
+    const Params& params, SATModel& model, Solver& solver);
+void fillResultStack(
+    const SATModel& model, Solver& solver, const InputGraph& graph,
+    const Params& params, Result& result);
 Result runSolver(const Params& params, const InputGraph& graph);
 
 void minimizeCrossings(const InputGraph& graph, Result& result, int verbose);

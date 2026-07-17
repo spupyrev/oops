@@ -1688,7 +1688,7 @@ lbool Solver::search(int &nof_conflicts) {
         return l_False;
       }
 
-      if (data.bOnlyOneLitFromHighest && !user_conflict) {
+      if (assumptions.size() == 0 && data.bOnlyOneLitFromHighest && !user_conflict) {
         chrono_lim--;
         cancelUntil(data.nHighestLevel - 1);
         continue;
@@ -1699,7 +1699,8 @@ lbool Solver::search(int &nof_conflicts) {
       analyze(confl, learnt_clause, backtrack_level, lbd);
 
       // check chrono backtrack condition
-      if (chrono_lim > 0 && (confl_to_chrono < 0 || confl_to_chrono <= (int)conflicts) && chrono > -1 &&
+      if (assumptions.size() == 0 && chrono_lim > 0 &&
+          (confl_to_chrono < 0 || confl_to_chrono <= (int)conflicts) && chrono > -1 &&
           (decisionLevel() - backtrack_level) >= chrono) {
         chrono_lim--;
         ++chrono_backtrack;
@@ -1828,7 +1829,20 @@ lbool Solver::search(int &nof_conflicts) {
       }
 
       Lit next = lit_Undef;
-      {
+      while (decisionLevel() < assumptions.size()) {
+        const Lit assumption = assumptions[decisionLevel()];
+        if (value(assumption) == l_True) {
+          newDecisionLevel();
+        } else if (value(assumption) == l_False) {
+          analyzeFinal(~assumption, conflict);
+          return l_False;
+        } else {
+          next = assumption;
+          break;
+        }
+      }
+
+      if (next == lit_Undef) {
         // New variable decision:
         decisions++;
         next = pickBranchLit();
@@ -1907,6 +1921,12 @@ lbool Solver::solve_() {
   if (!ok) {
     return l_False;
   }
+
+  // A previous solve may finish while CHB or DISTANCE branching is active.
+  // cancelUntil(0) then reinserts variables only into that active heap, while
+  // solve_ starts again in VSIDS mode.  Rebuild every heap so repeated solves
+  // cannot mistake an empty stale heap for a complete assignment.
+  rebuildOrderHeap();
 
   lbd_sum = 0;
   solves++;
