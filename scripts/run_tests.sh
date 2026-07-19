@@ -82,6 +82,11 @@ assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=move"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=stack"
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -unsat=1 -up-sepcycles"
 
+# flexibility coverage and finite local drawings
+assert_pass "${OP} -i=${DATA_DIR}/cubic_verification_smoke.g6 -max-n=12 -verify-cubic -colors=0 2> /tmp/last.log"
+assert_pass "grep -Fq '#3-flexible = 20; #2-flexible = 0' /tmp/last.log"
+assert_pass "g++ -std=c++17 -O2 -Isrc cubic/test_cycle_expansions.cpp src/planarity_test.cpp -o /tmp/test_cycle_expansions"
+assert_pass "/tmp/test_cycle_expansions"
 # brute-force
 assert_pass "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=brute-force"
 assert_fail "${OP} -verbose=1 -i=${DATA_DIR}/test1.cfg -part=1 -solver=brute-force -ic"

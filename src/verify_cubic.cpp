@@ -5,6 +5,7 @@
 #include "one_planar.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -14,405 +15,184 @@ std::unique_ptr<GraphList> genGraphs(CMDOptions& options);
 
 namespace {
 
-/// Result of contracting a compatible packing of pentagons.
-struct PackedPentagonContraction {
+/// Result of contracting one 6-cycle for the order-28 expansion proof.
+struct SixCycleContraction {
   AdjListTy adjList;
-  std::vector<EdgeTy> protectedAttachments;
+  std::vector<EdgeTy> uncrossedAttachments;
 };
 
-/// Result of contracting one pentagon for the order-26 flexibility proof.
-struct PentagonFlexibilityContraction {
-  AdjListTy adjList;
-  std::vector<std::vector<EdgeTy>> requirements;
-};
+enum class FiveCycleReduction { NO_FIVE_CYCLE, SUCCESS, FAILURE };
 
-/// Result of contracting one hexagon for the order-28 expansion proof.
-struct HexagonContraction {
-  AdjListTy adjList;
-  std::vector<EdgeTy> protectedAttachments;
-};
-
-/// Contract a deterministic compatible packing of chordless pentagons and
-/// select two consecutive protected attachment edges for each pentagon.
-PackedPentagonContraction contractPackedPentagons(const AdjListTy& adjList) {
+/// Test whether some 5-cycle can be replaced by a three-vertex path while
+/// leaving a simple connected cubic graph of girth at least five.
+FiveCycleReduction findFiveCycleReduction(const AdjListTy& adjList) {
   constexpr int cycleLength = 5;
-  constexpr int protectedSpokes = 2;
   const int n = static_cast<int>(adjList.size());
-  CHECK(n <= 63, "pentagon packing uses a 64-bit vertex mask");
+  CHECK(n <= 63, "5-cycle path reduction uses a 64-bit vertex mask");
   for (const auto& neighbors : adjList)
-    CHECK(neighbors.size() == 3, "pentagon contraction is defined here only for cubic graphs");
-
-  struct Candidate {
-    std::vector<int> vertices;
-    std::vector<int> outside;
-    uint64_t mask = 0;
-  };
-  std::vector<Candidate> candidates;
+    CHECK(neighbors.size() == 3, "5-cycle path reduction requires a cubic graph");
   std::vector<int> cycle;
-  std::function<void(int, int)> enumerate = [&](const int start, const int current) {
-    if (static_cast<int>(cycle.size()) == cycleLength) {
-      if (cycle[1] > cycle.back() ||
-          std::find(adjList[current].begin(), adjList[current].end(), start) == adjList[current].end())
-        return;
+  bool found = false;
+  bool sawFiveCycle = false;
 
-      Candidate candidate;
-      candidate.vertices = cycle;
-      for (int vertex : cycle)
-        candidate.mask |= uint64_t(1) << vertex;
-      uint64_t outsideMask = 0;
-      for (int i = 0; i < cycleLength; i++) {
-        const int previous = cycle[(i + cycleLength - 1) % cycleLength];
-        const int next = cycle[(i + 1) % cycleLength];
-        int external = -1;
-        for (int neighbor : adjList[cycle[i]]) {
-          if (neighbor == previous || neighbor == next)
-            continue;
-          if ((candidate.mask & (uint64_t(1) << neighbor)) != 0 || external != -1)
-            return;
-          external = neighbor;
-        }
-        if (external == -1)
-          return;
-        const uint64_t externalBit = uint64_t(1) << external;
-        if ((outsideMask & externalBit) != 0)
-          return;
-        outsideMask |= externalBit;
-        candidate.outside.push_back(external);
+  auto tryReduction = [&](const int middlePosition) {
+    uint64_t cycleMask = 0;
+    for (int vertex : cycle)
+      cycleMask |= uint64_t(1) << vertex;
+    std::vector<int> outsideNeighbors;
+    uint64_t outsideNeighborMask = 0;
+    for (int position = 0; position < cycleLength; position++) {
+      const int previous = cycle[(position + cycleLength - 1) % cycleLength];
+      const int next = cycle[(position + 1) % cycleLength];
+      int outsideNeighbor = -1;
+      for (int neighbor : adjList[cycle[position]]) {
+        if (neighbor == previous || neighbor == next)
+          continue;
+        if ((cycleMask & (uint64_t(1) << neighbor)) != 0 || outsideNeighbor != -1)
+          return false;
+        outsideNeighbor = neighbor;
       }
-      candidates.push_back(std::move(candidate));
-      return;
+      if (outsideNeighbor == -1 ||
+          (outsideNeighborMask & (uint64_t(1) << outsideNeighbor)) != 0)
+        return false;
+      outsideNeighborMask |= uint64_t(1) << outsideNeighbor;
+      outsideNeighbors.push_back(outsideNeighbor);
     }
 
+    std::vector<int> remap(n, -1);
+    int reducedN = 0;
+    for (int vertex = 0; vertex < n; vertex++)
+      if ((cycleMask & (uint64_t(1) << vertex)) == 0)
+        remap[vertex] = reducedN++;
+    const int a = reducedN++;
+    const int b = reducedN++;
+    const int c = reducedN++;
+    CHECK(reducedN == n - 2);
+
+    AdjListTy reduced(reducedN);
+    auto addEdge = [&](const int first, const int second) {
+      if (first == second || contains(reduced[first], second))
+        return false;
+      reduced[first].push_back(second);
+      reduced[second].push_back(first);
+      return true;
+    };
+    for (int first = 0; first < n; first++) {
+      if (remap[first] == -1)
+        continue;
+      for (int second : adjList[first])
+        if (first < second && remap[second] != -1)
+          CHECK(addEdge(remap[first], remap[second]));
+    }
+    CHECK(addEdge(a, b) && addEdge(b, c));
+    const std::array<int, 5> attachmentOwners = {a, a, b, c, c};
+    for (int offset = -2; offset <= 2; offset++) {
+      const int position = (middlePosition + offset + cycleLength) % cycleLength;
+      if (!addEdge(attachmentOwners[offset + 2], remap[outsideNeighbors[position]]))
+        return false;
+    }
+    for (const auto& neighbors : reduced)
+      if (neighbors.size() != 3)
+        return false;
+    return computeGirth(reducedN, adj_to_edges(reduced)) >= 5;
+  };
+
+  std::function<void(int, int)> enumerate = [&](const int start, const int current) {
+    if (found)
+      return;
+    if (static_cast<int>(cycle.size()) == cycleLength) {
+      if (cycle[1] > cycle.back() || !contains(adjList[current], start))
+        return;
+      sawFiveCycle = true;
+      for (int middle = 0; middle < cycleLength && !found; middle++)
+        found = tryReduction(middle);
+      return;
+    }
     for (int next : adjList[current]) {
-      if (next <= start || std::find(cycle.begin(), cycle.end(), next) != cycle.end())
+      if (next <= start || contains(cycle, next))
         continue;
       cycle.push_back(next);
       enumerate(start, next);
       cycle.pop_back();
     }
   };
-  for (int start = 0; start < n; start++) {
+  for (int start = 0; start < n && !found; start++) {
     cycle = {start};
     enumerate(start, start);
   }
-  if (candidates.empty())
-    return {};
-
-  auto compatible = [&](const int first, const int second) {
-    if ((candidates[first].mask & candidates[second].mask) != 0)
-      return false;
-    int joiningEdges = 0;
-    for (int outside : candidates[first].outside)
-      joiningEdges += (candidates[second].mask & (uint64_t(1) << outside)) != 0;
-    return joiningEdges <= 1;
-  };
-
-  auto hasProtectedPairs = [&](const std::vector<int>& packing) {
-    uint64_t packedVertices = 0;
-    for (int candidate : packing)
-      packedVertices |= candidates[candidate].mask;
-    for (int candidate : packing) {
-      bool found = false;
-      const uint64_t otherPentagons = packedVertices & ~candidates[candidate].mask;
-      for (int offset = 0; offset < cycleLength; offset++) {
-        bool clean = true;
-        for (int delta = 0; delta < protectedSpokes; delta++)
-          clean &= (otherPentagons &
-                    (uint64_t(1) << candidates[candidate].outside[(offset + delta) % cycleLength])) == 0;
-        found |= clean;
-      }
-      if (!found)
-        return false;
-    }
-    return true;
-  };
-
-  // Choose a deterministic, low-conflict maximal packing.  Maximality is not
-  // needed for correctness; contracting more pentagons only improves speed.
-  std::vector<int> available = identity(candidates.size());
-  std::vector<int> selected;
-  while (!available.empty()) {
-    std::vector<std::pair<int, int>> ranked;
-    for (int candidate : available) {
-      bool fits = true;
-      for (int chosen : selected)
-        fits &= compatible(candidate, chosen);
-      std::vector<int> tentative = selected;
-      tentative.push_back(candidate);
-      if (!fits || !hasProtectedPairs(tentative))
-        continue;
-      int conflicts = 0;
-      for (int other : available)
-        conflicts += candidate != other && !compatible(candidate, other);
-      ranked.push_back({conflicts, candidate});
-    }
-    if (ranked.empty())
-      break;
-    std::sort(ranked.begin(), ranked.end());
-    const int chosen = ranked.front().second;
-    selected.push_back(chosen);
-    available.erase(std::remove_if(available.begin(), available.end(), [&](const int candidate) {
-      return candidate == chosen || !compatible(chosen, candidate);
-    }), available.end());
-  }
-  CHECK(!selected.empty());
-
-  std::vector<int> owner(n, -1);
-  for (int packed = 0; packed < static_cast<int>(selected.size()); packed++)
-    for (int vertex : candidates[selected[packed]].vertices)
-      owner[vertex] = packed;
-
-  std::vector<int> remap(n, -1);
-  int reducedN = 0;
-  for (int vertex = 0; vertex < n; vertex++)
-    if (owner[vertex] == -1)
-      remap[vertex] = reducedN++;
-  std::vector<int> contracted(selected.size());
-  for (int& vertex : contracted)
-    vertex = reducedN++;
-  auto mappedVertex = [&](const int vertex) {
-    return owner[vertex] == -1 ? remap[vertex] : contracted[owner[vertex]];
-  };
-
-  std::vector<EdgeTy> edges;
-  for (int u = 0; u < n; u++) {
-    for (int v : adjList[u]) {
-      if (u >= v)
-        continue;
-      const int mappedU = mappedVertex(u);
-      const int mappedV = mappedVertex(v);
-      if (mappedU != mappedV)
-        edges.push_back({std::min(mappedU, mappedV), std::max(mappedU, mappedV)});
-    }
-  }
-  const size_t edgesBeforeDeduplication = edges.size();
-  sort_unique(edges);
-  CHECK(edges.size() == edgesBeforeDeduplication, "pentagon contraction created parallel edges");
-  AdjListTy reduced = edges_to_adj(reducedN, edges);
-  for (int vertex : contracted)
-    CHECK(reduced[vertex].size() == cycleLength, "contracted pentagon vertex has incorrect degree");
-
-  std::vector<EdgeTy> protectedAttachments;
-  for (int packed = 0; packed < static_cast<int>(selected.size()); packed++) {
-    const Candidate& candidate = candidates[selected[packed]];
-    int safeOffset = -1;
-    for (int offset = 0; offset < cycleLength && safeOffset < 0; offset++) {
-      bool clean = true;
-      for (int delta = 0; delta < protectedSpokes; delta++)
-        clean &= owner[candidate.outside[(offset + delta) % cycleLength]] == -1;
-      if (clean)
-        safeOffset = offset;
-    }
-    CHECK(safeOffset >= 0, "packed pentagon has no clean consecutive attachment pair");
-    for (int delta = 0; delta < protectedSpokes; delta++) {
-      const int outside = candidate.outside[(safeOffset + delta) % cycleLength];
-      const EdgeTy edge(std::min(contracted[packed], remap[outside]),
-                        std::max(contracted[packed], remap[outside]));
-      CHECK(std::find(edges.begin(), edges.end(), edge) != edges.end());
-      protectedAttachments.push_back(edge);
-    }
-  }
-
-  return {std::move(reduced), std::move(protectedAttachments)};
+  if (found)
+    return FiveCycleReduction::SUCCESS;
+  return sawFiveCycle ? FiveCycleReduction::FAILURE : FiveCycleReduction::NO_FIVE_CYCLE;
 }
 
-/// Contract one chordless pentagon and construct the reduced-graph edge
-/// requirements that preserve every possible parent edge.
-PentagonFlexibilityContraction contractPentagonForFlexibility(const AdjListTy& adjList) {
-  constexpr int cycleLength = 5;
-  const int n = static_cast<int>(adjList.size());
-  CHECK(n <= 63, "pentagon flexibility contraction uses a 64-bit vertex mask");
-  for (const auto& neighbors : adjList)
-    CHECK(neighbors.size() == 3, "pentagon flexibility contraction requires a cubic graph");
-
-  std::vector<int> selected;
-  std::vector<int> selectedOutside;
-  uint64_t selectedMask = 0;
-  std::vector<int> cycle;
-  std::function<void(int, int)> findCycle = [&](const int start, const int current) {
-    if (!selected.empty())
-      return;
-    if (static_cast<int>(cycle.size()) == cycleLength) {
-      if (cycle[1] > cycle.back() ||
-          std::find(adjList[current].begin(), adjList[current].end(), start) == adjList[current].end())
-        return;
-      uint64_t cycleMask = 0;
-      for (int vertex : cycle)
-        cycleMask |= uint64_t(1) << vertex;
-      std::vector<int> outside;
-      uint64_t outsideMask = 0;
-      for (int i = 0; i < cycleLength; i++) {
-        const int previous = cycle[(i + cycleLength - 1) % cycleLength];
-        const int next = cycle[(i + 1) % cycleLength];
-        int external = -1;
-        for (int neighbor : adjList[cycle[i]]) {
-          if (neighbor == previous || neighbor == next)
-            continue;
-          if ((cycleMask & (uint64_t(1) << neighbor)) != 0 || external != -1)
-            return;
-          external = neighbor;
-        }
-        if (external == -1)
-          return;
-        const uint64_t externalBit = uint64_t(1) << external;
-        if ((outsideMask & externalBit) != 0)
-          return;
-        outsideMask |= externalBit;
-        outside.push_back(external);
-      }
-      selected = cycle;
-      selectedOutside = std::move(outside);
-      selectedMask = cycleMask;
-      return;
-    }
-    for (int next : adjList[current]) {
-      if (next <= start || std::find(cycle.begin(), cycle.end(), next) != cycle.end())
-        continue;
-      cycle.push_back(next);
-      findCycle(start, next);
-      cycle.pop_back();
-    }
-  };
-  for (int start = 0; start < n && selected.empty(); start++) {
-    cycle = {start};
-    findCycle(start, start);
-  }
-  if (selected.empty())
-    return {};
-
-  std::vector<int> remap(n, -1);
-  int reducedN = 0;
-  for (int vertex = 0; vertex < n; vertex++)
-    if ((selectedMask & (uint64_t(1) << vertex)) == 0)
-      remap[vertex] = reducedN++;
-  const int contracted = reducedN++;
-  auto mappedVertex = [&](const int vertex) {
-    return (selectedMask & (uint64_t(1) << vertex)) != 0 ? contracted : remap[vertex];
-  };
-  std::vector<EdgeTy> parentEdges;
-  std::vector<EdgeTy> reducedEdges;
-  for (int first = 0; first < n; first++) {
-    for (int second : adjList[first]) {
-      if (first >= second)
-        continue;
-      parentEdges.push_back({first, second});
-      const int mappedFirst = mappedVertex(first);
-      const int mappedSecond = mappedVertex(second);
-      if (mappedFirst != mappedSecond)
-        reducedEdges.push_back(make_edge(mappedFirst, mappedSecond));
-    }
-  }
-  const size_t edgesBeforeDeduplication = reducedEdges.size();
-  sort_unique(reducedEdges);
-  CHECK(reducedEdges.size() == edgesBeforeDeduplication,
-        "pentagon flexibility contraction created parallel edges");
-  AdjListTy reduced = edges_to_adj(reducedN, reducedEdges);
-  CHECK(reduced[contracted].size() == cycleLength, "contracted pentagon vertex has incorrect degree");
-
-  std::vector<EdgeTy> spokes;
-  for (const int outside : selectedOutside)
-    spokes.push_back(make_edge(contracted, remap[outside]));
-
-  std::vector<std::vector<EdgeTy>> requirements;
-  requirements.reserve(parentEdges.size());
-
-  // A cycle target c_i is preserved by the checked local table when the two
-  // endpoint spokes s_i,s_{i+1} are uncrossed.
-  for (int position = 0; position < cycleLength; position++)
-    requirements.push_back({spokes[position], spokes[(position + 1) % cycleLength]});
-
-  // For an attachment target s_i, rotate the ordinary pentagon patch so its
-  // protected consecutive spokes are s_{i+1},s_{i+2}.  The target spoke s_i
-  // is then also uncrossed by that same patch.  Thus no separate
-  // target-specific pentagon table is needed.
-  for (int position = 0; position < cycleLength; position++)
-    requirements.push_back({spokes[position], spokes[(position + 1) % cycleLength],
-                            spokes[(position + 2) % cycleLength]});
-
-  // Every other target edge is unchanged by the local patch.  Protect it
-  // together with one fixed consecutive pair at the contracted pentagon.
-  for (const EdgeTy& edge : parentEdges) {
-    if ((selectedMask & (uint64_t(1) << edge.first)) != 0 ||
-        (selectedMask & (uint64_t(1) << edge.second)) != 0)
-      continue;
-    requirements.push_back({spokes[0], spokes[1], make_edge(remap[edge.first], remap[edge.second])});
-  }
-  CHECK(requirements.size() == parentEdges.size(), "one parent-edge requirement was omitted");
-  for (auto& requirement : requirements) {
-    sort_unique(requirement);
-    CHECK(2 <= requirement.size() && requirement.size() <= 3);
-    for (const EdgeTy& edge : requirement)
-      CHECK(std::binary_search(reducedEdges.begin(), reducedEdges.end(), edge),
-            "pentagon flexibility requirement is not a reduced edge");
-  }
-  std::sort(requirements.begin(), requirements.end());
-
-  return {std::move(reduced), std::move(requirements)};
-}
-
-/// Contract one chordless hexagon and return the four attachment edges that
-/// the expansion certificate requires to remain uncrossed.
-HexagonContraction contractHexagon(const AdjListTy& adjList) {
+/// Contract one chordless 6-cycle and return the four attachment edges that
+/// the 6-cycle expansion lemma requires to remain uncrossed.
+SixCycleContraction contractSixCycle(const AdjListTy& adjList) {
   constexpr int cycleLength = 6;
   const int n = static_cast<int>(adjList.size());
-  CHECK(n <= 63, "hexagon contraction uses a 64-bit vertex mask");
+  CHECK(n <= 63, "6-cycle contraction uses a 64-bit vertex mask");
   for (const auto& neighbors : adjList)
-    CHECK(neighbors.size() == 3, "hexagon contraction is defined here only for cubic graphs");
+    CHECK(neighbors.size() == 3, "6-cycle contraction is defined here only for cubic graphs");
 
-  std::vector<int> selected;
-  std::vector<int> selectedOutside;
+  std::vector<int> outsideNeighbors;
   uint64_t selectedMask = 0;
+  bool found = false;
   std::vector<int> cycle;
   std::function<void(int, int)> findCycle = [&](const int start, const int current) {
-    if (!selected.empty())
+    if (found)
       return;
     if (static_cast<int>(cycle.size()) == cycleLength) {
-      if (cycle[1] > cycle.back() ||
-          std::find(adjList[current].begin(), adjList[current].end(), start) == adjList[current].end())
+      if (cycle[1] > cycle.back() || !contains(adjList[current], start))
         return;
       uint64_t cycleMask = 0;
       for (int vertex : cycle)
         cycleMask |= uint64_t(1) << vertex;
-      std::vector<int> outside;
-      uint64_t outsideMask = 0;
+      std::vector<int> candidateOutsideNeighbors;
+      uint64_t outsideNeighborMask = 0;
       for (int i = 0; i < cycleLength; i++) {
         const int previous = cycle[(i + cycleLength - 1) % cycleLength];
         const int next = cycle[(i + 1) % cycleLength];
-        int external = -1;
+        int outsideNeighbor = -1;
         for (int neighbor : adjList[cycle[i]]) {
           if (neighbor == previous || neighbor == next)
             continue;
-          if ((cycleMask & (uint64_t(1) << neighbor)) != 0 || external != -1)
+          if ((cycleMask & (uint64_t(1) << neighbor)) != 0 || outsideNeighbor != -1)
             return;
-          external = neighbor;
+          outsideNeighbor = neighbor;
         }
-        if (external == -1)
+        if (outsideNeighbor == -1)
           return;
-        const uint64_t externalBit = uint64_t(1) << external;
-        if ((outsideMask & externalBit) != 0)
+        const uint64_t outsideNeighborBit = uint64_t(1) << outsideNeighbor;
+        if ((outsideNeighborMask & outsideNeighborBit) != 0)
           return;
-        outsideMask |= externalBit;
-        outside.push_back(external);
+        outsideNeighborMask |= outsideNeighborBit;
+        candidateOutsideNeighbors.push_back(outsideNeighbor);
       }
-      selected = cycle;
-      selectedOutside = std::move(outside);
+      outsideNeighbors = std::move(candidateOutsideNeighbors);
       selectedMask = cycleMask;
+      found = true;
       return;
     }
     for (int next : adjList[current]) {
-      if (next <= start || std::find(cycle.begin(), cycle.end(), next) != cycle.end())
+      if (next <= start || contains(cycle, next))
         continue;
       cycle.push_back(next);
       findCycle(start, next);
       cycle.pop_back();
     }
   };
-  for (int start = 0; start < n && selected.empty(); start++) {
+  for (int start = 0; start < n && !found; start++) {
     cycle = {start};
     findCycle(start, start);
   }
-  if (selected.empty())
+  if (!found)
     return {};
+
+  // Rotate the cycle labeling before choosing s1, s2, s4, and s5 as the
+  // attachment edges required to be uncrossed.  The expansion lemma is
+  // invariant under this relabeling, while the fixed edge indices materially
+  // affect SAT branching.
+  std::rotate(outsideNeighbors.begin(), outsideNeighbors.end() - 1, outsideNeighbors.end());
 
   std::vector<int> remap(n, -1);
   int reducedN = 0;
@@ -432,25 +212,26 @@ HexagonContraction contractHexagon(const AdjListTy& adjList) {
       const int mappedU = mappedVertex(u);
       const int mappedV = mappedVertex(v);
       if (mappedU != mappedV)
-        edges.push_back({std::min(mappedU, mappedV), std::max(mappedU, mappedV)});
+        edges.push_back(make_edge(mappedU, mappedV));
     }
   }
   const size_t edgesBeforeDeduplication = edges.size();
   sort_unique(edges);
-  CHECK(edges.size() == edgesBeforeDeduplication, "hexagon contraction created parallel edges");
+  CHECK(edges.size() == edgesBeforeDeduplication, "6-cycle contraction created parallel edges");
   AdjListTy reduced = edges_to_adj(reducedN, edges);
-  CHECK(reduced[contracted].size() == cycleLength, "contracted hexagon vertex has incorrect degree");
+  CHECK(reduced[contracted].size() == cycleLength, "contracted 6-cycle vertex has incorrect degree");
 
-  std::vector<EdgeTy> protectedAttachments;
+  std::vector<EdgeTy> uncrossedAttachments;
   for (int position : {1, 2, 4, 5}) {
-    const int outside = selectedOutside[position];
-    protectedAttachments.push_back({std::min(contracted, remap[outside]), std::max(contracted, remap[outside])});
+    const int outsideNeighbor = outsideNeighbors[position];
+    uncrossedAttachments.push_back(make_edge(contracted, remap[outsideNeighbor]));
   }
-  return {std::move(reduced), std::move(protectedAttachments)};
+  return {std::move(reduced), std::move(uncrossedAttachments)};
 }
+
 /// Reconstruct the drawing represented by a satisfying assignment and check
 /// independently that its proposed crossings produce a planarization.
-Result checkedDrawing(const Params& params, const InputGraph& graph, SATModel& model, Solver& solver) {
+Result verifiedDrawing(const Params& params, const InputGraph& graph, SATModel& model, Solver& solver) {
   Result drawing(ResultCodeTy::SAT);
   fillResultStack(model, solver, graph, params, drawing);
   CHECK(isPlanarWithCrossings(graph, drawing.crossings), "SAT produced an invalid 1-planar drawing");
@@ -473,12 +254,12 @@ void verifyDrawing(
   }
   CHECK(solver.solveLimited(assumptions) == l_True, "failed to find a required 1-planar drawing");
 
-  const Result drawing = checkedDrawing(params, graph, model, solver);
+  const Result drawing = verifiedDrawing(params, graph, model, solver);
   for (int edge : uncrossedEdges)
     CHECK(!drawing.isCrossed[edge], "required edge %d is crossed", edge);
 }
 
-/// Return the sorted set of original edges crossed in a checked drawing.
+/// Return the sorted set of original edges crossed in a verified drawing.
 std::vector<int> crossedEdges(const Result& drawing) {
   std::vector<int> crossed;
   for (const auto& [first, second] : drawing.crossings) {
@@ -489,25 +270,19 @@ std::vector<int> crossedEdges(const Result& drawing) {
   return crossed;
 }
 
-/// Test whether a drawing leaves every edge in a requirement uncrossed.
-bool covers(const std::vector<int>& requirement, const std::vector<int>& crossed) {
-  return std::none_of(requirement.begin(), requirement.end(), [&](const int edge) {
+/// Test whether a prescribed edge set is disjoint from a drawing's crossed-edge set.
+bool areDisjoint(const std::vector<int>& prescribed, const std::vector<int>& crossed) {
+  return std::none_of(prescribed.begin(), prescribed.end(), [&](const int edge) {
     return std::binary_search(crossed.begin(), crossed.end(), edge);
   });
 }
 
-/// Accumulate checked drawings until they cover every required edge set.
+/// Accumulate verified drawings until they prove k-flexibility or cover all
+/// prescribed sets of edges that must be simultaneously uncrossed.
 void verifyFlexibility(
-    const Params& params, const InputGraph& graph, const int flexibility,
-    const std::vector<std::vector<int>>& explicitRequirements = {}) {
-  CHECK((flexibility > 0) != !explicitRequirements.empty(),
-        "specify either a flexibility value or explicit requirements");
-  for (const auto& requirement : explicitRequirements) {
-    CHECK(!requirement.empty() && all_unique(requirement), "invalid uncrossed-edge requirement");
-    for (int edge : requirement) {
-      CHECK(0 <= edge && edge < static_cast<int>(graph.edges.size()), "uncrossed-edge requirement is out of range");
-    }
-  }
+    const Params& params, const InputGraph& graph, const int k,
+    const std::vector<std::vector<int>>& prescribedSets = {}) {
+  CHECK((k > 0) != !prescribedSets.empty(), "specify either k-flexibility or prescribed edge sets");
 
   initCrossablePairs(params, graph);
   SATModel model;
@@ -516,68 +291,68 @@ void verifyFlexibility(
   initSATSolver(params, graph, model, solver);
   CHECK(solveSATModel(params, model, solver) == l_True, "failed to find an initial 1-planar drawing");
 
-  Result drawing = checkedDrawing(params, graph, model, solver);
-  std::vector<std::vector<int>> witnesses = {crossedEdges(drawing)};
+  Result drawing = verifiedDrawing(params, graph, model, solver);
+  std::vector<std::vector<int>> crossedEdgeSets = {crossedEdges(drawing)};
 
-  auto findUncoveredRequirement = [&]() {
-    if (!explicitRequirements.empty()) {
-      for (const auto& requirement : explicitRequirements) {
-        const bool isCovered = std::any_of(witnesses.begin(), witnesses.end(), [&](const std::vector<int>& crossed) {
-          return covers(requirement, crossed);
-        });
+  auto findUncoveredEdgeSet = [&]() {
+    if (!prescribedSets.empty()) {
+      for (const auto& prescribed : prescribedSets) {
+        const bool isCovered =
+            std::any_of(crossedEdgeSets.begin(), crossedEdgeSets.end(),
+                        [&](const std::vector<int>& crossed) { return areDisjoint(prescribed, crossed); });
         if (!isCovered)
-          return requirement;
+          return prescribed;
       }
       return std::vector<int>();
     }
 
-    std::vector<int> candidate;
+    std::vector<int> hittingSet;
     std::function<bool(int)> findHittingSet = [&](const int limit) {
-      const std::vector<int>* unhitWitness = nullptr;
-      for (const auto& crossed : witnesses) {
-        const bool hit = std::any_of(candidate.begin(), candidate.end(), [&](const int edge) {
+      const std::vector<int>* unhitCrossedSet = nullptr;
+      for (const auto& crossed : crossedEdgeSets) {
+        const bool hit = std::any_of(hittingSet.begin(), hittingSet.end(), [&](const int edge) {
           return std::binary_search(crossed.begin(), crossed.end(), edge);
         });
         if (!hit) {
-          unhitWitness = &crossed;
+          unhitCrossedSet = &crossed;
           break;
         }
       }
-      if (unhitWitness == nullptr)
+      if (unhitCrossedSet == nullptr)
         return true;
-      if (static_cast<int>(candidate.size()) == limit || unhitWitness->empty())
+      if (static_cast<int>(hittingSet.size()) == limit || unhitCrossedSet->empty())
         return false;
-      for (int edge : *unhitWitness) {
-        candidate.push_back(edge);
+      for (int edge : *unhitCrossedSet) {
+        hittingSet.push_back(edge);
         if (findHittingSet(limit))
           return true;
-        candidate.pop_back();
+        hittingSet.pop_back();
       }
       return false;
     };
 
-    for (int limit = 1; limit <= flexibility; limit++) {
-      candidate.clear();
+    for (int limit = 1; limit <= k; limit++) {
+      hittingSet.clear();
       if (findHittingSet(limit))
-        return candidate;
+        return hittingSet;
     }
     return std::vector<int>();
   };
 
   while (true) {
-    const std::vector<int> requirement = findUncoveredRequirement();
-    if (requirement.empty())
+    const std::vector<int> prescribed = findUncoveredEdgeSet();
+    if (prescribed.empty())
       return;
 
     vec<Lit> assumptions;
-    for (int edge : requirement)
+    for (int edge : prescribed)
       assumptions.push(model.getSolverLit(model.getCross1Var(graph.n + edge, false)));
     CHECK(solver.solveLimited(assumptions) == l_True, "failed uncrossed-edge requirement");
 
-    drawing = checkedDrawing(params, graph, model, solver);
-    for (int edge : requirement)
+    drawing = verifiedDrawing(params, graph, model, solver);
+    for (int edge : prescribed)
       CHECK(!drawing.isCrossed[edge], "required edge %d is crossed", edge);
-    witnesses.push_back(crossedEdges(drawing));
+    crossedEdgeSets.push_back(crossedEdges(drawing));
   }
 }
 
@@ -593,98 +368,83 @@ std::vector<int> edgeIndices(const InputGraph& graph, const std::vector<EdgeTy>&
   return indices;
 }
 
-/// Convert endpoint-based requirements into edge-index requirements.
-std::vector<std::vector<int>> edgeRequirements(
-    const InputGraph& graph, const std::vector<std::vector<EdgeTy>>& requirements) {
-  std::vector<std::vector<int>> result;
-  for (const auto& requirement : requirements)
-    result.push_back(edgeIndices(graph, requirement));
-  return result;
-}
-
-/// Check that an input record belongs to the census class for its order.
-void validateInput(const int n, const std::vector<EdgeTy>& edges) {
+/// Check that an input record belongs to the required graph family for its order.
+void validateInput(const AdjListTy& adjList, const std::vector<EdgeTy>& edges) {
+  const int n = static_cast<int>(adjList.size());
   CHECK(4 <= n && n <= 28 && n % 2 == 0, "verification expects an even order from 4 through 28");
-  CHECK(static_cast<int>(edges.size()) * 2 == 3 * n &&
-            minDegree(n, edges) == 3 && maxDegree(n, edges) == 3,
+  CHECK(std::all_of(adjList.begin(), adjList.end(), [](const auto& neighbors) { return neighbors.size() == 3; }),
         "verification expects a cubic graph");
-  CHECK(isConnected(n, edges), "verification censuses contain connected graphs");
+  CHECK(isConnected(n, edges), "verification inputs contain connected graphs");
   if (n >= 24) {
     CHECK(computeGirth(n, edges) >= 5, "orders 24, 26, and 28 require girth at least five");
   }
 }
 
-/// Verify three-edge flexibility for a nonplanar input through order 22.
+/// Verify Claim 1 for a nonplanar input through order 22.
 void verifyCubic22(const int n, const std::vector<EdgeTy>& edges, const Params& params) {
   CHECK(n <= 22);
   InputGraph graph(n, edges, {});
   verifyFlexibility(params, graph, 3);
 }
 
-/// Verify two-edge flexibility for a nonplanar order-24 input.
+/// Verify Claim 2 for a nonplanar order-24 input.
 void verifyCubic24(const int n, const std::vector<EdgeTy>& edges, const Params& params) {
   CHECK(n == 24);
   InputGraph graph(n, edges, {});
   verifyFlexibility(params, graph, 2);
 }
 
-/// Verify one-edge flexibility for a nonplanar order-26 input; return true
-/// when the proof uses a contracted pentagon and false for a direct check.
-bool verifyCubic26(
-    const int n, const std::vector<EdgeTy>& edges, const AdjListTy& adj, const Params& params) {
+/// Verify Claim 3: every vertex has a drawing with its three incident edges uncrossed.
+void verifyCubic26(const int n, const std::vector<EdgeTy>& edges, const Params& params) {
   CHECK(n == 26);
-  const PentagonFlexibilityContraction contraction = contractPentagonForFlexibility(adj);
-  if (contraction.adjList.empty()) {
-    InputGraph graph(n, edges, {});
-    verifyFlexibility(params, graph, 1);
-    return false;
+  InputGraph graph(n, edges, {});
+  std::vector<std::vector<int>> incidentEdges(n);
+  for (int edge = 0; edge < static_cast<int>(edges.size()); edge++) {
+    incidentEdges[edges[edge].first].push_back(edge);
+    incidentEdges[edges[edge].second].push_back(edge);
   }
-
-  InputGraph graph(static_cast<int>(contraction.adjList.size()), adj_to_edges(contraction.adjList), {});
-  CHECK(contraction.requirements.size() == edges.size(), "pentagon contraction omitted a parent edge");
-  verifyFlexibility(params, graph, 0, edgeRequirements(graph, contraction.requirements));
-  return true;
+  verifyFlexibility(params, graph, 0, incidentEdges);
 }
 
-/// Certificate selected for a nonplanar order-28 input.
-enum class Cubic28Certificate { PENTAGON, HEXAGON, DIRECT };
+/// Method used to verify a nonplanar order-28 input.
+enum class Cubic28Method {
+  FIVE_CYCLE_EXPANSION,
+  DIRECT_GIRTH_FIVE,
+  SIX_CYCLE_EXPANSION,
+  DIRECT_NO_SIX_CYCLE
+};
 
-/// Verify a nonplanar order-28 input by pentagon expansion, hexagon expansion,
-/// or a direct drawing, and return the certificate that was used.
-Cubic28Certificate verifyCubic28(
+/// Verify Claims 4 and 5 by a 5-cycle expansion, a 6-cycle expansion, or a direct drawing.
+Cubic28Method verifyCubic28(
     const int n, const std::vector<EdgeTy>& edges, const AdjListTy& adj, const Params& params) {
   CHECK(n == 28);
-  const PackedPentagonContraction pentagons = contractPackedPentagons(adj);
-  if (!pentagons.adjList.empty()) {
-    InputGraph graph(static_cast<int>(pentagons.adjList.size()), adj_to_edges(pentagons.adjList), {});
-    const size_t removed = adj.size() - pentagons.adjList.size();
-    CHECK(removed % 4 == 0 &&
-              pentagons.protectedAttachments.size() == removed / 2,
-          "invalid packed-pentagon contraction");
-    if (!isPlanar(graph.n, graph.edges, 0)) {
-      verifyDrawing(params, graph, edgeIndices(graph, pentagons.protectedAttachments));
-    }
-    return Cubic28Certificate::PENTAGON;
+  const FiveCycleReduction fiveCycleReduction = findFiveCycleReduction(adj);
+  if (fiveCycleReduction == FiveCycleReduction::SUCCESS)
+    return Cubic28Method::FIVE_CYCLE_EXPANSION;
+  if (fiveCycleReduction == FiveCycleReduction::FAILURE) {
+    InputGraph graph(n, edges, {});
+    verifyDrawing(params, graph);
+    return Cubic28Method::DIRECT_GIRTH_FIVE;
   }
 
-  const HexagonContraction hexagon = contractHexagon(adj);
-  if (!hexagon.adjList.empty()) {
-    InputGraph graph(static_cast<int>(hexagon.adjList.size()), adj_to_edges(hexagon.adjList), {});
-    CHECK(hexagon.protectedAttachments.size() == 4, "invalid hexagon contraction");
+  const SixCycleContraction sixCycle = contractSixCycle(adj);
+  if (!sixCycle.adjList.empty()) {
+    InputGraph graph(static_cast<int>(sixCycle.adjList.size()), adj_to_edges(sixCycle.adjList), {});
+    CHECK(sixCycle.uncrossedAttachments.size() == 4, "invalid 6-cycle contraction");
     if (!isPlanar(graph.n, graph.edges, 0)) {
-      verifyDrawing(params, graph, edgeIndices(graph, hexagon.protectedAttachments));
+      verifyDrawing(params, graph, edgeIndices(graph, sixCycle.uncrossedAttachments));
     }
-    return Cubic28Certificate::HEXAGON;
+    return Cubic28Method::SIX_CYCLE_EXPANSION;
   }
 
   InputGraph graph(n, edges, {});
   verifyDrawing(params, graph);
-  return Cubic28Certificate::DIRECT;
+  return Cubic28Method::DIRECT_NO_SIX_CYCLE;
 }
 
 }  // namespace
 
-/// Verify the unique cubic-28 proof obligation selected by each graph's order.
+/// Verify the claim or claims prescribed by the order of each input graph.
 void verifyCubic(CMDOptions& options) {
   Params params;
   params.cubicVerification = true;
@@ -698,17 +458,17 @@ void verifyCubic(CMDOptions& options) {
   int num1Planar = 0;
   int num3Flexible = 0;
   int num2Flexible = 0;
-  int numPentagonFlexible = 0;
-  int numDirect1Flexible = 0;
-  int numPentagonExpanded = 0;
-  int numHexagonExpanded = 0;
-  int numDirect28 = 0;
+  int numClaim3Verified = 0;
+  int numFiveCycleExpanded = 0;
+  int numFiveCycleDirect = 0;
+  int numSixCycleExpanded = 0;
+  int numNoSixCycleDirect = 0;
 
   for (int i = 0; i < numGraphs; i++) {
     const auto& adj = graphs->next().second;
     const int n = static_cast<int>(adj.size());
     const std::vector<EdgeTy> edges = adj_to_edges(adj);
-    validateInput(n, edges);
+    validateInput(adj, edges);
 
     if (isPlanar(n, edges, 0)) {
       numPlanar++;
@@ -721,19 +481,19 @@ void verifyCubic(CMDOptions& options) {
       num2Flexible++;
       num1Planar++;
     } else if (n == 26) {
-      if (verifyCubic26(n, edges, adj, params))
-        numPentagonFlexible++;
-      else
-        numDirect1Flexible++;
+      verifyCubic26(n, edges, params);
+      numClaim3Verified++;
       num1Planar++;
     } else {
-      const Cubic28Certificate certificate = verifyCubic28(n, edges, adj, params);
-      if (certificate == Cubic28Certificate::PENTAGON)
-        numPentagonExpanded++;
-      else if (certificate == Cubic28Certificate::HEXAGON)
-        numHexagonExpanded++;
+      const Cubic28Method method = verifyCubic28(n, edges, adj, params);
+      if (method == Cubic28Method::FIVE_CYCLE_EXPANSION)
+        numFiveCycleExpanded++;
+      else if (method == Cubic28Method::DIRECT_GIRTH_FIVE)
+        numFiveCycleDirect++;
+      else if (method == Cubic28Method::SIX_CYCLE_EXPANSION)
+        numSixCycleExpanded++;
       else
-        numDirect28++;
+        numNoSixCycleDirect++;
       num1Planar++;
     }
 
@@ -743,7 +503,8 @@ void verifyCubic(CMDOptions& options) {
   LOG("processed %'d graphs in %s", numGraphs, ms_to_str(start, std::chrono::steady_clock::now()).c_str());
   LOG("#planar = %'d; #1-planar = %'d", numPlanar, num1Planar);
   LOG("#3-flexible = %'d; #2-flexible = %'d", num3Flexible, num2Flexible);
-  LOG("#pentagon-flexible = %'d; #direct-1-flexible = %'d", numPentagonFlexible, numDirect1Flexible);
-  LOG("#pentagon-expanded = %'d; #hexagon-expanded = %'d; #direct-28 = %'d",
-      numPentagonExpanded, numHexagonExpanded, numDirect28);
+  LOG("#claim3-verified = %'d", numClaim3Verified);
+  LOG("#5-cycle-expanded = %'d; #direct-girth5 = %'d; #6-cycle-expanded = %'d; "
+      "#direct-no-6-cycle = %'d",
+      numFiveCycleExpanded, numFiveCycleDirect, numSixCycleExpanded, numNoSixCycleDirect);
 }

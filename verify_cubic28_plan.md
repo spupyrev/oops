@@ -93,18 +93,20 @@ very fast check. Can we develop any other quick filters? This is an open, explor
 
 Stricly follow the following development:
 
-1. Come up with an idea. Write it down to cubic28_progress_report.md
+1. Come up with an idea. Write it down to cubic/cubic28_progress_report.md
 2. Read the code, think about the best possible implementation, decide what logging is
    needed.
 3. Implement the feature, run smallish SAT/UNSAT tests. Iterate over the implementation
    until all tests pass as expected.
 5. Iterate until the feature is fully implemented and thoroughly tested. If there are
    promising follow-ups, continue to Step 2.
-6. Record the results and the analysis to cubic28_progress_report.md
+6. Record the results and the analysis to cubic/cubic28_progress_report.md
 7. Go to Step 1
 
 You have at most 48h for research/development on the project, so be careful with 
 running long tests. The actual testing time of real instances is excluded from the timeline.
+
+YOU CAN NEVER RUN MULTI-THREADED OOPS JOBS BY YOURSELF; A HUMAN WILL DO IT ON A DEDICATED SERVER
 
 ## Result
 

@@ -1,34 +1,53 @@
-\documentclass[a4paper,USenglish,cleveref,nameinlink,autoref]{lipics-v2021}
+\documentclass[a4paper,11pt]{article}
 
-\usepackage{microtype}
-\usepackage{multirow}
-\usepackage{complexity}
-\usepackage{booktabs}
-\usepackage{xcolor}
-\usepackage[nocompress,noadjust]{cite}
+\usepackage{kpfonts}
 \usepackage[utf8]{inputenc}
+\usepackage[margin=3cm]{geometry}
+
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{enumerate,paralist}
+\usepackage{xspace}
+\usepackage{comment}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage[nocompress]{cite}
+\usepackage[pdfpagelabels,colorlinks,allcolors=blue]{hyperref}
+\usepackage[nameinlink,capitalize,noabbrev]{cleveref}
 
 \theoremstyle{plain}
-\newtheorem{problem}{Problem}
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{claim}{Claim}
+\crefname{claim}{Claim}{Claims}
+\Crefname{claim}{Claim}{Claims}
+\newtheorem{proposition}{Proposition}
+\newtheorem{observation}{Observation}
+\theoremstyle{definition}  % switches off use of italics in following env's
 
 \title{Smallest Cubic Non-1-Planar Graph}
 
-\author{Sergey Pupyrev}{Menlo Park, CA, USA}{spupyrev@gmail.com}{https://orcid.org/0000-0003-4089-673X}{}
+%\author{Sergey Pupyrev}{Menlo Park, CA, USA}{spupyrev@gmail.com}{https://orcid.org/0000-0003-4089-673X}{}
 
-\authorrunning{S. Pupyrev}
-
-\Copyright{Sergey Pupyrev}
-
-\ccsdesc[500]{Theory of computation~Design and analysis of algorithms}
-\ccsdesc[500]{Mathematics of computing~Graph theory}
-\keywords{beyond planarity, 1-planar graph, SAT}
+%\authorrunning{S. Pupyrev}
 %
-%\supplementdetails[subcategory={Source Code}]{Software}{https://github.com/spupyrev/oops}
+%\Copyright{Sergey Pupyrev}
+%
+%\ccsdesc[500]{Theory of computation~Design and analysis of algorithms}
+%\ccsdesc[500]{Mathematics of computing~Graph theory}
+%\keywords{beyond planarity, 1-planar graph, cubic graph}
 
-\acknowledgements{}
-
-\hideLIPIcs
-\nolinenumbers
+%\acknowledgements{}
+%
+%\hideLIPIcs
+%\nolinenumbers
 
 \graphicspath{{pics/}}
 
@@ -43,6 +62,12 @@
 
 \begin{document}
 
+\author{
+    Sergey Pupyrev \\
+    spupyrev@gmail.com
+}
+
+\date{}
 \maketitle
 
 \begin{abstract}
@@ -63,13 +88,21 @@ find the smallest 3-regular (cubic) graph that is not 1-planar. While it is easy
 (see e.g., \cite{DKMW08}) that large random cubic graphs are not 1-planar, the
 smallest such instance is unknown.
 
+Throughout the paper, all graphs are finite, simple, and undirected.  The
+\emph{order} of a graph $G$ is $|V(G)|$.  A graph is \emph{cubic} if every
+vertex has degree three, and it is \emph{subcubic} if every vertex has degree
+at most three.  A connected graph is \emph{biconnected} if it has no cut
+vertex.  A graph is \emph{planar} if it has a drawing without crossings.  The
+\emph{girth} of a graph containing a cycle is the length of its shortest
+cycle.
+
 \newtheorem*{problem1b}{Problem 1}
 \begin{problem1b}[\cite{11011110_cubic,mathse_cubic,oops}]
     What is the smallest cubic non-1-planar graph?
 \end{problem1b}
 
 In an attempt to answer the question, Eppstein~\cite{11011110_cubic} manually constructed 1-planar
-drawings of several graphs and suggested that either the \texttt{Coxeter} graph or the \texttt{Tutte-Coxeter} graph
+drawings of several graphs and suggested that either the Coxeter graph or the Tutte--Coxeter graph
 is not 1-planar. As pointed out in \cite{oops}, the former is indeed 1-planar.
 The latter is conjectured to be non-1-planar in \cite{oops}.
 
@@ -85,7 +118,8 @@ and the total computation took $\approx$$1.5$ machine-months, averaging less tha
 \begin{table}[!h]
     \small
     \centering
-    \caption{Testing 1-planarity of cubic graphs with \texttt{OOPS} (Parallel).}
+    \caption{Computational results for cubic graphs.  The reported elapsed
+    times were obtained by parallel computation.}
     \label{table:cubic}
     \begin{tabular}{|r|r|r|r||C{50pt}|}
         \toprule
@@ -108,94 +142,580 @@ and the total computation took $\approx$$1.5$ machine-months, averaging less tha
     \end{tabular}
 \end{table}
 
-The next table lists biconnected sub-cubic graphs.
+The next table gives corresponding counts for several subcubic graph
+families.
 
 \begin{table}[!h]
     \small
     \centering
-    \caption{Testing 1-planarity of biconnected sub-cubic non-planar graphs;
-    created by \\ \texttt{geng -C -d3 -D3 | planarg -v}}
+    \caption{Computational results for selected subcubic graph families.}
     \label{table:subcubic}
-    \begin{tabular}{|r|l|r|r|r||C{50pt}|}
+    \begin{tabular}{@{}r p{205pt} r C{55pt}@{}}
         \toprule
-        graph size & params & total count & total runtime & mean runtime & all $1$-planar? \\
+        graph size & graph family & total count & all $1$-planar? \\
         \midrule
-        $n=18$ & \texttt{geng -c -d3 -D3}               & $41,\!301$ & & & \yes \\
-        $n=18$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $7,\!734$ & & & ? \\
+        $n=18$ & connected cubic                         & $41,\!301$ & \yes \\
+        $n=18$ & biconnected, nonplanar, triangle-free cubic & $7,\!734$ & ? \\
         \cmidrule{1-1}
-        $n=20$ & \texttt{geng -c -d3 -D3}               & $510,\!489$ & & & \yes \\
-        $n=20$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $97,\!141$ & & & ? \\
+        $n=20$ & connected cubic                         & $510,\!489$ & \yes \\
+        $n=20$ & biconnected, nonplanar, triangle-free cubic & $97,\!141$ & ? \\
         \cmidrule{1-1}
-        $n=22$ & \texttt{geng -c -d3 -D3}               & $7,\!319,\!447$ & & & \yes \\
-        $n=22$ & \texttt{geng -c -t -d3 -D3}            & $1,\!435,\!720$ & & & ? \\
-        $n=22$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $1,\!432,\!712$ & & & ? \\
+        $n=22$ & connected cubic                         & $7,\!319,\!447$ & \yes \\
+        $n=22$ & connected, triangle-free cubic          & $1,\!435,\!720$ & ? \\
+        $n=22$ & biconnected, nonplanar, triangle-free cubic & $1,\!432,\!712$ & ? \\
         \cmidrule{1-1}
-        $n=24$ & \texttt{geng -c -d3 -D3}               & $117,\!940,\!535$ & & & \yes \\
-        $n=24$ & \texttt{geng -C -t -d3 -D3 | planarg}  & $23,\!751,\!969$ & & & ? \\
+        $n=24$ & connected cubic                         & $117,\!940,\!535$ & \yes \\
+        $n=24$ & biconnected, nonplanar, triangle-free cubic & $23,\!751,\!969$ & ? \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-Our goal is to find the \df{smallest sub-cubic non-1-planar} graphs. In the following, we
-study properties of such instances. That is, a non-1-planar graph in which (i) the maximum vertex degree is $3$ and (ii) removing any vertex or any edge from the graph makes it 1-planar (or planar).
+Our goal is to find the \df{smallest subcubic non-1-planar} graphs.  We order
+graphs lexicographically by $(|V|,|E|)$ and let $G$ be a minimum non-1-planar
+graph of maximum degree at most three.  Thus every smaller subcubic graph is
+1-planar.  This formulation is useful even though the graphs in our
+enumeration are cubic: any cubic counterexample contains such a minimal
+subcubic counterexample of no larger order.
 
 \begin{lemma}
-    The smallest sub-cubic non-1-planar graph is biconnected.
+    A smallest subcubic non-1-planar graph is biconnected.
 \end{lemma}
 
 \begin{proof}
-    A 1-planar drawing of a graph can be composed from 1-planar drawings of its biconnected components. Hence, if all such components are 1-planar, then the
-    graph itself is 1-planar too.
+    A disconnected graph is 1-planar if each of its components is 1-planar.
+    Likewise, 1-planar drawings of the blocks incident to a cut vertex can be
+    placed in disjoint wedges around that vertex.  Hence a non-1-planar graph
+    has a non-1-planar block.  Such a block would be smaller than $G$ unless
+    $G$ itself is biconnected.
 \end{proof}
 
 \begin{lemma}
-    The smallest sub-cubic non-1-planar graph is cubic.
+    A smallest subcubic non-1-planar graph is cubic.
 \end{lemma}
 
 \begin{proof}
-    Assume for a contradiction that the smallest sub-cubic graph contains a
-    vertex of degree $2$; that is, $v \in V$ is connected to $u$ and $w$. Consider two
-    cases:
+    A vertex of degree zero or one can be deleted and then reinserted without
+    creating a crossing.  Assume that $G$ contains a vertex $v$ of degree two,
+    with neighbors $u$ and $w$. Consider three cases.
     \begin{itemize}
-        \item edge $(u, w) \notin E$: Then we can remove $v$ from the graph and
-        insert a new edge $(u, w)$. The resulting graph $H$ is smaller and hence, is 1-planar. Take the drawing of $H$, remove the curve for $(u, w)$ and instead
-        re-insert a path $(u, v, w)$; one of the two edges, $(u, v)$ or $(v, w)$,
-        inherits (at most one) crossing of removed $(u, w)$, another one is crossing-free.
+        \item If $uw\notin E$, remove $v$ and insert $uw$.  The result $H$ is
+        a smaller subcubic graph and hence is 1-planar.  In a drawing of $H$,
+        replace the curve for $uw$ by the path $(u,v,w)$.  At most one path
+        edge inherits the possible crossing of $uw$.
 
-        \item edge $(u, w) \in E$ and there exists $x \in V$ such that
-        $(u, x) \in E$ and $(w, x) \in E$: Then $x$ is a cut vertex (unless the graph is $K_4$), since it
-        disconnects $u, w, v$ from the result of the graph. By previous lemma, we
-        have a desired claim.
+        \item Suppose $uw\in E$ and $u,w$ have another common neighbor $x$.
+        If there are vertices outside $\{u,v,w,x\}$, then $x$ is a cut vertex.
+        Otherwise the graph is planar.  Both alternatives contradict the
+        choice of $G$.
 
-        \item edge $(u, w) \in E$ and $u$ and $w$ have no common neighbors:
-        Then we can merge three vertices $u, v, w$ into a common one without creating
-        parallel edges. Then draw the result and re-insert the three vertices back.
+        \item Suppose $uw\in E$ and $u,w$ have no other common neighbor.
+        Merge $u,v,w$ into one vertex.  No loop or parallel edge is created,
+        and the new vertex has degree at most two.  The result is a smaller
+        subcubic graph.  In its 1-planar drawing, expand the merged vertex
+        inside a sufficiently small disk into the triangle $(u,v,w)$ while
+        preserving all external incidences.
     \end{itemize}
 \end{proof}
 
+We use the following elementary replacement observation.
 
-\begin{lemma}
-    The smallest cubic non-1-planar graph is triangle-free.
+\begin{lemma}[Planar two-terminal replacement]\label{lem:two-terminal-replacement}
+    Let $P$ be a planar graph with two vertices $a,b$ incident to a common
+    face.  Suppose that $G$ is obtained from a graph $H$ by deleting an edge
+    $xy$, inserting a disjoint copy of $P$, and adding the edges $xa$ and
+    $yb$.  If $H$ is 1-planar, then $G$ is 1-planar.
+    Moreover, let $F$ be a set of edges of $G$.  Form $F_H$ by retaining every
+    edge of $F$ outside the replacement and, if $F$ meets the inserted patch
+    or either attachment, adding $xy$.  Then $|F_H|\le |F|$, and a 1-planar
+    drawing of $H$ in which every edge of $F_H$ is uncrossed expands to one of
+    $G$ in which every edge of $F$ is uncrossed.
 \end{lemma}
 
 \begin{proof}
-    For a contradiction, assume $G$ has a triangle $u, v, w$.
-    Since \(G\) is cubic, each vertex in \(T\) has exactly one neighbor outside \(T\): let these be \(u^{\prime },v^{\prime },w^{\prime }\). Consider cases:
+    Take a 1-planar drawing of $H$ and remove the curve for $xy$.  Draw $P$
+    in a small disk around $x$, using a common face of $a,b$ as its outer
+    face.  Draw $xa$ inside the disk and route $yb$ along the former curve of
+    $xy$.  All new edges in the disk are crossing-free, while $yb$ inherits
+    the at most one crossing of $xy$.
+    For the strengthened statement, if $F$ meets the replacement then $xy$ is
+    uncrossed.  Choose the routing disk around its whole curve; the planar
+    patch and both attachments are then crossing-free.  Every retained
+    outside edge keeps its old crossing status.
+\end{proof}
+
+\begin{lemma}\label{lem:minimal-triangle-free}
+    A smallest cubic non-1-planar graph is triangle-free.
+\end{lemma}
+
+\begin{proof}
+    For a contradiction, assume $G$ has a triangle $T=(u,v,w)$.  Since $G$ is
+    cubic, each vertex of $T$ has exactly one neighbor outside $T$; denote
+    them by $u',v',w'$. Consider cases.
 
     \begin{itemize}
-        \item If \(u^{\prime },v^{\prime },w^{\prime }\) are pairwise distinct, we can perform a reduction: contract the entire triangle \(T\) into a single vertex \(z\) connected to \(u^{\prime },v^{\prime },w^{\prime }\). The resulting graph \(H\) is a smaller cubic graph and thus 1-planar. We can easily re-insert
-        contracted vertices and edges back to the drawing without creating new crossings.
+        \item If $u',v',w'$ are pairwise distinct, contract $T$ into one
+        vertex.  The result is a smaller simple subcubic graph and is therefore
+        1-planar.  Expanding the contracted vertex into $T$ inside a small
+        disk introduces no crossing.
 
-        \item If \(u^{\prime },v^{\prime },w^{\prime }\) are all the same, then the
-        graph is $K_4$.
+        \item If $u'=v'=w'$, then connectedness and cubicity imply that
+        $G=K_4$, which is planar.
 
-        \item If $u^{\prime },v^{\prime }$ are the same and $w^{\prime }$ is different, then ...
+        \item It remains to consider the case $u'=v'=x$ and $w'=y\ne x$.
+        The subgraph $P_0$ induced by $u,v,w,x$ is a diamond.  Its terminals
+        are $x,w$, and $P_0+xw=K_4$ is planar.  Let $p$ be the third neighbor
+        of $x$, outside the diamond.  If $p=y$, then $y$ is a cut vertex,
+        contradicting biconnectivity.  If $p\ne y$ and $py\notin E$, replace
+        the diamond by the edge $py$.  This gives a smaller subcubic graph,
+        and \cref{lem:two-terminal-replacement} expands any of its 1-planar
+        drawings back into a drawing of $G$.
+
+        Finally suppose $py\in E$.  Absorb $p,y$ and the three edges
+        $xp,py,yw$ into the planar patch.  The new terminals $p,y$ are
+        incident to a common face (indeed, they are adjacent).  Let their two
+        as-yet unaccounted-for neighbors be $p_1,y_1$.  If $p_1=y_1$, that
+        vertex is a cut vertex.  If they are distinct and nonadjacent, replace
+        the enlarged patch by $p_1y_1$ and apply
+        \cref{lem:two-terminal-replacement}.  If
+        they are adjacent, absorb them as well and repeat.
+
+        Every absorbed terminal pair consists of new vertices: all vertices
+        of an earlier pair already have their three incident edges inside the
+        patch or leading to the next pair.  Since $G$ is finite, the process
+        must therefore reach either a common outside neighbor (a cut vertex)
+        or two distinct nonadjacent outside neighbors (a valid replacement).
+        Both outcomes contradict the choice of $G$.
     \end{itemize}
+\end{proof}
+
+For the flexibility statements we use a strengthened form of the same
+induction.
+Call a graph \emph{$k$-flexible} if, for every set of at most $k$ of its
+edges, it has a 1-planar drawing in which all those edges are uncrossed.
+
+\begin{lemma}[Minimal obstruction to flexibility]\label{lem:flexibility-core}
+    Let $k$ be a nonnegative integer.  A lexicographically smallest subcubic graph that is not
+    $k$-flexible is biconnected, cubic, and triangle-free.
+\end{lemma}
+
+\begin{proof}
+    Let $G$ be such a graph.  For any set $F\subseteq E(G)$ with $|F|\leq k$,
+    distribute the edges of $F$ among the components or blocks of $G$.  Every
+    proper component or block is smaller than $G$ and is therefore
+    $k$-flexible.  Its drawing may consequently be chosen with its part of
+    $F$ uncrossed.  Placing component drawings in disjoint regions, or block
+    drawings in disjoint wedges at their common cut vertices, gives the
+    required drawing of $G$.  Hence $G$ is biconnected.
+
+    It remains to exclude a vertex $v$ of degree two.  Let its neighbors be
+    $u$ and $w$.  If $uw\notin E(G)$, delete $v$ and add $uw$.  Retain every
+    prescribed edge outside $uv,vw$, and prescribe $uw$ if $uv$ or $vw$
+    belongs to $F$.  Subdividing an uncrossed drawing of $uw$ restores both
+    $uv$ and $vw$ without crossings.
+
+    Suppose instead that $uw\in E(G)$.  If $u$ and $w$ have another common
+    neighbor $x$, then either $G$ is planar or $x$ is a cut vertex, contrary
+    to the preceding paragraph.  Otherwise identify $u,v,w$ to a single
+    vertex.  The resulting graph is simple and subcubic.  Retain prescribed
+    edges outside the triangle, map its prescribed attachment edges to their
+    images, and omit its prescribed internal edges.  Expanding the identified
+    vertex inside a disk restores the triangle, keeps its internal edges
+    uncrossed, and preserves the crossing status of every mapped attachment.
+    Thus $G$ is cubic.
+
+    Finally, let $T$ be a triangle.  If its three external neighbors are
+    distinct, contract $T$ to $z$.  Map a prescribed attachment $v_ix_i$ to
+    $zx_i$, retain prescribed outside edges, and omit prescribed triangle
+    edges from the mapped set; the map does not increase its size.  Expanding
+    an uncrossed mapped attachment and drawing the triangle inside the vertex
+    disk preserves every prescribed edge.  In the repeated-neighbor cases,
+    apply the iterative two-terminal replacement used in the proof of
+    \cref{lem:minimal-triangle-free}.  The prescribed-edge construction in
+    \cref{lem:two-terminal-replacement} does not increase the number of
+    prescribed edges.  Every case therefore reduces to a smaller subcubic
+    graph, a contradiction.
+\end{proof}
+
+\begin{lemma}[Drawing criterion for flexibility]\label{lem:drawing-coverage}
+    Let $\mathcal D$ be a finite collection of 1-planar drawings of a graph
+    $G$.  For each $D\in\mathcal D$, let $X_D\subseteq E(G)$ contain every
+    edge crossed in $D$.  If, for every $F\subseteq E(G)$ with $|F|\leq k$,
+    there exists $D\in\mathcal D$ such that $F\cap X_D=\varnothing$, then
+    $G$ is $k$-flexible.
+\end{lemma}
+
+\begin{proof}
+    Fix $F\subseteq E(G)$ with $|F|\leq k$.  By hypothesis, some
+    $D\in\mathcal D$ satisfies $F\cap X_D=\varnothing$.  Since $X_D$ contains
+    every crossed edge of $D$, every edge of $F$ is uncrossed in $D$.
+\end{proof}
+
+The computation constructs a collection $\mathcal D$ as follows.  Beginning
+with one verified drawing, it searches for a set $F$, $|F|\le k$, that
+intersects $X_D$ for every $D\in\mathcal D$.  If no such set exists,
+\cref{lem:drawing-coverage} applies.  Otherwise it searches for a 1-planar
+drawing in which every edge of $F$ is uncrossed.  Each resulting drawing is
+verified independently before it is added to $\mathcal D$.  The procedure
+terminates because the new crossed-edge set is disjoint from the set $F$
+found in that iteration.  Consequently, the same $F$ cannot be returned in a
+later iteration, and there are only finitely many subsets of $E(G)$ of size at
+most $k$.
+
+Verification of a proposed drawing requires only ordinary planarity of
+the graph obtained by replacing every proposed crossing pair by a degree-four
+vertex.  At such a vertex, alternate edge ends are redrawn as a proper
+crossing; consecutive ends of the same edge are instead smoothed without a
+crossing.  Proposed crossing pairs form a matching, so this produces a
+1-planar drawing whose actually crossed edges are a subset of the recorded
+set $X_D$.  Accordingly, \cref{lem:drawing-coverage} permits $X_D$ to be a
+superset of the edges that cross in the resulting drawing.
+
+The following local observation justifies the crossing elimination used in
+the constrained drawing searches.
+
+\begin{lemma}[Local crossing elimination]\label{lem:local-crossing-elimination}
+    Let $v$ have neighbors $x,y,z$ in a 1-planar drawing, and suppose that
+    $vx$ crosses $yz$.  The drawing can be modified so that this crossing is
+    removed and no new crossing is introduced.  In particular, every edge
+    that was uncrossed before the modification remains uncrossed.
+\end{lemma}
+
+\begin{proof}
+    Move $v$ into a sufficiently small disk beside the crossing, on the
+    $x$-side of $yz$.  Draw $vx$ along the crossing-free portion of its original
+    curve, and draw $vy$ and $vz$ in narrow neighborhoods of the two
+    crossing-free portions of $yz$.  The modification removes the crossing
+    between $vx$ and $yz$ and introduces none.
+\end{proof}
+
+\begin{lemma}[4-cycle expansion]\label{lem:4-cycle-expansion}
+    Let $G$ be a triangle-free cubic graph containing the cycle
+    $C=(v_0,v_1,v_2,v_3)$, and let $x_i$ be the neighbor of $v_i$ outside
+    $C$.  Form $H$ by deleting $C$, adding adjacent vertices $a,b$, joining
+    $a$ to $x_0,x_1$, and joining $b$ to $x_2,x_3$.  If $H$ has a 1-planar
+    drawing in which $ab$ is uncrossed, then $G$ is 1-planar.
+\end{lemma}
+
+\begin{proof}
+    Triangle-freeness implies $x_0\ne x_1$ and $x_2\ne x_3$, so $H$ is a
+    simple cubic graph; equality between opposite external neighbors does not
+    create parallel edges.  Take a narrow disk containing the curve $ab$ and small
+    neighborhoods of its endpoints, but no crossing.  Inside the disk, split
+    $a$ into $v_0,v_1$, split $b$ into $v_2,v_3$, preserve the four external
+    incidences, and draw the edges of $C$.  Depending on the rotations at
+    $a,b$, the two remaining cycle edges can be drawn either without a
+    crossing or crossing each other once.  Every edge inherited from $H$
+    retains its crossings, and each new edge has at most one crossing.
+\end{proof}
+
+The analogous construction pairing $x_1,x_2$ at $a$ and $x_3,x_0$ at $b$
+gives the corresponding second expansion.
+
+\begin{lemma}[Adjacent-edge 4-cycle expansion]\label{lem:adjacent-4-cycle}
+    In the setting of \cref{lem:4-cycle-expansion}, let
+    $c_i=v_iv_{i+1}$ and $s_i=v_ix_i$, with indices modulo four.  If $H$ has
+    a 1-planar drawing in which $ab$ and the image of $s_1$ are uncrossed,
+    then $G$ has a 1-planar drawing in which the three consecutive cycle
+    edges $c_0,c_1,c_2$ are all uncrossed.
+\end{lemma}
+
+\begin{proof}
+    Again take a disk around the uncrossed curve $ab$ and its endpoints.  The
+    four attachment portions have one of the boundary orders
+
+    \[
+       0123,\quad 0132,\quad 0231,\quad 0321,
+    \]
+    according to the two endpoint rotations.  For orders $0123$ and $0321$,
+    restore the 4-cycle without a crossing.  For orders $0132$ and $0231$,
+    use the single crossing $c_3\mathbin\times s_1$.  The edges $c_0,c_1,c_2$
+    remain uncrossed in every case.  The edge $c_3$ is new, and $s_1$ is
+    uncrossed outside the disk; hence neither edge has another crossing.
 
 \end{proof}
+
+\begin{lemma}[4-cycle reduction through order 24]\label{lem:order24-reduction}
+    Suppose every subcubic graph of order at most 22 is $3$-flexible and
+    every cubic graph of order 24 and girth at least five is $2$-flexible.
+    Then every cubic graph of order at most 24 is $2$-flexible.
+\end{lemma}
+
+\begin{proof}
+    By \cref{lem:flexibility-core}, it is enough to consider a biconnected
+    triangle-free cubic graph $G$ of order 24 and a prescribed set $F$ of at
+    most two edges.  If $G$ has no 4-cycle, the second hypothesis applies.
+    Otherwise choose a 4-cycle $C$.
+
+    First suppose that $F$ is not a pair of adjacent edges of $C$.  Choose
+    one of the two 4-cycle reductions so that every prescribed cycle
+    edge is created inside an endpoint disk: one split handles the opposite
+    pair $c_0,c_2$, and the other handles $c_1,c_3$.  In the resulting
+    order-22 graph prescribe the new middle edge and the images of all edges
+    of $F$ outside $C$.  This is a set of at most three edges.  A drawing
+    supplied by $3$-flexibility expands by \cref{lem:4-cycle-expansion};
+    prescribed outside edges are unchanged, and prescribed cycle edges are
+    drawn uncrossed inside the endpoint disks.
+
+    The remaining case is $F=\{c_i,c_{i+1}\}$.  Rotate the labels so that
+    these are $c_0,c_1$, use the displayed split, and prescribe only $ab$ and
+    the image of $s_1$.  By \cref{lem:adjacent-4-cycle}, the resulting
+    $3$-flexible order-22 drawing expands while keeping both prescribed edges
+    uncrossed.
+\end{proof}
+
+Consequently, it suffices to verify $3$-flexibility for biconnected,
+triangle-free cubic graphs of order at most 22 and $2$-flexibility for cubic
+graphs of order 24 and girth at least five.
+
+\begin{lemma}[5-cycle expansion]\label{lem:5-cycle-expansion}
+    Let $C=(v_0,\ldots,v_4)$ be a chordless 5-cycle in a cubic graph $G$,
+    and let $x_i$ be the neighbor of $v_i$ outside $C$.  Suppose that the
+    vertices $x_0,\ldots,x_4$ are distinct.  Form $H$ by deleting $C$,
+    introducing a path $a b c$, and adding the edges
+    $ax_0,ax_1,bx_2,cx_3,cx_4$.  If $H$ has a 1-planar drawing in which the
+    three edges incident with $b$ are uncrossed, then $G$ is 1-planar.
+\end{lemma}
+
+\begin{proof}
+    Take a sufficiently small regular neighborhood of the drawn path
+    $a b c$.  It contains no crossing and meets the five attachment edges in
+    five boundary points.  The rotations at $a,b,c$ give, up to reflection,
+    exactly the four boundary orders in \cref{tab:5-cycle-expansion}.  Inside
+    the neighborhood, replace the path by the 5-cycle and its five attachment
+    portions using the corresponding row.  Here
+    $c_i=v_iv_{i+1}$ and $s_i=v_ix_i$, with indices modulo five.
+
+    Every row is a matching of local edges.  The only old edge that occurs in
+    a listed crossing is $s_2$, which replaces the uncrossed edge $bx_2$.
+    Every new cycle edge is crossed at most once, and all crossings outside
+    the neighborhood are unchanged.  Planarizing each displayed crossing
+    gives a planar graph in a disk with the stated boundary order and
+    alternating incidences at its crossing vertices.  Thus the four rows
+    give valid local 1-planar drawings and complete the expansion.
+\end{proof}
+
+\begin{table}[!ht]
+    \centering
+    \caption{Crossing pairs for the 5-cycle expansion.}
+    \label{tab:5-cycle-expansion}
+    \begin{tabular}{@{}>{$}c<{$}@{\qquad}>{$}l<{$}@{}}
+        \toprule
+        \multicolumn{1}{c}{boundary order} & \multicolumn{1}{c}{crossing pairs} \\
+        \midrule
+        01234&\varnothing\\
+        01243&c_2\mathbin\times c_4\\
+        01342&c_4\mathbin\times s_2\\
+        01432&c_1\mathbin\times c_4\\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{lemma}[6-cycle expansion]\label{lem:6-cycle-expansion}
+    Let $C=(v_0,v_1,\ldots,v_5)$ be a chordless 6-cycle in a cubic graph
+    $G$, let $x_i$ be the neighbor of $v_i$ outside $C$, and suppose that the
+    six $x_i$ are distinct.  Write $s_i=v_ix_i$, and let $H$ be obtained by
+    contracting $C$ to one vertex.  If $H$ has a 1-planar drawing in which
+    $s_1,s_2,s_4,s_5$ are uncrossed, then $G$ is 1-planar.
+\end{lemma}
+
+\begin{proof}[Proof (computational)]
+    Take a disk around the contracted vertex that contains no crossing of the
+    drawing of $H$.  The six incident edge portions meet its boundary in some
+    cyclic order.  Fixing $s_0$ as the first attachment and identifying an
+    order with its reversal leaves $(6-1)!/2=60$ possibilities.  For each
+    order, enumerate matchings of nonadjacent edge pairs among the 6-cycle
+    and its attachments, excluding pairs containing $s_0$ or $s_3$.
+    Planarize every proposed crossing and test for a planar embedding in the
+    disk with alternating incidences at each crossing vertex.  This finite
+    check finds a valid drawing for every boundary order; insert the
+    corresponding drawing in the disk.
+
+    Each new cycle edge is used only inside the disk and has at most one
+    crossing.  Each of $s_1,s_2,s_4,s_5$ is uncrossed outside the disk and
+    has at most one crossing inside it.  The edges $s_0,s_3$ receive no
+    crossing inside the disk and retain their at most one crossing outside.
+    Hence every edge in the expanded drawing is crossed at most once.
+\end{proof}
+
+In a cubic graph of girth at least six, every 6-cycle is chordless and its
+six outside neighbors are distinct: a chord or a repeated outside neighbor
+would create a cycle of length at most five.  Choose any 6-cycle, contract
+it, and require the four attachment edges specified in
+\cref{lem:6-cycle-expansion} to be uncrossed.  A graph with no 6-cycle has
+girth at least seven.  A 1-planar drawing of each such graph is computed and
+independently validated.  There are 21 such graphs at order 28; an independent
+enumeration of the girth-at-least-seven family confirms this number.  No
+simple planar cubic graph has girth at least six: Euler's inequality
+$|E|\le 3(|V|-2)/2$ for a planar graph of girth six contradicts
+$|E|=3|V|/2$.
 
 \section{Upper Bound}
 
+Our goal is to prove that every simple cubic graph with at most 28 vertices
+is 1-planar.  Direct recognition of all graphs at the two largest orders is
+not practical: there are $2{,}094{,}480{,}864$ connected cubic graphs of order 26
+and $40{,}497{,}138{,}011$ of order 28.  Even at ten milliseconds per graph, the
+order-28 computation alone would require more than twelve CPU-years.
+
+We replace direct recognition by five computer-assisted statements together
+with the preceding reductions.  Triangles and 4-cycles reduce to smaller
+graphs with prescribed uncrossed edges.  A 5-cycle at order 28 is replaced
+by a three-vertex path and expanded using \cref{lem:5-cycle-expansion}; 6-cycles
+are treated by \cref{lem:6-cycle-expansion}.  It therefore suffices to
+enumerate the graph classes stated below.
+
+For completeness, we briefly describe how the computational claims are
+certified.  Each graph class is generated up to isomorphism.  A proposed
+drawing is represented by a matching of pairs of edges that are designated to
+cross.  Replacing each designated crossing by a vertex of degree four produces
+a planar graph.  In a planar embedding of this graph, alternating incidences
+at the new vertex yield the designated crossing, whereas consecutive
+incidences can be smoothed without a crossing.  The matching condition implies
+that no edge is crossed more than once.  For the flexibility statements, the
+computation constructs a collection of verified drawings satisfying the
+hypothesis of \cref{lem:drawing-coverage}.  Thus every computational conclusion
+follows from an exhaustive enumeration and explicitly verified 1-planar
+drawings.
+
+\begin{claim}\label{clm:flexible22}
+    Every connected cubic graph with $n \leq 18$ is $3$-flexible.  Every
+    biconnected, nonplanar, triangle-free cubic graph with
+    $n \in \{20,22\}$ is also $3$-flexible.
+\end{claim}
+
+\begin{proof}[Proof (computational)]
+    Exhaustive generation up to isomorphism produces $1{,}575{,}835$ graphs in
+    these families.  Every planar graph is $3$-flexible.  For each nonplanar graph
+    $G$, the computation constructs a finite collection $\mathcal D$ of
+    verified 1-planar drawings such that no set of at most three edges of $G$
+    intersects $X_D$ for every $D\in\mathcal D$.  The claim follows from
+    \cref{lem:drawing-coverage}.
+\end{proof}
+
+\begin{claim}\label{clm:flexible24}
+    Every connected cubic graph with $n=24$ and girth $\geq 5$ is
+    $2$-flexible.
+\end{claim}
+
+\begin{proof}[Proof (computational)]
+    There are $1{,}620{,}479$ isomorphism classes in this family.  For each
+    nonplanar graph $G$, the computation constructs a finite collection
+    $\mathcal D$ of verified 1-planar drawings such that no set of at most two
+    edges of $G$ intersects $X_D$ for every $D\in\mathcal D$.  Hence $G$ is
+    $2$-flexible by \cref{lem:drawing-coverage}.
+\end{proof}
+
+\begin{claim}\label{clm:stars26}
+    For every connected cubic graph $G$ with $n=26$ and girth $\geq 5$, and
+    every vertex $v\in V(G)$, there is a 1-planar drawing of $G$ in which all
+    three edges incident with $v$ are uncrossed.
+\end{claim}
+
+\begin{proof}[Proof (computational)]
+    The family contains $31{,}478{,}584$ isomorphism classes.  For every
+    nonplanar graph and every vertex $v$, the computation obtains and verifies
+    a 1-planar drawing in which the three edges incident with $v$ are
+    uncrossed.  One drawing may satisfy this requirement for several
+    vertices.  Planar graphs satisfy the requirement in a planar drawing.
+\end{proof}
+
+\begin{claim}\label{clm:girth5-28}
+    Every connected cubic graph with $n=28$ and girth $=5$ is 1-planar.
+\end{claim}
+
+\begin{proof}[Proof (computational)]
+    There are $652{,}159{,}389$ isomorphism classes.  For every nonplanar
+    graph, the computation first searches for a 5-cycle and a cyclic choice
+    of its middle attachment such that the replacement in
+    \cref{lem:5-cycle-expansion} is a simple connected cubic graph $H$ with 26
+    vertices and girth at least five.  When such a replacement exists,
+    \cref{clm:stars26} supplies a drawing of $H$ in which the three edges
+    incident with the middle vertex of the replacement path are uncrossed;
+    \cref{lem:5-cycle-expansion} then gives a drawing of the original graph.
+    If no such replacement exists, the computation obtains and independently
+    verifies a 1-planar drawing of the original graph.
+\end{proof}
+
+\begin{claim}\label{clm:girth6-28}
+    Every connected cubic graph with $n=28$ and girth $\geq 6$ is 1-planar.
+\end{claim}
+
+\begin{proof}[Proof (computational)]
+    There are $4{,}624{,}501$ isomorphism classes in this family.  A 6-cycle
+    occurs in $4{,}624{,}480$ of them.  For each of these graphs, contracting a
+    6-cycle gives a graph with a verified 1-planar drawing in which the four
+    attachment edges specified in \cref{lem:6-cycle-expansion} are uncrossed.
+    Consequently, the original graph is 1-planar by
+    \cref{lem:6-cycle-expansion}.  The remaining 21
+    graphs have girth at least seven, and a verified 1-planar drawing was
+    obtained for each of them.
+\end{proof}
+
+The projected running times for the five computations are summarized in
+\cref{tab:cubic28-runtime}.  They are extrapolated from computations on
+representative subsets and on complete subsets of the enumerations.
+The one-core column gives the projected aggregate processor time; the
+32-core column assumes an even distribution of the work.  Time required to
+enumerate the graph families is not included.
+
+\begin{table}[!ht]
+    \small
+    \centering
+    \caption{Projected running times for the computational claims.}
+    \label{tab:cubic28-runtime}
+    \begin{tabular}{@{}lrr@{}}
+        \toprule
+        computation & one core & 32 cores \\
+        \midrule
+        \cref{clm:flexible22} & 4.6 days & 3.5 hours \\
+        \cref{clm:flexible24} & 6.7 days & 5.0 hours \\
+        \cref{clm:stars26}    & 279 days & 8.7 days \\
+        \cref{clm:girth5-28}  & 6.3 days & 4.7 hours \\
+        \cref{clm:girth6-28}  & 12.3 days & 9.2 hours \\
+        \midrule
+        total & 309 days & 9.7 days \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The five claims reduce the proof to the structural arguments established
+earlier in the paper.
+
+\begin{theorem}\label{thm:cubic28}
+    Every simple cubic graph with at most 28 vertices is 1-planar.
+\end{theorem}
+
+\begin{proof}
+    By \cref{lem:flexibility-core,clm:flexible22}, every subcubic graph of
+    order at most 22 is $3$-flexible.  Applying
+    \cref{lem:order24-reduction,clm:flexible24} shows that every cubic graph
+    of order at most 24 is $2$-flexible and hence 1-planar.
+
+    A disconnected cubic graph of order 26 or 28 has only components of order
+    at most 24, whose drawings can be placed disjointly.  It therefore remains
+    to consider connected graphs at these two orders.
+
+    Consider order 26.  A triangle reduces to a smaller subcubic graph.  In a
+    triangle-free graph containing a 4-cycle, fix any prescribed edge and
+    split that cycle.  If the prescribed edge lies on the cycle, choose the
+    split that creates it inside an endpoint disk; otherwise retain its image.
+    Together with the new middle edge this gives at most two prescribed edges
+    in the order-24 graph, covered by its $2$-flexibility.  A
+    triangle-free graph with no 4-cycle has girth at least five and is
+    covered by \cref{clm:stars26}.  The property in \cref{clm:stars26}
+    implies $1$-flexibility, since each prescribed edge is incident with a
+    vertex whose entire three-edge star can be kept uncrossed.  Hence every
+    order-26 cubic graph is $1$-flexible and therefore 1-planar.
+
+    Finally consider order 28.  Triangles reduce as before.  In a triangle-free
+    graph containing a 4-cycle, split that cycle once and use the
+    established order-26 $1$-flexibility to keep the new middle edge
+    uncrossed.  A graph with neither a triangle nor a 4-cycle has girth at
+    least five.  The case of girth exactly five is covered by
+    \cref{clm:girth5-28}, and the case of girth at least six is covered by
+    \cref{clm:girth6-28}.  These cases exhaust all simple cubic graphs of
+    order at most 28.
+\end{proof}
 
 
 
