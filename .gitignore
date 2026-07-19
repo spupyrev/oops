@@ -32,5 +32,6 @@ __pycache__/
 /main_cubic.vtc
 speedup_plan.md
 oops_parallel_design_v3.md
+cubic/cubic28_progress_report.md
 AGENTS.md
 CLAUDE.md
