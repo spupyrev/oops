@@ -89,12 +89,12 @@ find the smallest 3-regular (cubic) graph that is not 1-planar. While it is easy
 smallest such instance is unknown.
 
 Throughout the paper, all graphs are finite, simple, and undirected.  The
-\emph{order} of a graph $G$ is $|V(G)|$.  A graph is \emph{cubic} if every
-vertex has degree three, and it is \emph{subcubic} if every vertex has degree
-at most three.  A connected graph is \emph{biconnected} if it has no cut
-vertex.  A graph is \emph{planar} if it has a drawing without crossings.  The
-\emph{girth} of a graph containing a cycle is the length of its shortest
-cycle.
+\emph{order} of a graph $G$ is $|V(G)|$, and we write $n=|V(G)|$.  A graph is
+\emph{cubic} if every vertex has degree three, and it is \emph{subcubic} if
+every vertex has degree at most three.  A connected graph is
+\emph{biconnected} if it has no cut vertex.  A graph is \emph{planar} if it
+has a drawing without crossings.  The \emph{girth} of a graph containing a
+cycle is the length of its shortest cycle.
 
 \newtheorem*{problem1b}{Problem 1}
 \begin{problem1b}[\cite{11011110_cubic,mathse_cubic,oops}]
@@ -337,7 +337,7 @@ edges, it has a 1-planar drawing in which all those edges are uncrossed.
 \end{proof}
 
 \begin{lemma}[Drawing criterion for flexibility]\label{lem:drawing-coverage}
-    Let $\mathcal D$ be a finite collection of 1-planar drawings of a graph
+    Let $\mathcal D$ be a collection of 1-planar drawings of a graph
     $G$.  For each $D\in\mathcal D$, let $X_D\subseteq E(G)$ contain every
     edge crossed in $D$.  If, for every $F\subseteq E(G)$ with $|F|\leq k$,
     there exists $D\in\mathcal D$ such that $F\cap X_D=\varnothing$, then
@@ -350,28 +350,17 @@ edges, it has a 1-planar drawing in which all those edges are uncrossed.
     every crossed edge of $D$, every edge of $F$ is uncrossed in $D$.
 \end{proof}
 
-The computation constructs a collection $\mathcal D$ as follows.  Beginning
-with one verified drawing, it searches for a set $F$, $|F|\le k$, that
-intersects $X_D$ for every $D\in\mathcal D$.  If no such set exists,
-\cref{lem:drawing-coverage} applies.  Otherwise it searches for a 1-planar
-drawing in which every edge of $F$ is uncrossed.  Each resulting drawing is
-verified independently before it is added to $\mathcal D$.  The procedure
-terminates because the new crossed-edge set is disjoint from the set $F$
-found in that iteration.  Consequently, the same $F$ cannot be returned in a
-later iteration, and there are only finitely many subsets of $E(G)$ of size at
-most $k$.
+To establish $k$-flexibility, we construct $\mathcal D$ iteratively.  If some
+set $F\subseteq E(G)$ with $|F|\leq k$ intersects $X_D$ for every
+$D\in\mathcal D$, we add a 1-planar drawing in which every edge of $F$ is
+uncrossed.  If no such $F$ exists, \cref{lem:drawing-coverage} applies.  The
+procedure terminates because the drawing added in an iteration has a
+crossed-edge set disjoint from the corresponding set $F$; hence that $F$
+cannot occur again.  Only finitely many subsets of $E(G)$ have size at most
+$k$.
 
-Verification of a proposed drawing requires only ordinary planarity of
-the graph obtained by replacing every proposed crossing pair by a degree-four
-vertex.  At such a vertex, alternate edge ends are redrawn as a proper
-crossing; consecutive ends of the same edge are instead smoothed without a
-crossing.  Proposed crossing pairs form a matching, so this produces a
-1-planar drawing whose actually crossed edges are a subset of the recorded
-set $X_D$.  Accordingly, \cref{lem:drawing-coverage} permits $X_D$ to be a
-superset of the edges that cross in the resulting drawing.
-
-The following local observation justifies the crossing elimination used in
-the constrained drawing searches.
+The following local observation will be used when prescribing uncrossed
+edges.
 
 \begin{lemma}[Local crossing elimination]\label{lem:local-crossing-elimination}
     Let $v$ have neighbors $x,y,z$ in a 1-planar drawing, and suppose that
@@ -436,15 +425,16 @@ gives the corresponding second expansion.
 
 \begin{lemma}[4-cycle reduction through order 24]\label{lem:order24-reduction}
     Suppose every subcubic graph of order at most 22 is $3$-flexible and
-    every cubic graph of order 24 and girth at least five is $2$-flexible.
-    Then every cubic graph of order at most 24 is $2$-flexible.
+    every biconnected, nonplanar cubic graph of order 24 and girth at least
+    five is $2$-flexible.  Then every cubic graph of order at most 24 is
+    $2$-flexible.
 \end{lemma}
 
 \begin{proof}
     By \cref{lem:flexibility-core}, it is enough to consider a biconnected
     triangle-free cubic graph $G$ of order 24 and a prescribed set $F$ of at
-    most two edges.  If $G$ has no 4-cycle, the second hypothesis applies.
-    Otherwise choose a 4-cycle $C$.
+    most two edges.  We may assume that $G$ is nonplanar.  If $G$ has no
+    4-cycle, the second hypothesis applies.  Otherwise choose a 4-cycle $C$.
 
     First suppose that $F$ is not a pair of adjacent edges of $C$.  Choose
     one of the two 4-cycle reductions so that every prescribed cycle
@@ -464,8 +454,8 @@ gives the corresponding second expansion.
 \end{proof}
 
 Consequently, it suffices to verify $3$-flexibility for biconnected,
-triangle-free cubic graphs of order at most 22 and $2$-flexibility for cubic
-graphs of order 24 and girth at least five.
+triangle-free cubic graphs of order at most 22 and $2$-flexibility for
+biconnected, nonplanar cubic graphs of order 24 and girth at least five.
 
 \begin{lemma}[5-cycle expansion]\label{lem:5-cycle-expansion}
     Let $C=(v_0,\ldots,v_4)$ be a chordless 5-cycle in a cubic graph $G$,
@@ -526,8 +516,8 @@ graphs of order 24 and girth at least five.
     order, enumerate matchings of nonadjacent edge pairs among the 6-cycle
     and its attachments, excluding pairs containing $s_0$ or $s_3$.
     Planarize every proposed crossing and test for a planar embedding in the
-    disk with alternating incidences at each crossing vertex.  This finite
-    check finds a valid drawing for every boundary order; insert the
+    disk with alternating incidences at each crossing vertex.  The check
+    finds a valid drawing for every boundary order; insert the
     corresponding drawing in the disk.
 
     Each new cycle edge is used only inside the disk and has at most one
@@ -539,70 +529,65 @@ graphs of order 24 and girth at least five.
 
 In a cubic graph of girth at least six, every 6-cycle is chordless and its
 six outside neighbors are distinct: a chord or a repeated outside neighbor
-would create a cycle of length at most five.  Choose any 6-cycle, contract
-it, and require the four attachment edges specified in
-\cref{lem:6-cycle-expansion} to be uncrossed.  A graph with no 6-cycle has
-girth at least seven.  A 1-planar drawing of each such graph is computed and
-independently validated.  There are 21 such graphs at order 28; an independent
-enumeration of the girth-at-least-seven family confirms this number.  No
-simple planar cubic graph has girth at least six: Euler's inequality
+would create a cycle of length at most five.  No simple planar cubic graph
+has girth at least six: Euler's inequality
 $|E|\le 3(|V|-2)/2$ for a planar graph of girth six contradicts
 $|E|=3|V|/2$.
 
 \section{Upper Bound}
 
 Our goal is to prove that every simple cubic graph with at most 28 vertices
-is 1-planar.  Direct recognition of all graphs at the two largest orders is
-not practical: there are $2{,}094{,}480{,}864$ connected cubic graphs of order 26
-and $40{,}497{,}138{,}011$ of order 28.  Even at ten milliseconds per graph, the
-order-28 computation alone would require more than twelve CPU-years.
+is 1-planar.  Testing all graphs directly is impractical: there are
+$2{,}094{,}480{,}864$ connected cubic graphs with $n=26$ and
+$40{,}497{,}138{,}011$ with $n=28$.  Even at ten milliseconds per graph, the
+latter family alone would require more than twelve CPU-years.
 
-We replace direct recognition by five computer-assisted statements together
-with the preceding reductions.  Triangles and 4-cycles reduce to smaller
-graphs with prescribed uncrossed edges.  A 5-cycle at order 28 is replaced
-by a three-vertex path and expanded using \cref{lem:5-cycle-expansion}; 6-cycles
-are treated by \cref{lem:6-cycle-expansion}.  It therefore suffices to
-enumerate the graph classes stated below.
+The reductions above leave five computational claims.  All enumerations below
+are exhaustive and contain one representative of each isomorphism class.
 
-For completeness, we briefly describe how the computational claims are
-certified.  Each graph class is generated up to isomorphism.  A proposed
-drawing is represented by a matching of pairs of edges that are designated to
-cross.  Replacing each designated crossing by a vertex of degree four produces
-a planar graph.  In a planar embedding of this graph, alternating incidences
-at the new vertex yield the designated crossing, whereas consecutive
-incidences can be smoothed without a crossing.  The matching condition implies
-that no edge is crossed more than once.  For the flexibility statements, the
-computation constructs a collection of verified drawings satisfying the
-hypothesis of \cref{lem:drawing-coverage}.  Thus every computational conclusion
-follows from an exhaustive enumeration and explicitly verified 1-planar
-drawings.
+We first describe the mathematical objects checked in these computations.  A
+\emph{crossing pattern} in a graph $G$ is a set $M$ of unordered pairs of
+nonadjacent edges such that no edge occurs in more than one pair.  Let
+$\operatorname{supp}(M)$ be the set of edges occurring in the pairs of $M$,
+and let $G_M$ be obtained by replacing each pair $\{uv,xy\}\in M$ with a new
+vertex adjacent to $u,v,x,y$.
+
+If $G_M$ is planar, then $G$ is 1-planar.  Indeed, consider a planar embedding
+of $G_M$ and a small disk around each new vertex.  If the two portions of each
+original edge alternate around the new vertex, replace that vertex by a
+crossing; otherwise join the two portions of each original edge without a
+crossing.  Since no edge belongs to two pairs of $M$, every edge is crossed at
+most once.  Moreover, every edge outside $\operatorname{supp}(M)$ is
+uncrossed.  The computational proofs below consist of finding such crossing
+patterns and testing the planarity of the corresponding graphs $G_M$.  For a
+planar graph, the empty crossing pattern suffices.
 
 \begin{claim}\label{clm:flexible22}
     Every connected cubic graph with $n \leq 18$ is $3$-flexible.  Every
     biconnected, nonplanar, triangle-free cubic graph with
-    $n \in \{20,22\}$ is also $3$-flexible.
+    $n \in \{20,22\}$ is $3$-flexible.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    Exhaustive generation up to isomorphism produces $1{,}575{,}835$ graphs in
-    these families.  Every planar graph is $3$-flexible.  For each nonplanar graph
-    $G$, the computation constructs a finite collection $\mathcal D$ of
-    verified 1-planar drawings such that no set of at most three edges of $G$
-    intersects $X_D$ for every $D\in\mathcal D$.  The claim follows from
-    \cref{lem:drawing-coverage}.
+    These families contain $1{,}575{,}835$ isomorphism classes.  For every
+    nonplanar graph $G$ in the enumeration and every set
+    $F\subseteq E(G)$ with $|F|\leq 3$, the computation found a crossing
+    pattern $M$ such that $G_M$ is planar and
+    $F\cap\operatorname{supp}(M)=\varnothing$.  Hence $G$ has a 1-planar
+    drawing in which every edge of $F$ is uncrossed.
 \end{proof}
 
 \begin{claim}\label{clm:flexible24}
-    Every connected cubic graph with $n=24$ and girth $\geq 5$ is
-    $2$-flexible.
+    Every biconnected, nonplanar cubic graph with $n=24$ and girth $\geq 5$
+    is $2$-flexible.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    There are $1{,}620{,}479$ isomorphism classes in this family.  For each
-    nonplanar graph $G$, the computation constructs a finite collection
-    $\mathcal D$ of verified 1-planar drawings such that no set of at most two
-    edges of $G$ intersects $X_D$ for every $D\in\mathcal D$.  Hence $G$ is
-    $2$-flexible by \cref{lem:drawing-coverage}.
+    This family contains $1{,}620{,}470$ isomorphism classes.  For every graph
+    $G$ in the enumeration and every set $F\subseteq E(G)$ with $|F|\leq 2$,
+    the computation found a crossing pattern $M$ such that $G_M$ is planar and
+    $F\cap\operatorname{supp}(M)=\varnothing$.  Thus every edge of $F$ is
+    uncrossed in the resulting 1-planar drawing.
 \end{proof}
 
 \begin{claim}\label{clm:stars26}
@@ -613,10 +598,10 @@ drawings.
 
 \begin{proof}[Proof (computational)]
     The family contains $31{,}478{,}584$ isomorphism classes.  For every
-    nonplanar graph and every vertex $v$, the computation obtains and verifies
-    a 1-planar drawing in which the three edges incident with $v$ are
-    uncrossed.  One drawing may satisfy this requirement for several
-    vertices.  Planar graphs satisfy the requirement in a planar drawing.
+    nonplanar graph $G$ in the enumeration and every vertex $v\in V(G)$, the
+    computation found a crossing pattern $M$ such that $G_M$ is planar and no
+    edge incident with $v$ belongs to $\operatorname{supp}(M)$.  The resulting
+    1-planar drawing has the required property.
 \end{proof}
 
 \begin{claim}\label{clm:girth5-28}
@@ -624,16 +609,20 @@ drawings.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    There are $652{,}159{,}389$ isomorphism classes.  For every nonplanar
-    graph, the computation first searches for a 5-cycle and a cyclic choice
-    of its middle attachment such that the replacement in
-    \cref{lem:5-cycle-expansion} is a simple connected cubic graph $H$ with 26
-    vertices and girth at least five.  When such a replacement exists,
-    \cref{clm:stars26} supplies a drawing of $H$ in which the three edges
-    incident with the middle vertex of the replacement path are uncrossed;
-    \cref{lem:5-cycle-expansion} then gives a drawing of the original graph.
-    If no such replacement exists, the computation obtains and independently
-    verifies a 1-planar drawing of the original graph.
+    This family contains $652{,}159{,}389$ isomorphism classes.  For every
+    nonplanar graph $G$ in the enumeration, the computation established one
+    of the following alternatives.
+    \begin{enumerate}[(i)]
+        \item A 5-cycle can be labeled as in \cref{lem:5-cycle-expansion} so
+        that the resulting graph $H$ is a simple connected cubic graph with
+        $n=26$ and girth at least five.
+        \item There is a crossing pattern $M$ in $G$ such that $G_M$ is
+        planar.
+    \end{enumerate}
+    In the first case, \cref{clm:stars26} gives a 1-planar drawing of $H$ in
+    which the three edges incident with $b$ are uncrossed, and
+    \cref{lem:5-cycle-expansion} gives a 1-planar drawing of $G$.  The second
+    case follows from the planarity of $G_M$.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
@@ -641,80 +630,87 @@ drawings.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    There are $4{,}624{,}501$ isomorphism classes in this family.  A 6-cycle
-    occurs in $4{,}624{,}480$ of them.  For each of these graphs, contracting a
-    6-cycle gives a graph with a verified 1-planar drawing in which the four
-    attachment edges specified in \cref{lem:6-cycle-expansion} are uncrossed.
-    Consequently, the original graph is 1-planar by
-    \cref{lem:6-cycle-expansion}.  The remaining 21
-    graphs have girth at least seven, and a verified 1-planar drawing was
-    obtained for each of them.
+    This family contains $4{,}624{,}501$ isomorphism classes, of which
+    $4{,}624{,}480$ contain a 6-cycle.  For each such graph $G$, the computation
+    selected a 6-cycle, formed the graph $H$ defined in
+    \cref{lem:6-cycle-expansion}, and found a crossing pattern $M$ in $H$ such
+    that $H_M$ is planar and
+    $\{s_1,s_2,s_4,s_5\}\cap\operatorname{supp}(M)=\varnothing$.  Hence $H$
+    has a 1-planar drawing in which these four edges are uncrossed, and $G$ is
+    1-planar by \cref{lem:6-cycle-expansion}.  The remaining 21 graphs have
+    girth at least seven.  For each of them, the computation found a crossing
+    pattern $M$ such that $G_M$ is planar.
 \end{proof}
 
-The projected running times for the five computations are summarized in
-\cref{tab:cubic28-runtime}.  They are extrapolated from computations on
-representative subsets and on complete subsets of the enumerations.
-The one-core column gives the projected aggregate processor time; the
-32-core column assumes an even distribution of the work.  Time required to
-enumerate the graph families is not included.
+The running times for the five computations are summarized in
+\cref{tab:cubic28-runtime}.  The time for \cref{clm:flexible22} was measured
+in the complete verification; the remaining times are projected from
+computations on subsets of the enumerations.  All times are wall-clock times
+for 48 cores.  Time required to enumerate the graph families is not included.
 
 \begin{table}[!ht]
     \small
     \centering
-    \caption{Projected running times for the computational claims.}
+    \caption{Measured and projected wall-clock times on 48 cores.}
     \label{tab:cubic28-runtime}
-    \begin{tabular}{@{}lrr@{}}
+    \begin{tabular}{@{}lrc@{}}
         \toprule
-        computation & one core & 32 cores \\
+        computation & running time & verified \\
         \midrule
-        \cref{clm:flexible22} & 4.6 days & 3.5 hours \\
-        \cref{clm:flexible24} & 6.7 days & 5.0 hours \\
-        \cref{clm:stars26}    & 279 days & 8.7 days \\
-        \cref{clm:girth5-28}  & 6.3 days & 4.7 hours \\
-        \cref{clm:girth6-28}  & 12.3 days & 9.2 hours \\
+        \cref{clm:flexible22} & 14 hours 41 minutes (measured) & yes \\
+        \cref{clm:flexible24} & 3.3 hours (projected) & no \\
+        \cref{clm:stars26}    & 5.8 days (projected) & no \\
+        \cref{clm:girth5-28}  & 3.1 hours (projected) & no \\
+        \cref{clm:girth6-28}  & 6.1 hours (projected) & no \\
         \midrule
-        total & 309 days & 9.7 days \\
+        total & 6.9 days (projected) & no \\
         \bottomrule
     \end{tabular}
 \end{table}
-
-The five claims reduce the proof to the structural arguments established
-earlier in the paper.
 
 \begin{theorem}\label{thm:cubic28}
     Every simple cubic graph with at most 28 vertices is 1-planar.
 \end{theorem}
 
 \begin{proof}
-    By \cref{lem:flexibility-core,clm:flexible22}, every subcubic graph of
-    order at most 22 is $3$-flexible.  Applying
-    \cref{lem:order24-reduction,clm:flexible24} shows that every cubic graph
-    of order at most 24 is $2$-flexible and hence 1-planar.
+    We first apply the flexibility results at the smaller orders.  If a
+    subcubic graph of order at most 22 were not $3$-flexible, a smallest such
+    graph would be biconnected, cubic, and triangle-free by
+    \cref{lem:flexibility-core}, contrary to \cref{clm:flexible22}.  Thus every
+    subcubic graph of order at most 22 is $3$-flexible.  It follows from
+    \cref{lem:order24-reduction,clm:flexible24} that every cubic graph of order
+    at most 24 is $2$-flexible.  A smallest subcubic graph of order at most 24
+    that is not $2$-flexible would again be cubic by
+    \cref{lem:flexibility-core}; consequently, every subcubic graph of order
+    at most 24 is $2$-flexible.
 
-    A disconnected cubic graph of order 26 or 28 has only components of order
-    at most 24, whose drawings can be placed disjointly.  It therefore remains
-    to consider connected graphs at these two orders.
+    We next show that every subcubic graph of order at most 26 is
+    $1$-flexible.  Suppose otherwise, and choose a smallest counterexample
+    $G$.  By \cref{lem:flexibility-core}, the graph $G$ is biconnected, cubic,
+    and triangle-free.  The preceding paragraph excludes orders at most 24,
+    and a cubic graph has even order; hence $G$ has order 26.  Fix an edge
+    $e\in E(G)$.  If $G$ contains a 4-cycle, choose one of the
+    two reductions in \cref{lem:4-cycle-expansion} so that, when $e$ belongs
+    to the cycle, it is restored inside an endpoint disk.  In the resulting
+    graph of order 24, prescribe the edge $ab$ and, when $e$ lies outside the
+    cycle, its image.  Its $2$-flexibility gives a drawing that expands to a
+    drawing of $G$ in which $e$ is uncrossed.  If $G$ has no 4-cycle, then it
+    has girth at least five.  By \cref{clm:stars26}, choosing either endpoint
+    of $e$ gives a 1-planar drawing in which $e$ is uncrossed.  Since $e$ was
+    arbitrary, both cases contradict the choice of $G$.
 
-    Consider order 26.  A triangle reduces to a smaller subcubic graph.  In a
-    triangle-free graph containing a 4-cycle, fix any prescribed edge and
-    split that cycle.  If the prescribed edge lies on the cycle, choose the
-    split that creates it inside an endpoint disk; otherwise retain its image.
-    Together with the new middle edge this gives at most two prescribed edges
-    in the order-24 graph, covered by its $2$-flexibility.  A
-    triangle-free graph with no 4-cycle has girth at least five and is
-    covered by \cref{clm:stars26}.  The property in \cref{clm:stars26}
-    implies $1$-flexibility, since each prescribed edge is incident with a
-    vertex whose entire three-edge star can be kept uncrossed.  Hence every
-    order-26 cubic graph is $1$-flexible and therefore 1-planar.
-
-    Finally consider order 28.  Triangles reduce as before.  In a triangle-free
-    graph containing a 4-cycle, split that cycle once and use the
-    established order-26 $1$-flexibility to keep the new middle edge
-    uncrossed.  A graph with neither a triangle nor a 4-cycle has girth at
-    least five.  The case of girth exactly five is covered by
-    \cref{clm:girth5-28}, and the case of girth at least six is covered by
-    \cref{clm:girth6-28}.  These cases exhaust all simple cubic graphs of
-    order at most 28.
+    Finally, suppose that a subcubic graph of order at most 28 is not
+    1-planar, and choose a smallest such graph $G$.  By
+    \cref{lem:flexibility-core} with $k=0$, the graph $G$ is biconnected,
+    cubic, and triangle-free.  The preceding paragraph excludes orders at
+    most 26, and cubic graphs have even order; hence $G$ has order 28.  If $G$
+    contains a 4-cycle, apply
+    \cref{lem:4-cycle-expansion}.  The resulting graph has order 26, and its
+    $1$-flexibility provides a 1-planar drawing in which $ab$ is uncrossed;
+    this drawing expands to a 1-planar drawing of $G$.  Otherwise $G$ has
+    girth at least five.  If its girth is five, \cref{clm:girth5-28} applies;
+    if its girth is at least six, \cref{clm:girth6-28} applies.  Every case is
+    a contradiction.
 \end{proof}
 
 

@@ -10,6 +10,26 @@ input files may be assigned to independent processes.  A verification is
 successful only if every process exits successfully and the total number of
 processed records equals the stated family size.
 
+## Prerequisites
+
+The verification uses the following software:
+
+- A C++17 compiler, a C compiler, GNU Make, Bash, and standard Unix utilities
+  including `sha256sum`, `find`, `sort`, `xargs`, and `wc`.  Building OOPS also
+  requires the zlib development headers and library.
+- **nauty and Traces 2.9.3**, which supplies the `geng`, `pickg`, and `planarg`
+  executables used for Claims 1 and 2.  Obtain the sources from the
+  [official nauty page](https://users.cecs.anu.edu.au/~bdm/nauty/) or download
+  the [nauty 2.9.3 source archive](https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz).
+  After extracting the archive, run `./configure` and `make`; `geng`, `pickg`,
+  and `planarg` will be created in the resulting `nauty2_9_3`
+  directory.
+- **Minibaum 5**, which generates the connected cubic graphs of prescribed
+  minimum girth for Claims 2--5.  The author's
+  [Minibaum page](https://caagt.ugent.be/minibaum/) provides the
+  [minibaum5.c source](https://caagt.ugent.be/minibaum/minibaum5.c) and the
+  [Minibaum manual](https://caagt.ugent.be/minibaum/minibaummanual.pdf).
+
 ## Preparation
 
 Build OOPS and Minibaum, and identify the nauty executables:
@@ -26,7 +46,8 @@ PARTS=256
 
 mkdir -p data evidence
 sha256sum ./oops "$MINIBAUM" /path/to/minibaum5.c \
-  "$NAUTY/geng" "$NAUTY/planarg" > evidence/programs.sha256
+  "$NAUTY/geng" "$NAUTY/pickg" "$NAUTY/planarg" \
+  > evidence/programs.sha256
 ```
 
 The following shell function generates one complete Minibaum enumeration in 256
@@ -95,11 +116,24 @@ Their sum is 1,575,835.  Every nonplanar record must be reported as
 
 ## Verify Claim 2
 
-Generate the connected cubic graphs with $n=24$ and girth at least 5, then
-verify 2-flexibility:
+Generate the connected cubic graphs with $n=24$ and girth at least 5.  Retain
+only the biconnected, nonplanar graphs, then verify 2-flexibility:
 
 ```bash
-generate_minibaum 24 5 data/claim2
+generate_minibaum 24 5 data/claim2-all
+
+mkdir -p data/claim2
+for input in data/claim2-all/*.g6; do
+  name=$(basename "$input")
+  output="data/claim2/$name"
+  if [ ! -f "$output" ]; then
+    "$NAUTY/pickg" -q -c2 "$input" |
+      "$NAUTY/planarg" -q -v > "$output.tmp"
+    mv "$output.tmp" "$output"
+  fi
+done
+
+wc -l data/claim2-all/*.g6
 wc -l data/claim2/*.g6
 
 mkdir -p evidence/claim2
@@ -110,8 +144,12 @@ for input in data/claim2/*.g6; do
 done
 ```
 
-The expected number of records is 1,620,479.  Every nonplanar record must be
-reported as 2-flexible.
+The option `pickg -c2` selects graphs of vertex connectivity at least two,
+and `planarg -v` selects nonplanar graphs.
+
+The complete connected enumeration contains 1,620,479 records.  After
+filtering, 1,620,470 biconnected, nonplanar records remain.  Every remaining
+record must be reported as 2-flexible.
 
 ## Verify Claim 3
 
