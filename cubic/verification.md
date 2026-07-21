@@ -15,10 +15,10 @@ processed records equals the stated family size.
 The verification uses the following software:
 
 - A C++17 compiler, a C compiler, GNU Make, Bash, and standard Unix utilities
-  including `sha256sum`, `find`, `sort`, `xargs`, and `wc`.  Building OOPS also
-  requires the zlib development headers and library.
+  including `awk`, `sha256sum`, `find`, `sort`, `xargs`, and `wc`.  Building
+  OOPS also requires the zlib development headers and library.
 - **nauty and Traces 2.9.3**, which supplies the `geng`, `pickg`, and `planarg`
-  executables used for Claims 1 and 2.  Obtain the sources from the
+  executables used for Claims 1--5.  Obtain the sources from the
   [official nauty page](https://users.cecs.anu.edu.au/~bdm/nauty/) or download
   the [nauty 2.9.3 source archive](https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz).
   After extracting the archive, run `./configure` and `make`; `geng`, `pickg`,
@@ -50,11 +50,13 @@ sha256sum ./oops "$MINIBAUM" /path/to/minibaum5.c \
   > evidence/programs.sha256
 ```
 
-The following shell function generates one complete Minibaum enumeration in 256
-deterministic residue classes.  A completed file is not regenerated.
+The following shell function generates only the biconnected, nonplanar graphs
+from a Minibaum enumeration, in 256 deterministic residue classes.  The
+unfiltered graphs are passed directly between the three programs and are not
+stored.  A completed file is not regenerated.
 
 ```bash
-generate_minibaum() {
+generate_biconnected_nonplanar() {
   n=$1
   girth=$2
   output=$3
@@ -62,12 +64,17 @@ generate_minibaum() {
   for part in $(seq 0 $((PARTS - 1))); do
     file=$(printf '%s/part-%03d.g6' "$output" "$part")
     if [ ! -f "$file" ]; then
-      "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" > "$file.tmp"
+      "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
+        "$NAUTY/pickg" -q -c2 |
+        "$NAUTY/planarg" -q -v > "$file.tmp"
       mv "$file.tmp" "$file"
     fi
   done
 }
 ```
+
+The program `pickg -c2` tests biconnectivity, while `planarg -v` tests
+nonplanarity.  Neither program performs both tests, so both filters are needed.
 
 Before the graph families are processed, verify the finite local drawings
 used in the 4-cycle, 5-cycle, and 6-cycle expansion lemmas:
@@ -116,83 +123,70 @@ Their sum is 1,575,835.  Every nonplanar record must be reported as
 
 ## Verify Claim 2
 
-Generate the connected cubic graphs with $n=24$ and girth at least 5.  Retain
-only the biconnected, nonplanar graphs, then verify 2-flexibility:
+Generate the biconnected, nonplanar cubic graphs with $n=24$ and girth at
+least 5, then verify 2-flexibility:
 
 ```bash
-generate_minibaum 24 5 data/claim2-all
+generate_biconnected_nonplanar 24 5 data/claim2-biconnected-nonplanar
 
-mkdir -p data/claim2
-for input in data/claim2-all/*.g6; do
-  name=$(basename "$input")
-  output="data/claim2/$name"
-  if [ ! -f "$output" ]; then
-    "$NAUTY/pickg" -q -c2 "$input" |
-      "$NAUTY/planarg" -q -v > "$output.tmp"
-    mv "$output.tmp" "$output"
-  fi
-done
-
-wc -l data/claim2-all/*.g6
-wc -l data/claim2/*.g6
+wc -l data/claim2-biconnected-nonplanar/*.g6
+claim2_count=$(wc -l data/claim2-biconnected-nonplanar/*.g6 | awk 'END {print $1}')
+test "$claim2_count" -eq 1620470
 
 mkdir -p evidence/claim2
-for input in data/claim2/*.g6; do
+for input in data/claim2-biconnected-nonplanar/*.g6; do
   name=$(basename "$input" .g6)
   ./oops -i="$input" -verify-cubic -colors=0 \
     > "evidence/claim2/${name}.log" 2>&1
 done
 ```
 
-The option `pickg -c2` selects graphs of vertex connectivity at least two,
-and `planarg -v` selects nonplanar graphs.
-
-The complete connected enumeration contains 1,620,479 records.  After
-filtering, 1,620,470 biconnected, nonplanar records remain.  Every remaining
-record must be reported as 2-flexible.
+The family contains 1,620,470 records.  Every record must be reported as
+2-flexible.
 
 ## Verify Claim 3
 
-Generate the connected cubic graphs with $n=26$ and girth at least 5.  For
-each graph and each vertex, verify the existence of a 1-planar drawing in
-which the three incident edges are uncrossed:
+Generate the biconnected, nonplanar cubic graphs with $n=26$ and girth at
+least 5.  For each graph and each vertex, verify the existence of a 1-planar
+drawing in which the three incident edges are uncrossed:
 
 ```bash
-generate_minibaum 26 5 data/claim3
-wc -l data/claim3/*.g6
+generate_biconnected_nonplanar 26 5 data/claim3-biconnected-nonplanar
+wc -l data/claim3-biconnected-nonplanar/*.g6
 
 mkdir -p evidence/claim3
-for input in data/claim3/*.g6; do
+for input in data/claim3-biconnected-nonplanar/*.g6; do
   name=$(basename "$input" .g6)
   ./oops -i="$input" -verify-cubic -colors=0 \
     > "evidence/claim3/${name}.log" 2>&1
 done
 ```
 
-The expected number of records is 31,478,584.  For every nonplanar graph and
-every vertex, the computation must find a 1-planar drawing in which the three
-edges incident with that vertex are uncrossed.
+The exact number of records must be inserted here after the complete filtered
+enumeration.  For every graph and every vertex, the computation must find a
+1-planar drawing in which the three edges incident with that vertex are
+uncrossed.
 
 ## Verify Claim 4
 
-Generate every connected cubic graph with $n=28$ and girth at least 5.  This
-same computation will also verify Claim 5:
+Generate every biconnected, nonplanar cubic graph with $n=28$ and girth at
+least 5.  This same computation will also verify Claim 5:
 
 ```bash
-generate_minibaum 28 5 data/claims4-5
-wc -l data/claims4-5/*.g6
+generate_biconnected_nonplanar 28 5 data/claims4-5-biconnected-nonplanar
+wc -l data/claims4-5-biconnected-nonplanar/*.g6
 
 mkdir -p evidence/claims4-5
-for input in data/claims4-5/*.g6; do
+for input in data/claims4-5-biconnected-nonplanar/*.g6; do
   name=$(basename "$input" .g6)
   ./oops -i="$input" -verify-cubic -colors=0 \
     > "evidence/claims4-5/${name}.log" 2>&1
 done
 ```
 
-The complete enumeration has 656,783,890 records.  Exactly 652,159,389 have girth
-5.  Each of these must be planar, verified by a 5-cycle expansion,
-or verified directly.
+The exact number of girth-5 records must be inserted here after the complete
+filtered enumeration.  Each must be verified by a 5-cycle expansion or
+verified directly.
 
 ## Verify Claim 5
 

@@ -591,27 +591,26 @@ planar graph, the empty crossing pattern suffices.
 \end{proof}
 
 \begin{claim}\label{clm:stars26}
-    For every connected cubic graph $G$ with $n=26$ and girth $\geq 5$, and
-    every vertex $v\in V(G)$, there is a 1-planar drawing of $G$ in which all
-    three edges incident with $v$ are uncrossed.
+    For every biconnected, nonplanar cubic graph $G$ with $n=26$ and girth
+    $\geq 5$, and every vertex $v\in V(G)$, there is a 1-planar drawing of $G$
+    in which all three edges incident with $v$ are uncrossed.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    The family contains $31{,}478{,}584$ isomorphism classes.  For every
-    nonplanar graph $G$ in the enumeration and every vertex $v\in V(G)$, the
+    For every graph $G$ in this family and every vertex $v\in V(G)$, the
     computation found a crossing pattern $M$ such that $G_M$ is planar and no
     edge incident with $v$ belongs to $\operatorname{supp}(M)$.  The resulting
     1-planar drawing has the required property.
 \end{proof}
 
 \begin{claim}\label{clm:girth5-28}
-    Every connected cubic graph with $n=28$ and girth $=5$ is 1-planar.
+    Every biconnected, nonplanar cubic graph with $n=28$ and girth $=5$ is
+    1-planar.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    This family contains $652{,}159{,}389$ isomorphism classes.  For every
-    nonplanar graph $G$ in the enumeration, the computation established one
-    of the following alternatives.
+    For every graph $G$ in this family, the computation established one of the
+    following alternatives.
     \begin{enumerate}[(i)]
         \item A 5-cycle can be labeled as in \cref{lem:5-cycle-expansion} so
         that the resulting graph $H$ is a simple connected cubic graph with
@@ -626,7 +625,8 @@ planar graph, the empty crossing pattern suffices.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
-    Every connected cubic graph with $n=28$ and girth $\geq 6$ is 1-planar.
+    Every biconnected, nonplanar cubic graph with $n=28$ and girth $\geq 6$ is
+    1-planar.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
@@ -643,29 +643,33 @@ planar graph, the empty crossing pattern suffices.
 \end{proof}
 
 The running times for the five computations are summarized in
-\cref{tab:cubic28-runtime}.  The time for \cref{clm:flexible22} was measured
-in the complete verification; the remaining times are projected from
-computations on subsets of the enumerations.  All times are wall-clock times
-for 48 cores.  Time required to enumerate the graph families is not included.
+\cref{tab:cubic28-runtime}.  The times for
+\cref{clm:flexible22,clm:flexible24} were measured in the complete
+verification; the remaining times are projected from computations on subsets
+of the enumerations.  All times are wall-clock times for 48 cores.  Time
+required to enumerate the graph families is not included.
 
 \begin{table}[!ht]
     \small
     \centering
     \caption{Measured and projected wall-clock times on 48 cores.}
     \label{tab:cubic28-runtime}
-    \begin{tabular}{@{}lrc@{}}
+    \begin{tabular}{@{}lrrc@{}}
         \toprule
-        computation & running time & verified \\
+        computation & instances & running time & verified \\
         \midrule
-        \cref{clm:flexible22} & 14 hours 41 minutes (measured) & yes \\
-        \cref{clm:flexible24} & 3.3 hours (projected) & no \\
-        \cref{clm:stars26}    & 5.8 days (projected) & no \\
-        \cref{clm:girth5-28}  & 3.1 hours (projected) & no \\
-        \cref{clm:girth6-28}  & 6.1 hours (projected) & no \\
+        \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
+        \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
+        \cref{clm:stars26}    & $31{,}478{,}584^\ast$ & 5.8 days (projected) & no \\
+        \cref{clm:girth5-28}  & $652{,}159{,}389^\ast$ & 3.1 hours (projected) & no \\
+        \cref{clm:girth6-28}  & $4{,}624{,}501$ & 6.1 hours (projected) & no \\
         \midrule
-        total & 6.9 days (projected) & no \\
+        total & $691{,}458{,}779^\ast$ & 8.5 days (projected) & no \\
         \bottomrule
     \end{tabular}
+    \par\smallskip
+    {\footnotesize $^\ast$Connected-family count; replace with the
+    biconnected, nonplanar count after filtering.\par}
 \end{table}
 
 \begin{theorem}\label{thm:cubic28}
@@ -673,9 +677,11 @@ for 48 cores.  Time required to enumerate the graph families is not included.
 \end{theorem}
 
 \begin{proof}
-    We first apply the flexibility results at the smaller orders.  If a
-    subcubic graph of order at most 22 were not $3$-flexible, a smallest such
-    graph would be biconnected, cubic, and triangle-free by
+    A planar graph is $k$-flexible for every $k$, so every obstruction to a
+    flexibility statement below is nonplanar.  We first apply the flexibility
+    results at the smaller orders.  If a subcubic graph of order at most 22
+    were not $3$-flexible, a smallest such graph would be biconnected, cubic,
+    and triangle-free by
     \cref{lem:flexibility-core}, contrary to \cref{clm:flexible22}.  Thus every
     subcubic graph of order at most 22 is $3$-flexible.  It follows from
     \cref{lem:order24-reduction,clm:flexible24} that every cubic graph of order
