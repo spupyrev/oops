@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <climits>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -19,6 +20,13 @@ namespace {
 struct SixCycleContraction {
   AdjListTy adjList;
   std::vector<EdgeTy> uncrossedAttachments;
+};
+
+/// Contracted graph and uncrossed-edge requirements used to preserve every
+/// three-edge star of an order-26 graph containing a 5-cycle.
+struct FiveCycleStarContraction {
+  AdjListTy adjList;
+  std::vector<std::vector<EdgeTy>> uncrossedRequirements;
 };
 
 enum class FiveCycleReduction { NO_FIVE_CYCLE, SUCCESS, FAILURE };
@@ -94,7 +102,13 @@ FiveCycleReduction findFiveCycleReduction(const AdjListTy& adjList) {
     for (const auto& neighbors : reduced)
       if (neighbors.size() != 3)
         return false;
-    return computeGirth(reducedN, adj_to_edges(reduced)) >= 5;
+    const std::vector<EdgeTy> reducedEdges = adj_to_edges(reduced);
+    if (computeGirth(reducedN, reducedEdges) < 5)
+      return false;
+
+    // A planar reduced graph has the required three-edge star uncrossed.  A
+    // nonplanar reduced graph is covered by Claim 3 only when biconnected.
+    return is2Connected(reducedN, reducedEdges) || isPlanar(reducedN, reducedEdges, 0);
   };
 
   std::function<void(int, int)> enumerate = [&](const int start, const int current) {
@@ -123,6 +137,124 @@ FiveCycleReduction findFiveCycleReduction(const AdjListTy& adjList) {
   if (found)
     return FiveCycleReduction::SUCCESS;
   return sawFiveCycle ? FiveCycleReduction::FAILURE : FiveCycleReduction::NO_FIVE_CYCLE;
+}
+
+/// Contract one 5-cycle and form the reduced-graph requirements that preserve
+/// the complete three-edge star at every vertex of the original graph.
+FiveCycleStarContraction contractFiveCycleForStars(const AdjListTy& adjList) {
+  constexpr int cycleLength = 5;
+  const int n = static_cast<int>(adjList.size());
+  CHECK(n <= 63, "5-cycle star contraction uses a 64-bit vertex mask");
+  for (const auto& neighbors : adjList)
+    CHECK(neighbors.size() == 3, "5-cycle star contraction requires a cubic graph");
+
+  std::vector<int> selected;
+  std::vector<int> outsideNeighbors;
+  uint64_t selectedMask = 0;
+  std::vector<int> cycle;
+  std::function<void(int, int)> findCycle = [&](const int start, const int current) {
+    if (!selected.empty())
+      return;
+    if (static_cast<int>(cycle.size()) == cycleLength) {
+      if (cycle[1] > cycle.back() || !contains(adjList[current], start))
+        return;
+      uint64_t cycleMask = 0;
+      for (int vertex : cycle)
+        cycleMask |= uint64_t(1) << vertex;
+      std::vector<int> candidateOutsideNeighbors;
+      uint64_t outsideNeighborMask = 0;
+      for (int position = 0; position < cycleLength; position++) {
+        const int previous = cycle[(position + cycleLength - 1) % cycleLength];
+        const int next = cycle[(position + 1) % cycleLength];
+        int outsideNeighbor = -1;
+        for (int neighbor : adjList[cycle[position]]) {
+          if (neighbor == previous || neighbor == next)
+            continue;
+          if ((cycleMask & (uint64_t(1) << neighbor)) != 0 || outsideNeighbor != -1)
+            return;
+          outsideNeighbor = neighbor;
+        }
+        if (outsideNeighbor == -1 ||
+            (outsideNeighborMask & (uint64_t(1) << outsideNeighbor)) != 0)
+          return;
+        outsideNeighborMask |= uint64_t(1) << outsideNeighbor;
+        candidateOutsideNeighbors.push_back(outsideNeighbor);
+      }
+      selected = cycle;
+      outsideNeighbors = std::move(candidateOutsideNeighbors);
+      selectedMask = cycleMask;
+      return;
+    }
+    for (int next : adjList[current]) {
+      if (next <= start || contains(cycle, next))
+        continue;
+      cycle.push_back(next);
+      findCycle(start, next);
+      cycle.pop_back();
+    }
+  };
+  for (int start = 0; start < n && selected.empty(); start++) {
+    cycle = {start};
+    findCycle(start, start);
+  }
+  if (selected.empty())
+    return {};
+
+  std::vector<int> remap(n, -1);
+  int reducedN = 0;
+  for (int vertex = 0; vertex < n; vertex++)
+    if ((selectedMask & (uint64_t(1) << vertex)) == 0)
+      remap[vertex] = reducedN++;
+  const int contracted = reducedN++;
+
+  std::vector<EdgeTy> reducedEdges;
+  for (int first = 0; first < n; first++) {
+    for (int second : adjList[first]) {
+      if (first >= second)
+        continue;
+      const bool firstSelected = (selectedMask & (uint64_t(1) << first)) != 0;
+      const bool secondSelected = (selectedMask & (uint64_t(1) << second)) != 0;
+      if (firstSelected && secondSelected)
+        continue;
+      const int reducedFirst = firstSelected ? contracted : remap[first];
+      const int reducedSecond = secondSelected ? contracted : remap[second];
+      reducedEdges.push_back(make_edge(reducedFirst, reducedSecond));
+    }
+  }
+  const size_t edgesBeforeDeduplication = reducedEdges.size();
+  sort_unique(reducedEdges);
+  CHECK(reducedEdges.size() == edgesBeforeDeduplication,
+        "5-cycle star contraction created parallel edges");
+  AdjListTy reduced = edges_to_adj(reducedN, reducedEdges);
+  CHECK(reduced[contracted].size() == cycleLength,
+        "contracted 5-cycle vertex has incorrect degree");
+
+  std::vector<EdgeTy> attachments;
+  for (int outsideNeighbor : outsideNeighbors)
+    attachments.push_back(make_edge(contracted, remap[outsideNeighbor]));
+
+  std::vector<std::vector<EdgeTy>> requirements = {attachments};
+  for (int vertex = 0; vertex < contracted; vertex++) {
+    std::vector<EdgeTy> requirement;
+    for (int neighbor : reduced[vertex])
+      requirement.push_back(make_edge(vertex, neighbor));
+    CHECK(requirement.size() == 3);
+
+    int incidentAttachment = -1;
+    for (int attachment = 0; attachment < cycleLength; attachment++)
+      if (attachments[attachment] == make_edge(vertex, contracted))
+        incidentAttachment = attachment;
+    const int firstProtected =
+        incidentAttachment == -1 ? 0 : (incidentAttachment + 1) % cycleLength;
+    requirement.push_back(attachments[firstProtected]);
+    requirement.push_back(attachments[(firstProtected + 1) % cycleLength]);
+    sort_unique(requirement);
+    CHECK(requirement.size() == 5);
+    requirements.push_back(std::move(requirement));
+  }
+  CHECK(requirements.size() == 22, "unexpected number of 5-cycle star requirements");
+  std::sort(requirements.begin(), requirements.end());
+  return {std::move(reduced), std::move(requirements)};
 }
 
 /// Contract one chordless 6-cycle and return the four attachment edges that
@@ -281,7 +413,8 @@ bool areDisjoint(const std::vector<int>& prescribed, const std::vector<int>& cro
 /// prescribed sets of edges that must be simultaneously uncrossed.
 void verifyFlexibility(
     const Params& params, const InputGraph& graph, const int k,
-    const std::vector<std::vector<int>>& prescribedSets = {}) {
+    const std::vector<std::vector<int>>& prescribedSets = {},
+    const bool minimizeWitnesses = false) {
   CHECK((k > 0) != !prescribedSets.empty(), "specify either k-flexibility or prescribed edge sets");
 
   initCrossablePairs(params, graph);
@@ -292,18 +425,33 @@ void verifyFlexibility(
   CHECK(solveSATModel(params, model, solver) == l_True, "failed to find an initial 1-planar drawing");
 
   Result drawing = verifiedDrawing(params, graph, model, solver);
+  if (minimizeWitnesses)
+    minimizeCrossings(graph, drawing, 0);
   std::vector<std::vector<int>> crossedEdgeSets = {crossedEdges(drawing)};
 
   auto findUncoveredEdgeSet = [&]() {
     if (!prescribedSets.empty()) {
+      // Prefer the requirement that conflicts least with the drawings already
+      // found; this avoids difficult assumption queries without changing the
+      // set of requirements that must be covered.
+      const std::vector<int>* best = nullptr;
+      int bestScore = INT_MAX;
       for (const auto& prescribed : prescribedSets) {
         const bool isCovered =
             std::any_of(crossedEdgeSets.begin(), crossedEdgeSets.end(),
                         [&](const std::vector<int>& crossed) { return areDisjoint(prescribed, crossed); });
-        if (!isCovered)
-          return prescribed;
+        if (isCovered)
+          continue;
+        int score = 0;
+        for (const auto& crossed : crossedEdgeSets)
+          for (int edge : prescribed)
+            score += std::binary_search(crossed.begin(), crossed.end(), edge);
+        if (score < bestScore) {
+          best = &prescribed;
+          bestScore = score;
+        }
       }
-      return std::vector<int>();
+      return best == nullptr ? std::vector<int>() : *best;
     }
 
     std::vector<int> hittingSet;
@@ -350,6 +498,8 @@ void verifyFlexibility(
     CHECK(solver.solveLimited(assumptions) == l_True, "failed uncrossed-edge requirement");
 
     drawing = verifiedDrawing(params, graph, model, solver);
+    if (minimizeWitnesses)
+      minimizeCrossings(graph, drawing, 0);
     for (int edge : prescribed)
       CHECK(!drawing.isCrossed[edge], "required edge %d is crossed", edge);
     crossedEdgeSets.push_back(crossedEdges(drawing));
@@ -366,6 +516,15 @@ std::vector<int> edgeIndices(const InputGraph& graph, const std::vector<EdgeTy>&
   }
   sort_unique(indices);
   return indices;
+}
+
+/// Convert endpoint-based requirements into edge-index requirements.
+std::vector<std::vector<int>> edgeRequirements(
+    const InputGraph& graph, const std::vector<std::vector<EdgeTy>>& requirements) {
+  std::vector<std::vector<int>> result;
+  for (const auto& requirement : requirements)
+    result.push_back(edgeIndices(graph, requirement));
+  return result;
 }
 
 /// Check that an input record belongs to the required graph family for its order.
@@ -395,15 +554,27 @@ void verifyCubic24(const int n, const std::vector<EdgeTy>& edges, const Params& 
 }
 
 /// Verify Claim 3: every vertex has a drawing with its three incident edges uncrossed.
-void verifyCubic26(const int n, const std::vector<EdgeTy>& edges, const Params& params) {
+bool verifyCubic26(
+    const int n, const std::vector<EdgeTy>& edges, const AdjListTy& adjList,
+  const Params& params) {
   CHECK(n == 26);
+  const FiveCycleStarContraction contraction = contractFiveCycleForStars(adjList);
+  if (!contraction.adjList.empty()) {
+    InputGraph graph(
+        static_cast<int>(contraction.adjList.size()), adj_to_edges(contraction.adjList), {});
+    verifyFlexibility(
+        params, graph, 0, edgeRequirements(graph, contraction.uncrossedRequirements));
+    return true;
+  }
+
   InputGraph graph(n, edges, {});
   std::vector<std::vector<int>> incidentEdges(n);
   for (int edge = 0; edge < static_cast<int>(edges.size()); edge++) {
     incidentEdges[edges[edge].first].push_back(edge);
     incidentEdges[edges[edge].second].push_back(edge);
   }
-  verifyFlexibility(params, graph, 0, incidentEdges);
+  verifyFlexibility(params, graph, 0, incidentEdges, true);
+  return false;
 }
 
 /// Method used to verify a nonplanar order-28 input.
@@ -458,7 +629,8 @@ void verifyCubic(CMDOptions& options) {
   int num1Planar = 0;
   int num3Flexible = 0;
   int num2Flexible = 0;
-  int numClaim3Verified = 0;
+  int numFiveCycleStarVerified = 0;
+  int numDirectStarVerified = 0;
   int numFiveCycleExpanded = 0;
   int numFiveCycleDirect = 0;
   int numSixCycleExpanded = 0;
@@ -481,8 +653,10 @@ void verifyCubic(CMDOptions& options) {
       num2Flexible++;
       num1Planar++;
     } else if (n == 26) {
-      verifyCubic26(n, edges, params);
-      numClaim3Verified++;
+      if (verifyCubic26(n, edges, adj, params))
+        numFiveCycleStarVerified++;
+      else
+        numDirectStarVerified++;
       num1Planar++;
     } else {
       const Cubic28Method method = verifyCubic28(n, edges, adj, params);
@@ -503,7 +677,8 @@ void verifyCubic(CMDOptions& options) {
   LOG("processed %'d graphs in %s", numGraphs, ms_to_str(start, std::chrono::steady_clock::now()).c_str());
   LOG("#planar = %'d; #1-planar = %'d", numPlanar, num1Planar);
   LOG("#3-flexible = %'d; #2-flexible = %'d", num3Flexible, num2Flexible);
-  LOG("#claim3-verified = %'d", numClaim3Verified);
+  LOG("#5-cycle-star-verified = %'d; #direct-star-verified = %'d",
+      numFiveCycleStarVerified, numDirectStarVerified);
   LOG("#5-cycle-expanded = %'d; #direct-girth5 = %'d; #6-cycle-expanded = %'d; "
       "#direct-no-6-cycle = %'d",
       numFiveCycleExpanded, numFiveCycleDirect, numSixCycleExpanded, numNoSixCycleDirect);

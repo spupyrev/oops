@@ -147,8 +147,11 @@ The family contains 1,620,470 records.  Every record must be reported as
 ## Verify Claim 3
 
 Generate the biconnected, nonplanar cubic graphs with $n=26$ and girth at
-least 5.  For each graph and each vertex, verify the existence of a 1-planar
-drawing in which the three incident edges are uncrossed:
+least 5.  Graphs containing a 5-cycle are verified through the contracted
+graph and the 22 edge sets in the proof of Claim 3.  Graphs with no 5-cycle
+are checked directly.  In both cases, the result verifies for each vertex the
+existence of a 1-planar drawing in which its three incident edges are
+uncrossed:
 
 ```bash
 generate_biconnected_nonplanar 26 5 data/claim3-biconnected-nonplanar
@@ -165,7 +168,9 @@ done
 The exact number of records must be inserted here after the complete filtered
 enumeration.  For every graph and every vertex, the computation must find a
 1-planar drawing in which the three edges incident with that vertex are
-uncrossed.
+uncrossed.  The summaries distinguish graphs verified by a 5-cycle
+contraction from graphs verified directly; their sum must equal the input
+count.
 
 ## Verify Claim 4
 

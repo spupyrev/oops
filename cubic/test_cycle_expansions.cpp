@@ -165,6 +165,25 @@ int main() {
       {"01234", {}}, {"01243", {{2, 4}}},
       {"01342", {{4, 7}}}, {"01432", {{1, 4}}}};
 
+  // Boundary orders around a vertex obtained by contracting a 5-cycle.  The
+  // first table may cross only the two consecutive attachments s0,s1.
+  const std::vector<LocalDrawing> fiveCycleContractions = {
+      {"01234", {}}, {"01243", {{2, 4}}}, {"01324", {{1, 3}}},
+      {"01342", {{1, 5}, {2, 4}}}, {"01423", {{1, 3}, {4, 6}}},
+      {"01432", {{1, 4}}}, {"02134", {{0, 2}}}, {"02143", {{2, 5}}},
+      {"02314", {{3, 6}}}, {"02413", {{1, 4}, {2, 5}, {3, 6}}},
+      {"03124", {{0, 2}, {3, 5}}}, {"03214", {{0, 3}}}};
+
+  // These drawings preserve the star {c4,c0,s0}; all four other attachments
+  // may receive one local crossing after all five were uncrossed outside.
+  const std::vector<LocalDrawing> fiveCycleStarContractions = {
+      {"01234", {}}, {"01243", {{2, 9}}}, {"01324", {{1, 3}}},
+      {"01342", {{1, 3}, {7, 9}}}, {"01423", {{1, 9}}},
+      {"01432", {{1, 9}, {3, 7}}}, {"02134", {{2, 6}}},
+      {"02143", {{2, 6}, {8, 9}}}, {"02314", {{3, 6}}},
+      {"02413", {{1, 3}, {6, 8}, {7, 9}}},
+      {"03124", {{1, 3}, {6, 8}}}, {"03214", {{1, 8}, {3, 6}}}};
+
   // Boundary orders around the disk of the uncrossed edge introduced by
   // splitting a 4-cycle.
   // The target consecutive cycle edges c0,c1,c2 never cross; the only
@@ -265,6 +284,38 @@ int main() {
   }
   CHECK(listedFiveCycleOrders == fiveCycleOrders,
         "5-cycle expansion table does not cover the path rotations");
+
+  auto checkFiveCycleContractions = [](const std::vector<LocalDrawing>& drawings,
+                                       const std::set<int>& allowedCrossedAttachments,
+                                       const std::set<int>& uncrossedTarget) {
+    std::set<std::string> expectedOrders;
+    std::string permutation = "01234";
+    do {
+      std::string reverse = permutation;
+      std::reverse(reverse.begin() + 1, reverse.end());
+      expectedOrders.insert(std::min(permutation, reverse));
+    } while (std::next_permutation(permutation.begin() + 1, permutation.end()));
+
+    std::set<std::string> listedOrders;
+    for (const LocalDrawing& drawing : drawings) {
+      CHECK(listedOrders.insert(drawing.boundaryOrder).second,
+            "duplicate contracted 5-cycle boundary order");
+      for (const auto& [first, second] : drawing.crossings) {
+        for (int edge : {first, second}) {
+          CHECK(edge < 5 || allowedCrossedAttachments.count(edge),
+                "contracted 5-cycle drawing crosses an unavailable attachment");
+          CHECK(!uncrossedTarget.count(edge),
+                "contracted 5-cycle drawing crosses a target edge");
+        }
+      }
+      checkLocalDrawing(5, drawing);
+    }
+    CHECK(listedOrders == expectedOrders,
+          "contracted 5-cycle table does not cover every boundary order");
+  };
+  checkFiveCycleContractions(fiveCycleContractions, {5, 6}, {});
+  checkFiveCycleContractions(
+      fiveCycleStarContractions, {6, 7, 8, 9}, {0, 4, 5});
 
   auto checkFourCycleExpansions = [](const std::vector<LocalDrawing>& drawings,
                                     const std::set<int>& allowedCrossedEdges) {

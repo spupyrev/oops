@@ -500,6 +500,84 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     \end{tabular}
 \end{table}
 
+\begin{lemma}[5-cycle star expansion]\label{lem:5-cycle-star-expansion}
+    Let $C=(v_0,\ldots,v_4)$ be a chordless 5-cycle in a cubic graph $G$,
+    and let $x_i$ be the neighbor of $v_i$ outside $C$.  Suppose that the
+    vertices $x_0,\ldots,x_4$ are distinct, and let $J$ be obtained by
+    contracting $C$ to one vertex.  Write $c_i=v_iv_{i+1}$ and
+    $s_i=v_ix_i$, with indices modulo five, and call the edges $s_i$ the
+    attachments of $C$.
+    \begin{enumerate}[(i)]
+        \item If $J$ has a 1-planar drawing in which all five edges
+        $s_0,\ldots,s_4$ are uncrossed, then, for every $i$, the graph $G$
+        has a 1-planar drawing in which the three edges incident with $v_i$
+        are uncrossed.
+        \item Let $u\notin V(C)$, and choose two consecutive attachments
+        $s_j,s_{j+1}$ neither of which is incident with $u$.  If $J$ has a
+        1-planar drawing in which $s_j,s_{j+1}$ and the three edges incident
+        with $u$ are uncrossed, then $G$ has a 1-planar drawing in which the
+        three edges incident with $u$ are uncrossed.
+    \end{enumerate}
+\end{lemma}
+
+\begin{proof}[Proof (computational)]
+    Take a disk around the contracted vertex.  Fixing $s_0$ as the first
+    attachment and identifying an order with its reversal leaves twelve
+    possible cyclic orders on the boundary of the disk.  The second column
+    of \cref{tab:5-cycle-star-expansion} gives a local drawing for each order
+    whose attachment crossings use only $s_0,s_1$.  Relabeling the cycle maps
+    any chosen consecutive pair $s_j,s_{j+1}$ to this pair.  If
+    $u=x_i$, choose the pair to avoid $s_i$; the local drawing then does not
+    cross any edge incident with $u$.  This proves (ii).
+
+    For (i), it is enough by symmetry to preserve the star
+    $\{c_4,c_0,s_0\}$.  The third column gives a local drawing for every
+    boundary order in which these three edges are uncrossed.  Its attachment
+    crossings use only $s_1,s_2,s_3,s_4$, all of which are uncrossed outside
+    the disk.  Each listed set of crossings is a matching.  Replacing every
+    listed crossing by a degree-four vertex gives a planar graph in the disk
+    with the prescribed boundary order and alternating continuations at each
+    crossing.  Thus every listed local drawing is 1-planar, and inserting it
+    into the disk proves both statements.
+\end{proof}
+
+\begin{table}[!ht]
+    \centering
+    \caption{Crossing pairs for the 5-cycle star expansion.  The ordinary
+    column permits local crossings on $s_0,s_1$; the last column preserves
+    the star $\{c_4,c_0,s_0\}$.}
+    \label{tab:5-cycle-star-expansion}
+    \begin{tabular}{@{}>{$}c<{$}@{\qquad}>{$}l<{$}@{\qquad}>{$}l<{$}@{}}
+        \toprule
+        \multicolumn{1}{c}{boundary order} &
+        \multicolumn{1}{c}{ordinary expansion} &
+        \multicolumn{1}{c}{star at $v_0$} \\
+        \midrule
+        01234&\varnothing&\varnothing\\
+        01243&c_2\mathbin\times c_4&c_2\mathbin\times s_4\\
+        01324&c_1\mathbin\times c_3&c_1\mathbin\times c_3\\
+        01342&\{c_1\mathbin\times s_0,c_2\mathbin\times c_4\}&
+               \{c_1\mathbin\times c_3,s_2\mathbin\times s_4\}\\
+        01423&\{c_1\mathbin\times c_3,c_4\mathbin\times s_1\}&
+               c_1\mathbin\times s_4\\
+        01432&c_1\mathbin\times c_4&
+               \{c_1\mathbin\times s_4,c_3\mathbin\times s_2\}\\
+        02134&c_0\mathbin\times c_2&c_2\mathbin\times s_1\\
+        02143&c_2\mathbin\times s_0&
+               \{c_2\mathbin\times s_1,s_3\mathbin\times s_4\}\\
+        02314&c_3\mathbin\times s_1&c_3\mathbin\times s_1\\
+        02413&\{c_1\mathbin\times c_4,c_2\mathbin\times s_0,
+                 c_3\mathbin\times s_1\}&
+               \{c_1\mathbin\times c_3,s_1\mathbin\times s_3,
+                 s_2\mathbin\times s_4\}\\
+        03124&\{c_0\mathbin\times c_2,c_3\mathbin\times s_0\}&
+               \{c_1\mathbin\times c_3,s_1\mathbin\times s_3\}\\
+        03214&c_0\mathbin\times c_3&
+               \{c_1\mathbin\times s_3,c_3\mathbin\times s_1\}\\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \begin{lemma}[6-cycle expansion]\label{lem:6-cycle-expansion}
     Let $C=(v_0,v_1,\ldots,v_5)$ be a chordless 6-cycle in a cubic graph
     $G$, let $x_i$ be the neighbor of $v_i$ outside $C$, and suppose that the
@@ -597,10 +675,25 @@ planar graph, the empty crossing pattern suffices.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    For every graph $G$ in this family and every vertex $v\in V(G)$, the
-    computation found a crossing pattern $M$ such that $G_M$ is planar and no
-    edge incident with $v$ belongs to $\operatorname{supp}(M)$.  The resulting
-    1-planar drawing has the required property.
+    First suppose that $G$ contains a 5-cycle $C$.  Contract $C$ to one
+    vertex to obtain a graph $J$ of order 22, and retain the notation
+    $s_0,\ldots,s_4$ from \cref{lem:5-cycle-star-expansion}.  The computation
+    considered the following 22 sets of edges of $J$:
+    \begin{enumerate}[(i)]
+        \item the set $\{s_0,\ldots,s_4\}$; and
+        \item for every vertex $u\notin V(C)$, the three edges incident with
+        $u$ together with two consecutive attachments not incident with $u$.
+    \end{enumerate}
+    For every such set $F$, it found a crossing pattern $M$ such that $J_M$
+    is planar and $F\cap\operatorname{supp}(M)=\varnothing$.  Applying
+    \cref{lem:5-cycle-star-expansion} to the first set gives the required
+    drawing for every vertex of $C$; applying it to the corresponding set in
+    (ii) gives the required drawing for every other vertex.
+
+    If $G$ has no 5-cycle, then its girth is at least six.  For every vertex
+    $v\in V(G)$, the computation directly found a crossing pattern $M$ such
+    that $G_M$ is planar and no edge incident with $v$ belongs to
+    $\operatorname{supp}(M)$.
 \end{proof}
 
 \begin{claim}\label{clm:girth5-28}
@@ -614,12 +707,15 @@ planar graph, the empty crossing pattern suffices.
     \begin{enumerate}[(i)]
         \item A 5-cycle can be labeled as in \cref{lem:5-cycle-expansion} so
         that the resulting graph $H$ is a simple connected cubic graph with
-        $n=26$ and girth at least five.
+        $n=26$ and girth at least five, and $H$ is either planar or
+        biconnected.
         \item There is a crossing pattern $M$ in $G$ such that $G_M$ is
         planar.
     \end{enumerate}
-    In the first case, \cref{clm:stars26} gives a 1-planar drawing of $H$ in
-    which the three edges incident with $b$ are uncrossed, and
+    In the first case, if $H$ is planar, its planar drawing leaves every edge
+    uncrossed.  Otherwise $H$ is biconnected and nonplanar, so
+    \cref{clm:stars26} gives a 1-planar drawing of $H$ in which the three edges
+    incident with $b$ are uncrossed.  In either case,
     \cref{lem:5-cycle-expansion} gives a 1-planar drawing of $G$.  The second
     case follows from the planarity of $G_M$.
 \end{proof}
@@ -660,11 +756,11 @@ required to enumerate the graph families is not included.
         \midrule
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
-        \cref{clm:stars26}    & $31{,}478{,}584^\ast$ & 5.8 days (projected) & no \\
-        \cref{clm:girth5-28}  & $652{,}159{,}389^\ast$ & 3.1 hours (projected) & no \\
-        \cref{clm:girth6-28}  & $4{,}624{,}501$ & 6.1 hours (projected) & no \\
+        \cref{clm:stars26}    & $31{,}478{,}584^\ast$ & 33 days (preliminary) & no \\
+        \cref{clm:girth5-28}  & $652{,}159{,}389^\ast$ & 15 hours (projected) & no \\
+        \cref{clm:girth6-28}  & $4{,}624{,}501$ & 20 hours (projected) & no \\
         \midrule
-        total & $691{,}458{,}779^\ast$ & 8.5 days (projected) & no \\
+        total & $691{,}458{,}779^\ast$ & 37 days (preliminary) & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
