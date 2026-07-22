@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <utility>
 
@@ -23,13 +24,10 @@ static DoubleOption opt_var_decay(_cat, "var-decay", "The variable activity deca
                                   DoubleRange(0, false, 1, false));
 static DoubleOption opt_clause_decay(_cat, "cla-decay", "The clause activity decay factor", 0.999,
                                      DoubleRange(0, false, 1, false));
-static DoubleOption opt_random_seed(_cat, "rnd-seed", "Used by the random variable selection", 91648253,
-                                    DoubleRange(0, false, HUGE_VAL, false));
 static IntOption opt_ccmin_mode(_cat, "ccmin-mode", "Controls conflict clause minimization (0=none, 1=basic, 2=deep)",
                                 2, IntRange(0, 2));
 static IntOption opt_phase_saving(_cat, "phase-saving",
                                   "Controls the level of phase saving (0=none, 1=limited, 2=full)", 2, IntRange(0, 2));
-static BoolOption opt_rnd_init_act(_cat, "rnd-init", "Randomize the initial activity", false);
 static IntOption opt_restart_first(_cat, "rfirst", "The base restart interval", 100, IntRange(1, INT32_MAX));
 static DoubleOption opt_restart_inc(_cat, "rinc", "Restart interval increase factor", 2,
                                     DoubleRange(1, false, HUGE_VAL, false));
@@ -136,8 +134,8 @@ Solver::Solver()
       //
       verbosity(0), step_size(opt_step_size), step_size_dec(opt_step_size_dec),
       min_step_size(opt_min_step_size), timer(5000), var_decay(opt_var_decay), clause_decay(opt_clause_decay),
-      random_seed(opt_random_seed), VSIDS(false), ccmin_mode(opt_ccmin_mode),
-      phase_saving(opt_phase_saving), rnd_init_act(opt_rnd_init_act), garbage_frac(opt_garbage_frac),
+      VSIDS(false), ccmin_mode(opt_ccmin_mode),
+      phase_saving(opt_phase_saving), garbage_frac(opt_garbage_frac),
       restart_first(opt_restart_first), restart_inc(opt_restart_inc),
 
       // Parameters (the rest):
@@ -622,7 +620,7 @@ Var Solver::newVar(bool sign, bool dvar) {
   assigns.push(l_Undef);
   vardata.push(mkVarData(CRef_Undef, 0));
   activity_CHB.push(0);
-  activity_VSIDS.push(rnd_init_act ? drand(random_seed) * 0.00001 : 0);
+  activity_VSIDS.push(0);
   picked.push(0);
   conflicted.push(0);
   almost_conflicted.push(0);
@@ -1921,6 +1919,13 @@ lbool Solver::solve_() {
   if (!ok) {
     return l_False;
   }
+
+  // Determinism: the rephasing/branching heuristics consume the process-global
+  // C rand(), which is otherwise never seeded or reset. Reset it to a fixed
+  // state at the start of every solve so a solve's trajectory depends only on
+  // its formula -- not on how many rand() calls earlier solves/graphs happened
+  // to make (which differs between a sequential run and parallel -part workers).
+  srand(1u);
 
   // A previous solve may finish while CHB or DISTANCE branching is active.
   // cancelUntil(0) then reinserts variables only into that active heap, while

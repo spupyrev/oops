@@ -153,12 +153,9 @@ public:
   int timer;
   double var_decay;
   double clause_decay;
-  double random_var_freq;
-  double random_seed;
   bool VSIDS;
   int ccmin_mode;      // Controls conflict clause minimization (0=none, 1=basic, 2=deep).
   int phase_saving;    // Controls the level of phase saving (0=none, 1=limited, 2=full).
-  bool rnd_init_act;   // Initialize variable activities with a small random value.
   double garbage_frac; // The fraction of wasted memory allowed before a garbage collection is triggered.
 
   int restart_first;        // The initial restart limit. (default 100)
@@ -400,20 +397,6 @@ protected:
 
     return lbd;
   }
-
-  // Static helpers:
-  //
-
-  // Returns a random float 0 <= x < 1. Seed must never be 0.
-  static inline double drand(double &seed) {
-    seed *= 1389796;
-    int q = (int)(seed / 2147483647);
-    seed -= (double)q * 2147483647;
-    return seed / 2147483647;
-  }
-
-  // Returns a random integer 0 <= x < size. Seed must never be 0.
-  static inline int irand(double &seed, int size) { return (int)(drand(seed) * size); }
 
   // simplify
 public:
