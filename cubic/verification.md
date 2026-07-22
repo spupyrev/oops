@@ -190,14 +190,26 @@ verified directly.
 
 ## Verify Claim 5
 
-Use the input family and the computation from Claim 4; no second OOPS run is
-required.  Summed over all logs, the required results are:
+Generate every biconnected, nonplanar cubic graph with $n=28$ and girth at
+least 6.  On a multi-core machine, generate the family and process the parts
+in parallel across `JOBS` workers instead of the serial loops above:
 
-- 4,624,480 records verified by a 6-cycle expansion; and
-- 21 records of girth at least 7 verified directly.
+```bash
+JOBS=48
+generate_biconnected_nonplanar 28 6 data/claim5-biconnected-nonplanar
+wc -l data/claim5-biconnected-nonplanar/*.g6
 
-Thus the final two quantities sum to the 4,624,501 records of girth at least
-6 required by Claim 5.
+mkdir -p evidence/claim5
+find data/claim5-biconnected-nonplanar -name '*.g6' |
+  xargs -P "$JOBS" -I{} bash -c '
+    name=$(basename "$1" .g6)
+    ./oops -i="$1" -sat=1 -unsat=0 -colors=0 > "evidence/claim5/${name}.log" 2>&1
+  ' _ {}
+```
+
+Set `JOBS` no larger than the number of physical cores; oversubscribing the
+hyperthread siblings slows the SAT solver.  The family contains 4,624,501
+records.  Every record must be verified directly.
 
 ## Final checks
 

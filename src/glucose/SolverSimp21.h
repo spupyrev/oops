@@ -242,10 +242,6 @@ protected:
   double cla_inc;           // Amount to bump next clause with.
   // A heuristic measurement of the activity of a variable.
   vec<double> activity_CHB, activity_VSIDS, activity_distance;
-  // Lazy CHB decay (pow-free)
-  vec<uint32_t> chb_last_conflict;
-  static constexpr int CHB_DECAY_TABLE_SIZE = 2048;
-  double chb_decay_pows[CHB_DECAY_TABLE_SIZE];
   // Amount to bump next variable with.
   double var_inc;                                          
   OccLists<Lit, vec<Watcher>, WatcherDeleted> watches_bin, // Watches for binary clauses only.
