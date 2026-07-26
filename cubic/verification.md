@@ -57,15 +57,21 @@ stored.  A completed file is not regenerated.
 
 ```bash
 generate_biconnected_nonplanar() {
-  n=$1
-  girth=$2
-  output=$3
+  local n=$1
+  local girth=$2
+  local output=$3
+  local girth_mode=${4:-minimum}
+  local pickg_args=(-q -c2)
+  if [ "$girth_mode" = exact ]; then
+    pickg_args+=("-g$girth")
+  fi
   mkdir -p "$output"
   for part in $(seq 0 $((PARTS - 1))); do
+    local file
     file=$(printf '%s/part-%03d.g6' "$output" "$part")
     if [ ! -f "$file" ]; then
       "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
-        "$NAUTY/pickg" -q -c2 |
+        "$NAUTY/pickg" "${pickg_args[@]}" |
         "$NAUTY/planarg" -q -v > "$file.tmp"
       mv "$file.tmp" "$file"
     fi
@@ -74,10 +80,12 @@ generate_biconnected_nonplanar() {
 ```
 
 The program `pickg -c2` tests biconnectivity, while `planarg -v` tests
-nonplanarity.  Neither program performs both tests, so both filters are needed.
+nonplanarity.  Neither program performs both tests, so both filters are
+needed.  Passing `exact` as the fourth argument additionally applies
+`pickg -gN`, retaining only graphs of girth exactly `N`.
 
 Before the graph families are processed, verify the finite local drawings
-used in the 4-cycle, 5-cycle, and 6-cycle expansion lemmas:
+used in the 4-cycle and 5-cycle expansion lemmas:
 
 ```bash
 g++ -std=c++17 -O2 -Isrc \
@@ -174,18 +182,18 @@ count.
 
 ## Verify Claim 4
 
-Generate every biconnected, nonplanar cubic graph with $n=28$ and girth at
-least 5.  This same computation will also verify Claim 5:
+Generate every biconnected, nonplanar cubic graph with $n=28$ and girth
+exactly 5:
 
 ```bash
-generate_biconnected_nonplanar 28 5 data/claims4-5-biconnected-nonplanar
-wc -l data/claims4-5-biconnected-nonplanar/*.g6
+generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
+wc -l data/claim4-biconnected-nonplanar/*.g6
 
-mkdir -p evidence/claims4-5
-for input in data/claims4-5-biconnected-nonplanar/*.g6; do
+mkdir -p evidence/claim4
+for input in data/claim4-biconnected-nonplanar/*.g6; do
   name=$(basename "$input" .g6)
   ./oops -i="$input" -verify-cubic -colors=0 \
-    > "evidence/claims4-5/${name}.log" 2>&1
+    > "evidence/claim4/${name}.log" 2>&1
 done
 ```
 
@@ -214,7 +222,9 @@ find data/claim5-biconnected-nonplanar -name '*.g6' |
 
 Set `JOBS` no larger than the number of physical cores; oversubscribing the
 hyperthread siblings slows the SAT solver.  The family contains 4,624,501
-records.  Every record must be verified directly.
+records.  The completed verification reported 4,624,501 1-planar graphs and
+no other verdict; every invocation exited successfully.  Its wall-clock time
+was approximately three days with 48 workers.
 
 ## Final checks
 

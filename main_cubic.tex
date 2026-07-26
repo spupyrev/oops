@@ -578,40 +578,6 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     \end{tabular}
 \end{table}
 
-\begin{lemma}[6-cycle expansion]\label{lem:6-cycle-expansion}
-    Let $C=(v_0,v_1,\ldots,v_5)$ be a chordless 6-cycle in a cubic graph
-    $G$, let $x_i$ be the neighbor of $v_i$ outside $C$, and suppose that the
-    six $x_i$ are distinct.  Write $s_i=v_ix_i$, and let $H$ be obtained by
-    contracting $C$ to one vertex.  If $H$ has a 1-planar drawing in which
-    $s_1,s_2,s_4,s_5$ are uncrossed, then $G$ is 1-planar.
-\end{lemma}
-
-\begin{proof}[Proof (computational)]
-    Take a disk around the contracted vertex that contains no crossing of the
-    drawing of $H$.  The six incident edge portions meet its boundary in some
-    cyclic order.  Fixing $s_0$ as the first attachment and identifying an
-    order with its reversal leaves $(6-1)!/2=60$ possibilities.  For each
-    order, enumerate matchings of nonadjacent edge pairs among the 6-cycle
-    and its attachments, excluding pairs containing $s_0$ or $s_3$.
-    Planarize every proposed crossing and test for a planar embedding in the
-    disk with alternating incidences at each crossing vertex.  The check
-    finds a valid drawing for every boundary order; insert the
-    corresponding drawing in the disk.
-
-    Each new cycle edge is used only inside the disk and has at most one
-    crossing.  Each of $s_1,s_2,s_4,s_5$ is uncrossed outside the disk and
-    has at most one crossing inside it.  The edges $s_0,s_3$ receive no
-    crossing inside the disk and retain their at most one crossing outside.
-    Hence every edge in the expanded drawing is crossed at most once.
-\end{proof}
-
-In a cubic graph of girth at least six, every 6-cycle is chordless and its
-six outside neighbors are distinct: a chord or a repeated outside neighbor
-would create a cycle of length at most five.  No simple planar cubic graph
-has girth at least six: Euler's inequality
-$|E|\le 3(|V|-2)/2$ for a planar graph of girth six contradicts
-$|E|=3|V|/2$.
-
 \section{Upper Bound}
 
 Our goal is to prove that every simple cubic graph with at most 28 vertices
@@ -726,24 +692,17 @@ planar graph, the empty crossing pattern suffices.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    This family contains $4{,}624{,}501$ isomorphism classes, of which
-    $4{,}624{,}480$ contain a 6-cycle.  For each such graph $G$, the computation
-    selected a 6-cycle, formed the graph $H$ defined in
-    \cref{lem:6-cycle-expansion}, and found a crossing pattern $M$ in $H$ such
-    that $H_M$ is planar and
-    $\{s_1,s_2,s_4,s_5\}\cap\operatorname{supp}(M)=\varnothing$.  Hence $H$
-    has a 1-planar drawing in which these four edges are uncrossed, and $G$ is
-    1-planar by \cref{lem:6-cycle-expansion}.  The remaining 21 graphs have
-    girth at least seven.  For each of them, the computation found a crossing
-    pattern $M$ such that $G_M$ is planar.
+    This family contains $4{,}624{,}501$ isomorphism classes.  For every graph
+    $G$ in the enumeration, the computation found a crossing pattern $M$ such
+    that $G_M$ is planar.  Hence every graph in the family is 1-planar.
 \end{proof}
 
 The running times for the five computations are summarized in
 \cref{tab:cubic28-runtime}.  The times for
-\cref{clm:flexible22,clm:flexible24} were measured in the complete
-verification; the remaining times are projected from computations on subsets
-of the enumerations.  All times are wall-clock times for 48 cores.  Time
-required to enumerate the graph families is not included.
+\cref{clm:flexible22,clm:flexible24,clm:girth6-28} were measured in the
+complete verifications; the remaining times are projected from computations
+on subsets of the enumerations.  All times are wall-clock times for 48 cores.
+Time required to enumerate the graph families is not included.
 
 \begin{table}[!ht]
     \small
@@ -758,9 +717,9 @@ required to enumerate the graph families is not included.
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
         \cref{clm:stars26}    & $31{,}478{,}584^\ast$ & 33 days (preliminary) & no \\
         \cref{clm:girth5-28}  & $652{,}159{,}389^\ast$ & 15 hours (projected) & no \\
-        \cref{clm:girth6-28}  & $4{,}624{,}501$ & 20 hours (projected) & no \\
+        \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        total & $691{,}458{,}779^\ast$ & 37 days (preliminary) & no \\
+        total & $691{,}458{,}779^\ast$ & 39 days (preliminary) & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip

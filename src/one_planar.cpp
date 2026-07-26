@@ -1437,10 +1437,9 @@ void encodeStackPlanar(
     encodeCross1Constraints(model, graph, params);
   }
   if (params.cubicVerification) {
-    CHECK(params.unsatLevel == 0 && !params.useSATConstraints &&
-              !params.useUNSATConstraints,
-          "cubic verification requires -sat=0 and -unsat=0");
-    encodeCubicVerification(model, graph);
+    CHECK(params.unsatLevel == 0, "cubic verification requires unsatLevel=0");
+    if (!params.useSATConstraints)
+      encodeCubicVerification(model, graph);
   }
   if (params.useIC) {
     CHECK(params.useSATConstraints);
