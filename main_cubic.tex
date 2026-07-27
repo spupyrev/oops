@@ -500,7 +500,7 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     \end{tabular}
 \end{table}
 
-\begin{lemma}[5-cycle star expansion]\label{lem:5-cycle-star-expansion}
+\begin{lemma}[Contracted 5-cycle expansion]\label{lem:5-cycle-star-expansion}
     Let $C=(v_0,\ldots,v_4)$ be a chordless 5-cycle in a cubic graph $G$,
     and let $x_i$ be the neighbor of $v_i$ outside $C$.  Suppose that the
     vertices $x_0,\ldots,x_4$ are distinct, and let $J$ be obtained by
@@ -512,11 +512,11 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
         $s_0,\ldots,s_4$ are uncrossed, then, for every $i$, the graph $G$
         has a 1-planar drawing in which the three edges incident with $v_i$
         are uncrossed.
-        \item Let $u\notin V(C)$, and choose two consecutive attachments
-        $s_j,s_{j+1}$ neither of which is incident with $u$.  If $J$ has a
-        1-planar drawing in which $s_j,s_{j+1}$ and the three edges incident
-        with $u$ are uncrossed, then $G$ has a 1-planar drawing in which the
-        three edges incident with $u$ are uncrossed.
+        \item Let $e\in E(J)$.  If $e$ is not an attachment, suppose that
+        $J$ has a 1-planar drawing in which $e$ and at least three
+        attachments are uncrossed.  If $e=s_i$, instead suppose that $e$ and
+        at least three of the other four attachments are uncrossed.  In
+        either case, $G$ has a 1-planar drawing in which $e$ is uncrossed.
     \end{enumerate}
 \end{lemma}
 
@@ -526,9 +526,12 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     possible cyclic orders on the boundary of the disk.  The second column
     of \cref{tab:5-cycle-star-expansion} gives a local drawing for each order
     whose attachment crossings use only $s_0,s_1$.  Relabeling the cycle maps
-    any chosen consecutive pair $s_j,s_{j+1}$ to this pair.  If
-    $u=x_i$, choose the pair to avoid $s_i$; the local drawing then does not
-    cross any edge incident with $u$.  This proves (ii).
+    any chosen consecutive pair $s_j,s_{j+1}$ to this pair.  Any three
+    attachments contain a consecutive pair.  If $e$ is an attachment, any
+    three of the other four contain a consecutive pair avoiding $e$.
+    Choosing this pair ensures that the local drawing does not cross $e$;
+    if $e$ is not an attachment, it lies outside the replacement disk.
+    This proves (ii).
 
     For (i), it is enough by symmetry to preserve the star
     $\{c_4,c_0,s_0\}$.  The third column gives a local drawing for every
@@ -634,32 +637,34 @@ planar graph, the empty crossing pattern suffices.
     uncrossed in the resulting 1-planar drawing.
 \end{proof}
 
-\begin{claim}\label{clm:stars26}
-    For every biconnected, nonplanar cubic graph $G$ with $n=26$ and girth
-    $\geq 5$, and every vertex $v\in V(G)$, there is a 1-planar drawing of $G$
-    in which all three edges incident with $v$ are uncrossed.
+\begin{claim}\label{clm:flexible26}
+    Every biconnected, nonplanar cubic graph with $n=26$ and girth
+    at least five is $1$-flexible.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    First suppose that $G$ contains a 5-cycle $C$.  Contract $C$ to one
-    vertex to obtain a graph $J$ of order 22, and retain the notation
-    $s_0,\ldots,s_4$ from \cref{lem:5-cycle-star-expansion}.  The computation
-    considered the following 22 sets of edges of $J$:
-    \begin{enumerate}[(i)]
-        \item the set $\{s_0,\ldots,s_4\}$; and
-        \item for every vertex $u\notin V(C)$, the three edges incident with
-        $u$ together with two consecutive attachments not incident with $u$.
-    \end{enumerate}
-    For every such set $F$, it found a crossing pattern $M$ such that $J_M$
-    is planar and $F\cap\operatorname{supp}(M)=\varnothing$.  Applying
-    \cref{lem:5-cycle-star-expansion} to the first set gives the required
-    drawing for every vertex of $C$; applying it to the corresponding set in
-    (ii) gives the required drawing for every other vertex.
+    First consider the graphs of girth five.  For each such graph $G$, the
+    computation contracted every 5-cycle, canonically labeled the resulting
+    order-22 graph, and retained the lexicographically least code.  Equal
+    retained graphs were verified only once.  Write $J$ for one retained
+    graph and $s_0,\ldots,s_4$ for the five edges incident with its
+    degree-five vertex.
 
-    If $G$ has no 5-cycle, then its girth is at least six.  For every vertex
-    $v\in V(G)$, the computation directly found a crossing pattern $M$ such
-    that $G_M$ is planar and no edge incident with $v$ belongs to
-    $\operatorname{supp}(M)$.
+    The computation found a crossing pattern with all five $s_i$ uncrossed.
+    In addition, for every edge $e\in E(J)$ it found a crossing pattern in
+    which $e$ and at least three suitable attachments are uncrossed: all five
+    attachments are eligible when $e$ is not one of them, and the other four
+    are eligible when $e$ is an attachment.  Each resulting planarization was
+    checked.  These conditions do not depend on the cyclic order at the
+    contracted vertex.  An edge on the contracted 5-cycle is preserved using
+    part (i) of \cref{lem:5-cycle-star-expansion}; every other edge is
+    preserved using part (ii).  Thus every parent represented by $J$ is
+    $1$-flexible.
+
+    The remaining order-26 graphs have girth at least six.  For every such
+    graph $G$ and every edge $e\in E(G)$, the computation directly found a
+    crossing pattern whose planarization is planar and whose support avoids
+    $e$.
 \end{proof}
 
 \begin{claim}\label{clm:girth5-28}
@@ -668,22 +673,21 @@ planar graph, the empty crossing pattern suffices.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    For every graph $G$ in this family, the computation established one of the
-    following alternatives.
-    \begin{enumerate}[(i)]
-        \item A 5-cycle can be labeled as in \cref{lem:5-cycle-expansion} so
-        that the resulting graph $H$ is a simple connected cubic graph with
-        $n=26$ and girth at least five, and $H$ is either planar or
-        biconnected.
-        \item There is a crossing pattern $M$ in $G$ such that $G_M$ is
-        planar.
-    \end{enumerate}
-    In the first case, if $H$ is planar, its planar drawing leaves every edge
-    uncrossed.  Otherwise $H$ is biconnected and nonplanar, so
-    \cref{clm:stars26} gives a 1-planar drawing of $H$ in which the three edges
-    incident with $b$ are uncrossed.  In either case,
-    \cref{lem:5-cycle-expansion} gives a 1-planar drawing of $G$.  The second
-    case follows from the planarity of $G_M$.
+    For every graph $G$ in this family and every choice of a 5-cycle and its
+    middle attachment, form the simple connected cubic graph $H$ and the
+    vertex $b$ from \cref{lem:5-cycle-expansion}.  Girth five makes the five
+    outside neighbors distinct, so every such reduction is valid.
+    Canonically label $H$ and minimize first the code of $H$, then the
+    canonical label of $b$.  Identical reduced graphs are grouped, retaining
+    the set of all vertices marked in this way.
+
+    For every grouped graph $H$ and every one of its marked vertices $b$, the
+    computation found a crossing pattern whose planarization is planar and
+    whose support avoids all three edges incident with $b$.  Hence $H$ has
+    the drawing required by \cref{lem:5-cycle-expansion}, and the
+    corresponding parent $G$ is 1-planar.  This computation uses only the
+    marked reductions arising from the enumerated order-28 graphs; it invokes
+    no flexibility statement about all order-26 graphs.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
@@ -698,11 +702,11 @@ planar graph, the empty crossing pattern suffices.
 \end{proof}
 
 The running times for the five computations are summarized in
-\cref{tab:cubic28-runtime}.  The times for
-\cref{clm:flexible22,clm:flexible24,clm:girth6-28} were measured in the
-complete verifications; the remaining times are projected from computations
-on subsets of the enumerations.  All times are wall-clock times for 48 cores.
-Time required to enumerate the graph families is not included.
+\cref{tab:cubic28-runtime}.  Claims 1, 2, and 5 are completed computations.
+The two remaining computations are projected from bounded, single-process
+samples.  Their combined raw projection is 28 hours on 48 cores of the same
+speed; allowing a 50\% margin for enumeration, filtering, sorting, and sample
+variation gives 42 hours.
 
 \begin{table}[!ht]
     \small
@@ -715,16 +719,17 @@ Time required to enumerate the graph families is not included.
         \midrule
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
-        \cref{clm:stars26}    & $31{,}478{,}584^\ast$ & 33 days (preliminary) & no \\
-        \cref{clm:girth5-28}  & $652{,}159{,}389^\ast$ & 15 hours (projected) & no \\
+        \cref{clm:flexible26} & $2.8$ million${}^\ast$ & 3 hours (projected) & no \\
+        \cref{clm:girth5-28}  & $29$ million${}^\ast$ & 25 hours (projected) & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        total & $691{,}458{,}779^\ast$ & 39 days (preliminary) & no \\
+        remaining Claims 3--4 & & 42 hours (with 50\% margin) & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
-    {\footnotesize $^\ast$Connected-family count; replace with the
-    biconnected, nonplanar count after filtering.\par}
+    {\footnotesize $^\ast$Projected number of distinct retained cores or
+    grouped marked reductions; the complete preparation records the exact
+    counts before verification.\par}
 \end{table}
 
 \begin{theorem}\label{thm:cubic28}
@@ -756,9 +761,9 @@ Time required to enumerate the graph families is not included.
     graph of order 24, prescribe the edge $ab$ and, when $e$ lies outside the
     cycle, its image.  Its $2$-flexibility gives a drawing that expands to a
     drawing of $G$ in which $e$ is uncrossed.  If $G$ has no 4-cycle, then it
-    has girth at least five.  By \cref{clm:stars26}, choosing either endpoint
-    of $e$ gives a 1-planar drawing in which $e$ is uncrossed.  Since $e$ was
-    arbitrary, both cases contradict the choice of $G$.
+    has girth at least five, so \cref{clm:flexible26} directly gives a
+    1-planar drawing in which $e$ is uncrossed.  Since $e$ was arbitrary,
+    both cases contradict the choice of $G$.
 
     Finally, suppose that a subcubic graph of order at most 28 is not
     1-planar, and choose a smallest such graph $G$.  By

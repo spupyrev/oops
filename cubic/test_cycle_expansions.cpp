@@ -244,6 +244,92 @@ int main() {
   checkFiveCycleContractions(
       fiveCycleStarContractions, {6, 7, 8, 9}, {0, 4, 5});
 
+  // Check the weaker rotation-independent condition used for ordinary
+  // 1-flexibility.  Generate every dihedral relabeling of the ordinary
+  // table.  For any three available attachments, some relabeling must avoid
+  // every unavailable attachment.  If an attachment is prescribed, it and
+  // any three of the other four are available, and the prescribed attachment
+  // must not cross locally.
+  auto normalizeOrder = [](std::string order) {
+    std::rotate(
+        order.begin(), std::find(order.begin(), order.end(), '0'),
+        order.end());
+    std::string reverse = order;
+    std::reverse(reverse.begin() + 1, reverse.end());
+    return std::min(order, reverse);
+  };
+  auto mapIndex = [](const int index, const int shift, const bool reflect) {
+    int result = shift + (reflect ? -index : index);
+    result %= 5;
+    return result < 0 ? result + 5 : result;
+  };
+  std::vector<LocalDrawing> relabeledFiveCycleContractions;
+  for (const LocalDrawing& drawing : fiveCycleContractions) {
+    for (int shift = 0; shift < 5; shift++) {
+      for (bool reflect : {false, true}) {
+        LocalDrawing relabeled;
+        for (char label : drawing.boundaryOrder)
+          relabeled.boundaryOrder.push_back(
+              static_cast<char>('0' + mapIndex(label - '0', shift, reflect)));
+        relabeled.boundaryOrder = normalizeOrder(relabeled.boundaryOrder);
+        auto mapEdge = [&](const int edge) {
+          if (edge >= 5)
+            return 5 + mapIndex(edge - 5, shift, reflect);
+          return reflect ? mapIndex(edge + 1, shift, true)
+                         : mapIndex(edge, shift, false);
+        };
+        for (const auto& [first, second] : drawing.crossings)
+          relabeled.crossings.emplace_back(
+              mapEdge(first), mapEdge(second));
+        relabeledFiveCycleContractions.push_back(std::move(relabeled));
+      }
+    }
+  }
+
+  auto hasUsableExpansion = [&](
+                                const std::string& order,
+                                const int availableAttachments,
+                                const int preservedEdge) {
+    return std::any_of(
+        relabeledFiveCycleContractions.begin(),
+        relabeledFiveCycleContractions.end(),
+        [&](const LocalDrawing& drawing) {
+          if (drawing.boundaryOrder != order)
+            return false;
+          for (const auto& [first, second] : drawing.crossings) {
+            for (int edge : {first, second}) {
+              if (edge == preservedEdge)
+                return false;
+              if (edge >= 5 &&
+                  ((availableAttachments >> (edge - 5)) & 1) == 0)
+                return false;
+            }
+          }
+          return true;
+        });
+  };
+  std::set<std::string> fiveCycleBoundaryOrders;
+  for (const LocalDrawing& drawing : fiveCycleContractions)
+    fiveCycleBoundaryOrders.insert(drawing.boundaryOrder);
+  for (const std::string& order : fiveCycleBoundaryOrders) {
+    for (int available = 0; available < (1 << 5); available++) {
+      if (__builtin_popcount(available) != 3)
+        continue;
+      CHECK(hasUsableExpansion(order, available, -1),
+            "three attachments do not cover boundary %s", order.c_str());
+    }
+    for (int attachment = 0; attachment < 5; attachment++) {
+      for (int omitted = 0; omitted < 5; omitted++) {
+        if (omitted == attachment)
+          continue;
+        const int available = ((1 << 5) - 1) ^ (1 << omitted);
+        CHECK(hasUsableExpansion(order, available, 5 + attachment),
+              "attachment %d is not preserved for boundary %s",
+              attachment, order.c_str());
+      }
+    }
+  }
+
   auto checkFourCycleExpansions = [](const std::vector<LocalDrawing>& drawings,
                                     const std::set<int>& allowedCrossedEdges) {
     const std::set<std::string> fourCycleBoundaryOrders = {
