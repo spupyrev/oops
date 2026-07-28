@@ -704,9 +704,15 @@ planar graph, the empty crossing pattern suffices.
 The running times for the five computations are summarized in
 \cref{tab:cubic28-runtime}.  Claims 1, 2, and 5 are completed computations.
 The two remaining computations are projected from bounded, single-process
-samples.  Their combined raw projection is 28 hours on 48 cores of the same
-speed; allowing a 50\% margin for enumeration, filtering, sorting, and sample
-variation gives 42 hours.
+samples and a 48-core server pilot.  The pilot measured $269$ milliseconds
+per partially merged marked group for \cref{clm:girth5-28}, or 74.7 CPU-hours
+per million groups.  The machine's measured effective speedup is 25--30 with
+48 processes, giving 2.99--2.49 wall-clock hours per million groups.  The
+earlier estimate of 29 million groups was obtained from only 50
+reverse-expanded reduced graphs and is not a reliable estimate of the global
+quotient.  Even at that estimate, verification alone takes 72.2 hours at
+30-fold speedup.  The final group count and marker distribution are not yet
+known, so the current computation has no justified three-day bound.
 
 \begin{table}[!ht]
     \small
@@ -720,16 +726,17 @@ variation gives 42 hours.
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
         \cref{clm:flexible26} & $2.8$ million${}^\ast$ & 3 hours (projected) & no \\
-        \cref{clm:girth5-28}  & $29$ million${}^\ast$ & 25 hours (projected) & no \\
+        \cref{clm:girth5-28}  & $N_4$ million${}^\dagger$ & $2.49N_4$--$2.99N_4$ hours${}^\ddagger$ & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        remaining Claims 3--4 & & 42 hours (with 50\% margin) & no \\
+        remaining Claims 3--4 & & unknown & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
-    {\footnotesize $^\ast$Projected number of distinct retained cores or
-    grouped marked reductions; the complete preparation records the exact
-    counts before verification.\par}
+    {\footnotesize $^\ast$Projected number of distinct Claim 3 cores.
+    $^\dagger N_4$ is the as-yet unknown number of globally merged Claim 4
+    groups, in millions.  $^\ddagger$Measured 25--30-fold effective speedup,
+    excluding preparation; groups with more markers may cost more.\par}
 \end{table}
 
 \begin{theorem}\label{thm:cubic28}

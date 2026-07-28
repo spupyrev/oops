@@ -38,7 +38,7 @@ Build OOPS and Minibaum, and identify the nauty executables:
 set -euo pipefail
 
 make -j
-gcc -O3 /path/to/minibaum5.c -o minibaum5
+gcc -std=gnu89 -O3 /path/to/minibaum5.c -o minibaum5
 
 NAUTY=/path/to/nauty2_9_3
 MINIBAUM=./minibaum5
@@ -206,9 +206,24 @@ mkdir -p evidence/claim4
 Every record must be reported as a marked-star group.  The verifier removes
 the pendant markers, builds one SAT instance for `H`, and checks the
 three-edge star at every marked vertex.  The complete preparation records the
-exact number of groups; bounded forward and reverse samples project about
-29 million.  The connected exact-girth-five family has 652,159,389 records
-before the biconnectivity and nonplanarity filters.
+exact number of groups; no complete group count is available yet.  An earlier
+29-million estimate came from only 50 reverse-expanded reduced graphs and
+must not be used as a production count.  Three residue parts already produced
+about 2.6 million groups before the global merge; the amount of cross-part
+overlap is unknown.
+
+A 48-core server pilot measured 269 ms per partially merged group in the
+verifier, equivalent to 74.7 CPU-hours per million groups.  Its measured
+effective speedup is 25--30, so verification costs 2.99--2.49 wall-clock
+hours per million groups.  Two completely prepared residue parts merged to
+909,500 groups with a mean of 1.317 marked vertices, but their overlap does
+not justify an extrapolation to all 256 parts.  Verification alone fits in
+three days only if the final count is at most 24.1--28.9 million groups.
+Applying the measured preparation rate conservatively to all 652,159,389
+connected parents adds another 10.7 hours and lowers that threshold to about
+20.5--24.6 million groups, before allowing for generation, grouping,
+additional markers, or Claim 3.  The current pipeline therefore has no
+established three-day bound.
 
 ## Verify Claim 5
 
