@@ -101,8 +101,7 @@ std::string graph6(const Graph& graph) {
   return result;
 }
 
-std::string canonicalGraph6(
-    const Graph& input, std::vector<int>* oldToCanonical = nullptr) {
+std::string canonicalGraph6(const Graph& input) {
   if (input.n > kMaximumOrder)
     throw std::runtime_error("canonical labeling order exceeds fixed workspace");
   const int m = SETWORDSNEEDED(input.n);
@@ -125,23 +124,11 @@ std::string canonicalGraph6(
       graph, labels, partition, orbits, &options, &stats, m, input.n,
       canonical);
 
-  if (oldToCanonical != nullptr) {
-    oldToCanonical->assign(input.n, -1);
-    for (int canonicalVertex = 0;
-         canonicalVertex < input.n; canonicalVertex++)
-      (*oldToCanonical)[labels[canonicalVertex]] = canonicalVertex;
-  }
   Graph result(input.n);
   for (int first = 0; first < input.n; first++)
     for (int second = first + 1; second < input.n; second++)
       if (ISELEMENT(GRAPHROW(canonical, first, m), second))
         result.addEdge(first, second);
-  if (oldToCanonical != nullptr) {
-    for (const auto& [first, second] : input.edges())
-      if (!result.hasEdge(
-              (*oldToCanonical)[first], (*oldToCanonical)[second]))
-        throw std::runtime_error("canonical vertex map is inconsistent");
-  }
   return graph6(result);
 }
 
@@ -164,6 +151,27 @@ bool isConnected(const Graph& graph) {
     reached = next;
   }
   return __builtin_popcountll(reached) == graph.n;
+}
+
+bool isBiconnected(const Graph& graph) {
+  if (!isConnected(graph))
+    return false;
+  for (int removed = 0; removed < graph.n; removed++) {
+    const int start = removed == 0 ? 1 : 0;
+    uint64_t reached = uint64_t(1) << start;
+    while (true) {
+      uint64_t next = reached;
+      for (int vertex = 0; vertex < graph.n; vertex++)
+        if (vertex != removed && ((reached >> vertex) & 1))
+          next |= graph.adj[vertex] & ~(uint64_t(1) << removed);
+      if (next == reached)
+        break;
+      reached = next;
+    }
+    if (__builtin_popcountll(reached) != graph.n - 1)
+      return false;
+  }
+  return true;
 }
 
 int girth(const Graph& graph) {
@@ -250,9 +258,47 @@ Graph contractCycle(const Graph& graph, const std::vector<int>& cycle) {
   return reduced;
 }
 
+std::optional<Graph> contractCleanFiveCycle(
+    const Graph& graph, const std::vector<int>& cycle) {
+  Graph reduced;
+  try {
+    reduced = contractCycle(graph, cycle);
+  } catch (const std::runtime_error&) {
+    return std::nullopt;
+  }
+  if (reduced.n != graph.n - 4 || reduced.degree(reduced.n - 1) != 5)
+    return std::nullopt;
+  for (int vertex = 0; vertex + 1 < reduced.n; vertex++)
+    if (reduced.degree(vertex) != 3)
+      return std::nullopt;
+  return reduced;
+}
+
+Graph markAllAttachmentsCore(const Graph& base) {
+  int hub = -1;
+  for (int vertex = 0; vertex < base.n; vertex++) {
+    if (base.degree(vertex) == 5) {
+      if (hub != -1)
+        throw std::runtime_error("5-cycle core has two hubs");
+      hub = vertex;
+    } else if (base.degree(vertex) != 3) {
+      throw std::runtime_error("5-cycle core has an invalid degree");
+    }
+  }
+  if (hub == -1)
+    throw std::runtime_error("5-cycle core has no hub");
+  Graph marked(base.n + 1);
+  for (const auto& edge : base.edges())
+    marked.addEdge(edge.first, edge.second);
+  marked.addEdge(hub, base.n);
+  return marked;
+}
+
 struct PathReduction {
   Graph graph;
+  int left;
   int middle;
+  int right;
 };
 
 std::optional<PathReduction> reduceFiveCycle(
@@ -304,7 +350,7 @@ std::optional<PathReduction> reduceFiveCycle(
   }
   if (!isCubic(reduced) || !isConnected(reduced))
     return std::nullopt;
-  return PathReduction{std::move(reduced), middle};
+  return PathReduction{std::move(reduced), left, middle, right};
 }
 
 std::string minimumCanonicalContraction(
@@ -329,76 +375,105 @@ void prepareClaim3(const Graph& graph) {
     std::cout << minimumCanonicalContraction(graph, fiveCycles) << '\n';
 }
 
-void prepareClaim4(const Graph& parent) {
+char prepareClaim4Joint(const Graph& parent) {
   if (parent.n != 28 || !isCubic(parent) || girth(parent) != 5)
-    throw std::runtime_error("claim4 expects cubic order-28 graphs of girth 5");
+    throw std::runtime_error(
+        "claim4-joint expects cubic order-28 graphs of girth 5");
 
   const auto fiveCycles = cycles(parent, 5);
   if (fiveCycles.empty())
-    throw std::runtime_error("claim4 input has no 5-cycle");
-  std::pair<std::string, int> minimum;
-  minimum.second = -1;
+    throw std::runtime_error("claim4-joint input has no 5-cycle");
+  std::string bestExtraCore;
   for (const auto& cycle : fiveCycles) {
     for (int middle = 0; middle < 5; middle++) {
       const auto reduction = reduceFiveCycle(parent, cycle, middle);
       if (!reduction)
-        throw std::runtime_error("claim4 path reduction failed");
-      std::vector<int> oldToCanonical;
-      std::pair<std::string, int> candidate = {
-          canonicalGraph6(reduction->graph, &oldToCanonical),
-          -1};
-      candidate.second = oldToCanonical[reduction->middle];
-      if (minimum.first.empty() || candidate < minimum) {
-        minimum = candidate;
+        throw std::runtime_error("claim4-joint path reduction failed");
+
+      const auto secondCycles = cycles(reduction->graph, 5);
+      for (const auto& secondCycle : secondCycles) {
+        const auto middleIt = std::find(
+            secondCycle.begin(), secondCycle.end(), reduction->middle);
+        if (middleIt == secondCycle.end() ||
+            std::find(
+                secondCycle.begin(), secondCycle.end(), reduction->left) ==
+                secondCycle.end() ||
+            std::find(
+                secondCycle.begin(), secondCycle.end(), reduction->right) ==
+                secondCycle.end())
+          continue;
+        const auto order24 = reduceFiveCycle(
+            reduction->graph, secondCycle,
+            static_cast<int>(middleIt - secondCycle.begin()));
+        if (order24 && girth(order24->graph) >= 5 &&
+            isBiconnected(order24->graph)) {
+          std::cout << "D\n";
+          return 'D';
+        }
+      }
+
+      const bool canonicalFamily =
+          girth(reduction->graph) >= 5 &&
+          isBiconnected(reduction->graph);
+      std::vector<std::string> contractionCodes(secondCycles.size());
+      if (canonicalFamily) {
+        for (int index = 0;
+             index < static_cast<int>(secondCycles.size()); index++) {
+          const auto core = contractCleanFiveCycle(
+              reduction->graph, secondCycles[index]);
+          if (!core)
+            throw std::runtime_error(
+                "girth-five contraction is not clean");
+          contractionCodes[index] = canonicalGraph6(*core);
+        }
+      }
+
+      std::vector<std::string> orderedCodes = contractionCodes;
+      std::sort(orderedCodes.begin(), orderedCodes.end());
+      orderedCodes.erase(
+          std::unique(orderedCodes.begin(), orderedCodes.end()),
+          orderedCodes.end());
+      for (int index = 0;
+           index < static_cast<int>(secondCycles.size()); index++) {
+        if (std::find(
+                secondCycles[index].begin(), secondCycles[index].end(),
+                reduction->middle) == secondCycles[index].end())
+          continue;
+        std::string code;
+        if (canonicalFamily) {
+          code = contractionCodes[index];
+          if (code == orderedCodes.front()) {
+            std::cout << "C " << code << '\n';
+            return 'C';
+          }
+        } else {
+          const auto core = contractCleanFiveCycle(
+              reduction->graph, secondCycles[index]);
+          if (!core)
+            continue;
+          code = canonicalGraph6(*core);
+        }
+        if (bestExtraCore.empty() || code < bestExtraCore)
+          bestExtraCore = std::move(code);
       }
     }
   }
-  if (minimum.second == -1)
-    throw std::runtime_error("claim4 selected no marked reduction");
-  std::cout << minimum.first << ' ' << minimum.second << '\n';
+  if (!bestExtraCore.empty()) {
+    std::cout << "C " << bestExtraCore << '\n';
+    return 'C';
+  }
+  std::cout << "R " << graph6(parent) << '\n';
+  return 'R';
 }
 
-void groupClaim4Markers() {
-  std::string selectedCode;
-  std::vector<int> selectedTargets;
-  auto flush = [&]() {
-    if (selectedCode.empty())
-      return;
-    Graph base = parseGraph6(selectedCode);
-    std::sort(selectedTargets.begin(), selectedTargets.end());
-    selectedTargets.erase(
-        std::unique(selectedTargets.begin(), selectedTargets.end()),
-        selectedTargets.end());
-    Graph marked(base.n + static_cast<int>(selectedTargets.size()));
-    for (const auto& edge : base.edges())
-      marked.addEdge(edge.first, edge.second);
-    for (int index = 0;
-         index < static_cast<int>(selectedTargets.size()); index++) {
-      const int target = selectedTargets[index];
-      if (target < 0 || target >= base.n)
-        throw std::runtime_error("claim4 target vertex is out of range");
-      marked.addEdge(target, base.n + index);
-    }
-    std::cout << canonicalGraph6(marked) << '\n';
-  };
-
+void markAllAttachmentCores() {
   std::string line;
   while (std::getline(std::cin, line)) {
-    const size_t separator = line.find(' ');
-    if (separator == std::string::npos)
-      throw std::runtime_error("expected a graph6 record and target vertex");
-    const std::string code = line.substr(0, separator);
-    const int target = std::stoi(line.substr(separator + 1));
-    if (!selectedCode.empty() && code != selectedCode) {
-      if (code < selectedCode)
-        throw std::runtime_error("claim4 marker pairs are not sorted");
-      flush();
-      selectedTargets.clear();
-    }
-    selectedCode = code;
-    selectedTargets.push_back(target);
+    if (line.empty())
+      continue;
+    const Graph core = parseGraph6(line);
+    std::cout << canonicalGraph6(markAllAttachmentsCore(core)) << '\n';
   }
-  flush();
 }
 
 }  // namespace
@@ -407,30 +482,45 @@ int main(int argc, char** argv) {
   try {
     if (argc != 2) {
       std::cerr << "usage: prepare_cubic MODE\n"
-                << "MODE is claim3, claim4, or group-claim4\n";
+                << "MODE is claim3, claim4-joint, or mark-claim4-cores\n";
       return 2;
     }
     const std::string mode = argv[1];
-    if (mode == "group-claim4") {
-      groupClaim4Markers();
+    if (mode == "mark-claim4-cores") {
+      markAllAttachmentCores();
       return 0;
     }
 
     std::string line;
     uint64_t processed = 0;
+    uint64_t jointDirect = 0;
+    uint64_t jointExtraCores = 0;
+    uint64_t jointResiduals = 0;
     while (std::getline(std::cin, line)) {
       if (line.empty())
         continue;
       const Graph graph = parseGraph6(line);
       if (mode == "claim3")
         prepareClaim3(graph);
-      else if (mode == "claim4")
-        prepareClaim4(graph);
-      else
+      else if (mode == "claim4-joint") {
+        const char classification = prepareClaim4Joint(graph);
+        if (classification == 'D')
+          jointDirect++;
+        else if (classification == 'C')
+          jointExtraCores++;
+        else if (classification == 'R')
+          jointResiduals++;
+        else
+          throw std::runtime_error("invalid claim4-joint classification");
+      } else
         throw std::runtime_error("unknown preparation mode");
       processed++;
     }
     std::cerr << "processed " << processed << " graph6 records\n";
+    if (mode == "claim4-joint")
+      std::cerr << "claim4-joint: D=" << jointDirect
+                << " C=" << jointExtraCores
+                << " R=" << jointResiduals << '\n';
   } catch (const std::exception& error) {
     std::cerr << "prepare_cubic: " << error.what() << '\n';
     return 1;

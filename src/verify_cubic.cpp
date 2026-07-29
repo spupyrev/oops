@@ -297,7 +297,7 @@ void verifyFlexibility(
 enum class VerificationInput {
   CUBIC,
   FIVE_CYCLE_CORE,
-  MARKED_STARS
+  FIVE_CYCLE_STAR_CORE
 };
 
 /// Check that an input record is cubic or is a marked reduced graph.
@@ -305,34 +305,28 @@ VerificationInput validateInput(const AdjListTy& adjList, const std::vector<Edge
   const int n = static_cast<int>(adjList.size());
   CHECK(isConnected(n, edges), "verification inputs contain connected graphs");
 
-  if (27 <= n && n <= 52) {
-    std::vector<int> degreeOne;
-    std::vector<int> degreeFour;
-    bool markerDegrees = true;
+  if (n == 23) {
+    int leaf = -1;
+    int hub = -1;
+    bool valid = true;
     for (int vertex = 0; vertex < n; vertex++) {
       const int degree = static_cast<int>(adjList[vertex].size());
+      int* location = nullptr;
       if (degree == 1)
-        degreeOne.push_back(vertex);
-      else if (degree == 4)
-        degreeFour.push_back(vertex);
+        location = &leaf;
+      else if (degree == 6)
+        location = &hub;
       else if (degree != 3)
-        markerDegrees = false;
+        valid = false;
+      if (location != nullptr) {
+        if (*location != -1)
+          valid = false;
+        *location = vertex;
+      }
     }
-    if (markerDegrees && !degreeOne.empty() &&
-        degreeOne.size() == degreeFour.size() &&
-        std::all_of(
-            degreeOne.begin(), degreeOne.end(), [&](const int leaf) {
-              return contains(degreeFour, adjList[leaf].front());
-            }) &&
-        std::all_of(
-            degreeFour.begin(), degreeFour.end(), [&](const int target) {
-              return std::count_if(
-                         adjList[target].begin(), adjList[target].end(),
-                         [&](const int neighbor) {
-                           return adjList[neighbor].size() == 1;
-                         }) == 1;
-            }))
-      return VerificationInput::MARKED_STARS;
+    if (valid && leaf != -1 && hub != -1 &&
+        contains(adjList[leaf], hub))
+      return VerificationInput::FIVE_CYCLE_STAR_CORE;
   }
 
   int exceptionalVertex = -1;
@@ -351,11 +345,11 @@ VerificationInput validateInput(const AdjListTy& adjList, const std::vector<Edge
     return VerificationInput::FIVE_CYCLE_CORE;
   }
 
-  CHECK(4 <= n && n <= 26 && n % 2 == 0,
-        "verification expects an even order from 4 through 26");
+  CHECK(4 <= n && n <= 28 && n % 2 == 0,
+        "verification expects an even order from 4 through 28");
   if (n >= 24)
     CHECK(computeGirth(n, edges) >= 5,
-          "orders 24 and 26 require girth at least five");
+          "orders 24 through 28 require girth at least five");
   return VerificationInput::CUBIC;
 }
 
@@ -368,21 +362,23 @@ std::vector<int> incidentEdges(const InputGraph& graph, const int vertex) {
   return result;
 }
 
-/// Remove pendant markers and verify the three-edge star at every marked
-/// vertex in the underlying order-26 graph.
-void verifyMarkedStars(const AdjListTy& adjList, const Params& params) {
+/// Remove the pendant marker and verify the all-attachments requirement used
+/// jointly by the order-26 contraction and the order-28 path reduction.
+void verifyFiveCycleStarCore(
+    const AdjListTy& adjList, const Params& params) {
   const int n = static_cast<int>(adjList.size());
-  std::vector<int> targets;
+  int markedHub = -1;
   std::vector<int> remap(n, -1);
   int baseN = 0;
   for (int vertex = 0; vertex < n; vertex++) {
     const int degree = static_cast<int>(adjList[vertex].size());
-    if (degree == 4)
-      targets.push_back(vertex);
+    if (degree == 6)
+      markedHub = vertex;
     if (degree >= 3)
       remap[vertex] = baseN++;
   }
-  CHECK(baseN == 26 && !targets.empty(), "invalid marked-star graph");
+  CHECK(baseN == 22 && markedHub != -1,
+        "invalid marked 5-cycle core");
 
   std::vector<EdgeTy> baseEdges;
   for (int first = 0; first < n; first++)
@@ -390,17 +386,13 @@ void verifyMarkedStars(const AdjListTy& adjList, const Params& params) {
       if (first < second && remap[first] != -1 && remap[second] != -1)
         baseEdges.push_back(make_edge(remap[first], remap[second]));
   InputGraph graph(baseN, baseEdges, {});
-  CHECK(graph.edges.size() == 39, "marked-star base is not cubic");
-  std::vector<std::vector<int>> stars;
-  for (int target : targets) {
-    stars.push_back(incidentEdges(graph, remap[target]));
-    CHECK(stars.back().size() == 3,
-          "marked vertex does not have a three-edge star");
-  }
-  if (stars.size() == 1)
-    verifyDrawing(params, graph, stars.front());
-  else
-    verifyFlexibility(params, graph, 0, stars, true);
+  CHECK(graph.edges.size() == 34,
+        "marked 5-cycle core has an invalid base");
+  const std::vector<int> attachments =
+      incidentEdges(graph, remap[markedHub]);
+  CHECK(attachments.size() == 5,
+        "marked 5-cycle core has an invalid attachment set");
+  verifyDrawing(params, graph, attachments);
 }
 
 /// Verify the cyclic-order-independent conditions for expanding a contracted
@@ -417,10 +409,6 @@ void verifyFiveCycleCore(
   const std::vector<int> attachments = incidentEdges(graph, hub);
   CHECK(attachments.size() == 5, "5-cycle core has an invalid attachment set");
 
-  // The all-attachments drawing expands while preserving every new cycle
-  // edge.  For a chosen old edge, three other uncrossed attachments contain a
-  // consecutive pair that the ordinary local table can use.  If the old edge
-  // is itself an attachment, choose three of the other four attachments.
   std::vector<CoverageRequirement> requirements = {
       CoverageRequirement{attachments, {}, 0}};
   for (int edge = 0; edge < static_cast<int>(graph.edges.size()); edge++) {
@@ -456,6 +444,14 @@ void verifyCubic26(const int n, const std::vector<EdgeTy>& edges, const Params& 
   verifyFlexibility(params, graph, 1);
 }
 
+/// Directly verify a residual order-28 graph from the joint reduction.
+void verifyCubic28(
+    const int n, const std::vector<EdgeTy>& edges, const Params& params) {
+  CHECK(n == 28);
+  InputGraph graph(n, edges, {});
+  verifyDrawing(params, graph, {});
+}
+
 }  // namespace
 
 /// Verify the claim or claims prescribed by the order of each input graph.
@@ -474,7 +470,7 @@ void verifyCubic(CMDOptions& options) {
   int num2Flexible = 0;
   int num1Flexible = 0;
   int numFiveCycleCores = 0;
-  int numMarkedStarGroups = 0;
+  int numFiveCycleStarCores = 0;
 
   for (int i = 0; i < numGraphs; i++) {
     const auto& adj = graphs->next().second;
@@ -483,16 +479,16 @@ void verifyCubic(CMDOptions& options) {
     const VerificationInput input = validateInput(adj, edges);
     if (input == VerificationInput::FIVE_CYCLE_CORE)
       numFiveCycleCores++;
-    else if (input == VerificationInput::MARKED_STARS)
-      numMarkedStarGroups++;
+    else if (input == VerificationInput::FIVE_CYCLE_STAR_CORE)
+      numFiveCycleStarCores++;
 
     if (isPlanar(n, edges, 0)) {
       numPlanar++;
     } else if (input == VerificationInput::FIVE_CYCLE_CORE) {
       verifyFiveCycleCore(edges, adj, params);
       num1Planar++;
-    } else if (input == VerificationInput::MARKED_STARS) {
-      verifyMarkedStars(adj, params);
+    } else if (input == VerificationInput::FIVE_CYCLE_STAR_CORE) {
+      verifyFiveCycleStarCore(adj, params);
       num1Planar++;
     } else if (n <= 22) {
       verifyCubic22(n, edges, params);
@@ -506,8 +502,11 @@ void verifyCubic(CMDOptions& options) {
       verifyCubic26(n, edges, params);
       num1Flexible++;
       num1Planar++;
+    } else if (n == 28) {
+      verifyCubic28(n, edges, params);
+      num1Planar++;
     } else {
-      CHECK(false, "unmarked order-28 inputs are not part of cubic verification");
+      CHECK(false, "unsupported cubic verification input");
     }
 
     LOG_EVERY_MS(30000, "verified %'d of %'d graphs", i + 1, numGraphs);
@@ -517,6 +516,6 @@ void verifyCubic(CMDOptions& options) {
   LOG("#planar = %'d; #1-planar = %'d", numPlanar, num1Planar);
   LOG("#3-flexible = %'d; #2-flexible = %'d", num3Flexible, num2Flexible);
   LOG("#1-flexible = %'d; #5-cycle-cores = %'d; "
-      "#marked-star-groups = %'d",
-      num1Flexible, numFiveCycleCores, numMarkedStarGroups);
+      "#5-cycle-star-cores = %'d",
+      num1Flexible, numFiveCycleCores, numFiveCycleStarCores);
 }

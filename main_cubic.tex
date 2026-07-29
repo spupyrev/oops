@@ -500,6 +500,53 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     \end{tabular}
 \end{table}
 
+\begin{lemma}[Overlapping 5-cycle expansion]
+    \label{lem:overlapping-5-cycle-expansion}
+    Use the notation of \cref{lem:5-cycle-expansion}, with $v_2$ assigned
+    to the middle vertex $b$.  Suppose that the path $abc$ lies on another
+    5-cycle $D$ of $H$.  Replace $D$ by a three-vertex path, assigning the
+    attachment at $b$ to its middle vertex, and call the resulting order-24
+    graph $K$.  Suppose that this reduction is simple and connected.  If
+    $K$ has a 1-planar drawing in which the two edges of the new path are
+    uncrossed, then $G$ is 1-planar.
+\end{lemma}
+
+\begin{proof}[Proof (computational)]
+    The two vertices of $D-\{a,b,c\}$ are outside the original 5-cycle.
+    Girth five excludes the case in which they attach at consecutive
+    vertices of the original cycle.  Up to a dihedral relabeling, the patch
+    to be restored therefore consists of
+    $v_0,\ldots,v_4,x_0,x_3$, with the additional edges
+    $v_0x_0,v_3x_3,x_0x_3$.
+
+    Take a regular neighborhood of the uncrossed path in $K$.  Its five
+    attachment portions occur in the same four boundary orders as in
+    \cref{tab:5-cycle-expansion}.  The local drawings in
+    \cref{tab:overlapping-5-cycle-expansion} restore the seven-vertex patch.
+    Here $d_0=v_0x_0$ and $d_3=v_3x_3$.  Every displayed crossing uses two
+    edges of the restored patch, so no further edge of the drawing of $K$
+    must be kept uncrossed.  As for the other local tables, the computation
+    planarized every displayed crossing and checked planarity in a disk with
+    the prescribed boundary order.
+\end{proof}
+
+\begin{table}[!ht]
+    \centering
+    \caption{Crossing pairs for the overlapping 5-cycle expansion.}
+    \label{tab:overlapping-5-cycle-expansion}
+    \begin{tabular}{@{}>{$}c<{$}@{\qquad}>{$}l<{$}@{}}
+        \toprule
+        \multicolumn{1}{c}{boundary order} &
+        \multicolumn{1}{c}{crossing pairs} \\
+        \midrule
+        01234&c_4\mathbin\times d_3\\
+        01243&\{c_2\mathbin\times c_4,d_0\mathbin\times d_3\}\\
+        01342&c_3\mathbin\times d_0\\
+        01432&c_2\mathbin\times d_0\\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \begin{lemma}[Contracted 5-cycle expansion]\label{lem:5-cycle-star-expansion}
     Let $C=(v_0,\ldots,v_4)$ be a chordless 5-cycle in a cubic graph $G$,
     and let $x_i$ be the neighbor of $v_i$ outside $C$.  Suppose that the
@@ -672,22 +719,37 @@ planar graph, the empty crossing pattern suffices.
     1-planar.
 \end{claim}
 
-\begin{proof}[Proof (computational)]
-    For every graph $G$ in this family and every choice of a 5-cycle and its
-    middle attachment, form the simple connected cubic graph $H$ and the
-    vertex $b$ from \cref{lem:5-cycle-expansion}.  Girth five makes the five
-    outside neighbors distinct, so every such reduction is valid.
-    Canonically label $H$ and minimize first the code of $H$, then the
-    canonical label of $b$.  Identical reduced graphs are grouped, retaining
-    the set of all vertices marked in this way.
+\begin{proof}[Proposed joint computational proof]
+    For every graph $G$ in this family, the preparation enumerates the
+    5-cycle-to-path reductions $(H,b)$ from
+    \cref{lem:5-cycle-expansion}.  Girth five makes every first reduction
+    simple.  It seeks one of the following certificates.
 
-    For every grouped graph $H$ and every one of its marked vertices $b$, the
-    computation found a crossing pattern whose planarization is planar and
-    whose support avoids all three edges incident with $b$.  Hence $H$ has
-    the drawing required by \cref{lem:5-cycle-expansion}, and the
-    corresponding parent $G$ is 1-planar.  This computation uses only the
-    marked reductions arising from the enumerated order-28 graphs; it invokes
-    no flexibility statement about all order-26 graphs.
+    First, if the replacement path lies on a second 5-cycle, the preparation
+    performs the second path reduction with $b$ assigned to its middle
+    attachment.  When the resulting order-24 graph $K$ is biconnected and
+    has girth at least five, it is either planar or covered by
+    \cref{clm:flexible24}.  Thus its two path edges can be kept uncrossed, and
+    \cref{lem:overlapping-5-cycle-expansion} proves that $G$ is 1-planar.
+
+    Otherwise, the preparation looks for a clean 5-cycle $D$ of $H$ that
+    contains $b$, and contracts it to a degree-five vertex.  Let $J$ be one
+    selected canonical contraction.  If the code of $J$ is among the
+    retained Claim~3 cores, its drawing with all five attachments uncrossed
+    is already one of the requirements checked in
+    \cref{clm:flexible26}.  Every other selected code is checked once for
+    precisely this all-five-attachments requirement.  Part~(i) of
+    \cref{lem:5-cycle-star-expansion} expands $J$ to a drawing of $H$ in
+    which the star at $b$ is uncrossed, and
+    \cref{lem:5-cycle-expansion} then expands $H$ to $G$.
+
+    If neither reduction is available, the parent $G$ itself is retained and
+    checked directly for 1-planarity.  Consequently the computation needs
+    no three-edge-star verification at order 26 and no flexibility
+    assumption beyond the ordinary Claim~3 statement.  The global
+    preparation and verification described in
+    \texttt{cubic/verification.md} have not yet been run, so this proposed
+    computation does not yet prove the claim.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
@@ -703,16 +765,30 @@ planar graph, the empty crossing pattern suffices.
 
 The running times for the five computations are summarized in
 \cref{tab:cubic28-runtime}.  Claims 1, 2, and 5 are completed computations.
-The two remaining computations are projected from bounded, single-process
-samples and a 48-core server pilot.  The pilot measured $269$ milliseconds
-per partially merged marked group for \cref{clm:girth5-28}, or 74.7 CPU-hours
-per million groups.  The machine's measured effective speedup is 25--30 with
-48 processes, giving 2.99--2.49 wall-clock hours per million groups.  The
-earlier estimate of 29 million groups was obtained from only 50
-reverse-expanded reduced graphs and is not a reliable estimate of the global
-quotient.  Even at that estimate, verification alone takes 72.2 hours at
-30-fold speedup.  The final group count and marker distribution are not yet
-known, so the current computation has no justified three-day bound.
+The earlier marked-star preparation for \cref{clm:girth5-28} produced
+$38{,}120{,}815$ groups whose measured verification would take 392--470
+hours; that route was abandoned.  In a fixed 10,000-parent sample, the joint
+preparation above used a completed order-24 certificate for 4,465 parents,
+selected a contraction core for 5,535, and left no direct residual.  The
+4,080 distinct selected codes include the Claim~3 cores that will be removed
+by an exact set comparison.  Preparing the sample took 19.73 seconds in one
+process.  A separate 884-core stress sample of the extra all-attachment
+requirement took 33.15 seconds, and all records passed.
+
+For Claim~3, a bounded parent-weighted pilot sampled 300 parents from 256
+spread-out fine Minibaum parts containing 1,370,731 parents.  Enumerating the
+complete reverse fiber of each selected contraction gave
+\(\mathop{\rm E}(1/f)=0.1450\), projecting 4.54 million distinct cores.
+Timing the same cores gave
+\(\mathop{\rm E}(t/f)=0.06790\) seconds per parent; its 95\% sampling interval
+was \(0.05887\)--\(0.07693\).  Thus the girth-five part of Claim~3 projects
+to 19.7--23.6 hours at the measured 30--25-fold effective speedup, with a
+17.1--26.8 hour sampling envelope.  The smaller Claim~3 girth-six and
+Claim~4 checks add approximately 2.7--5.4 hours.  Combining these figures
+with the observed 15--24 hour preparation envelope gives a central
+37--53 hour projection and a 35--56 hour sampling envelope.  The final
+launch decision uses the exact globally merged count and a bounded timing
+sample from that file.
 
 \begin{table}[!ht]
     \small
@@ -725,19 +801,23 @@ known, so the current computation has no justified three-day bound.
         \midrule
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
-        \cref{clm:flexible26} & $2.8$ million${}^\ast$ & 3 hours (projected) & no \\
-        \cref{clm:girth5-28}  & $N_4$ million${}^\dagger$ & $2.49N_4$--$2.99N_4$ hours${}^\ddagger$ & no \\
+        \cref{clm:flexible26} & $4.54$ million${}^\ast$ & 20--27 hours (projected) & no \\
+        \cref{clm:girth5-28}  & joint with Claim 3 & see below & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        remaining Claims 3--4 & & unknown & no \\
+        remaining Claims 3--4 & & 35--56 hours${}^\dagger$ (projected) & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
     {\footnotesize $^\ast$Projected number of distinct Claim 3 cores.
-    $^\dagger N_4$ is the as-yet unknown number of globally merged Claim 4
-    groups, in millions.  $^\ddagger$Measured 25--30-fold effective speedup,
-    excluding preparation; groups with more markers may cost more.\par}
+    $^\dagger$Including the observed 15--24 hour preparation envelope, but
+    before the exact global set difference.\par}
 \end{table}
+
+Thus the present computations do not establish
+\cref{clm:flexible26,clm:girth5-28}, and the theorem below remains
+conditional on completing or
+replacing those two computations.
 
 \begin{theorem}\label{thm:cubic28}
     Every simple cubic graph with at most 28 vertices is 1-planar.

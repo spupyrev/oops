@@ -45,28 +45,28 @@ struct LocalDrawing {
   std::vector<Crossing> crossings;
 };
 
-/// Verify a listed local drawing by planarity after replacing each crossing.
-void checkLocalDrawing(const int k, const LocalDrawing& drawing) {
-  CHECK(static_cast<int>(drawing.boundaryOrder.size()) == k);
-  std::vector<EdgeTy> localEdges;
-  auto makeEdge = [](const int u, const int v) {
-    return EdgeTy(std::min(u, v), std::max(u, v));
-  };
-  for (int i = 0; i < k; i++)
-    localEdges.push_back(makeEdge(i, (i + 1) % k));
-  for (int i = 0; i < k; i++)
-    localEdges.push_back(makeEdge(i, k + i));
+EdgeTy makeEdge(const int first, const int second) {
+  return EdgeTy(std::min(first, second), std::max(first, second));
+}
 
-  std::vector<bool> crossedEdges(2 * k, false);
+/// Verify a listed patch drawing by planarity after replacing each crossing.
+void checkPatchDrawing(
+    const int patchVertices, const int boundaryVertices,
+    const std::vector<EdgeTy>& localEdges, const LocalDrawing& drawing) {
+  CHECK(static_cast<int>(drawing.boundaryOrder.size()) == boundaryVertices);
+  const int firstBoundary = patchVertices;
+  const int outerApex = patchVertices + boundaryVertices;
+  std::vector<bool> crossedEdges(localEdges.size(), false);
   std::vector<EdgeTy> planarized;
   struct CrossingWheel {
     std::array<int, 4> rim;
     int apex;
   };
   std::vector<CrossingWheel> crossingWheels;
-  int nextVertex = 2 * k + 1;
+  int nextVertex = outerApex + 1;
   for (const auto& [first, second] : drawing.crossings) {
-    CHECK(0 <= first && first < 2 * k && 0 <= second && second < 2 * k);
+    CHECK(0 <= first && first < static_cast<int>(localEdges.size()) &&
+          0 <= second && second < static_cast<int>(localEdges.size()));
     CHECK(first != second && !crossedEdges[first] && !crossedEdges[second]);
     CHECK(localEdges[first].first != localEdges[second].first &&
           localEdges[first].first != localEdges[second].second &&
@@ -90,12 +90,14 @@ void checkLocalDrawing(const int k, const LocalDrawing& drawing) {
   }
 
   // Add the uncrossed part of the local drawing and its prescribed boundary cycle.
-  for (int i = 0; i < k; i++) {
-    const int current = k + (drawing.boundaryOrder[i] - '0');
-    const int next = k + (drawing.boundaryOrder[(i + 1) % k] - '0');
+  for (int i = 0; i < boundaryVertices; i++) {
+    const int current =
+        firstBoundary + (drawing.boundaryOrder[i] - '0');
+    const int next = firstBoundary +
+        (drawing.boundaryOrder[(i + 1) % boundaryVertices] - '0');
     planarized.push_back(makeEdge(current, next));
   }
-  for (int edge = 0; edge < 2 * k; edge++) {
+  for (int edge = 0; edge < static_cast<int>(localEdges.size()); edge++) {
     const auto [u, v] = localEdges[edge];
     if (!crossedEdges[edge])
       planarized.push_back(makeEdge(u, v));
@@ -133,28 +135,40 @@ void checkLocalDrawing(const int k, const LocalDrawing& drawing) {
   std::vector<EdgeTy> interior;
   for (const EdgeTy& edge : planarized) {
     const bool boundaryEdge =
-        k <= edge.first && edge.first < 2 * k &&
-        k <= edge.second && edge.second < 2 * k;
+        firstBoundary <= edge.first && edge.first < outerApex &&
+        firstBoundary <= edge.second && edge.second < outerApex;
     if (!boundaryEdge)
       interior.push_back(edge);
   }
   CHECK(connectedSupport(nextVertex, interior),
         "disconnected interior for boundary %s", drawing.boundaryOrder.c_str());
-  for (int boundaryVertex = k; boundaryVertex < 2 * k; boundaryVertex++)
+  for (int boundaryVertex = firstBoundary;
+       boundaryVertex < outerApex; boundaryVertex++)
     CHECK(std::any_of(interior.begin(), interior.end(),
                       [&](const EdgeTy& edge) {
                         return edge.first == boundaryVertex || edge.second == boundaryVertex;
                       }),
-          "unused boundary point %d for boundary %s", boundaryVertex - k,
+          "unused boundary point %d for boundary %s",
+          boundaryVertex - firstBoundary,
           drawing.boundaryOrder.c_str());
 
-  const int apex = 2 * k;
-  for (int i = 0; i < k; i++) {
-    const int current = k + (drawing.boundaryOrder[i] - '0');
-    planarized.push_back(makeEdge(apex, current));
+  for (int i = 0; i < boundaryVertices; i++) {
+    const int current =
+        firstBoundary + (drawing.boundaryOrder[i] - '0');
+    planarized.push_back(makeEdge(outerApex, current));
   }
   CHECK(isPlanar(nextVertex, planarized, 0),
         "nonplanar local drawing for boundary %s", drawing.boundaryOrder.c_str());
+}
+
+/// Verify a cycle and its attachment portions in a disk.
+void checkLocalDrawing(const int k, const LocalDrawing& drawing) {
+  std::vector<EdgeTy> localEdges;
+  for (int i = 0; i < k; i++)
+    localEdges.push_back(makeEdge(i, (i + 1) % k));
+  for (int i = 0; i < k; i++)
+    localEdges.push_back(makeEdge(i, k + i));
+  checkPatchDrawing(k, k, localEdges, drawing);
 }
 
 int main() {
@@ -164,6 +178,22 @@ int main() {
   const std::vector<LocalDrawing> fiveCycleExpansions = {
       {"01234", {}}, {"01243", {{2, 4}}},
       {"01342", {{4, 7}}}, {"01432", {{1, 4}}}};
+
+  // If the replacement path lies on another 5-cycle, vertices 0..4 are the
+  // original cycle and vertices 5,6 are the two other vertices of the second
+  // cycle.  Boundary points 7..11 are the five edges leaving this patch.
+  // Only edges 0..7, which disappear with the patch, may cross locally.
+  const std::vector<EdgeTy> overlappingFiveCyclePatch = {
+      makeEdge(0, 1), makeEdge(1, 2), makeEdge(2, 3),
+      makeEdge(3, 4), makeEdge(4, 0), makeEdge(0, 5),
+      makeEdge(3, 6), makeEdge(5, 6), makeEdge(1, 7),
+      makeEdge(2, 8), makeEdge(4, 9), makeEdge(6, 10),
+      makeEdge(5, 11)};
+  const std::vector<LocalDrawing> overlappingFiveCycleExpansions = {
+      {"01234", {{4, 6}}},
+      {"01243", {{2, 4}, {5, 6}}},
+      {"01342", {{3, 5}}},
+      {"01432", {{2, 5}}}};
 
   // Boundary orders around a vertex obtained by contracting a 5-cycle.  The
   // first table may cross only the two consecutive attachments s0,s1.
@@ -211,6 +241,19 @@ int main() {
   }
   CHECK(listedFiveCycleOrders == fiveCycleOrders,
         "5-cycle expansion table does not cover the path rotations");
+
+  std::set<std::string> listedOverlappingOrders;
+  for (const LocalDrawing& drawing : overlappingFiveCycleExpansions) {
+    CHECK(listedOverlappingOrders.insert(drawing.boundaryOrder).second,
+          "duplicate overlapping 5-cycle boundary order");
+    for (const auto& [first, second] : drawing.crossings)
+      for (int edge : {first, second})
+        CHECK(edge < 8,
+              "overlapping 5-cycle drawing crosses an old attachment");
+    checkPatchDrawing(7, 5, overlappingFiveCyclePatch, drawing);
+  }
+  CHECK(listedOverlappingOrders == fiveCycleOrders,
+        "overlapping 5-cycle table does not cover the path rotations");
 
   auto checkFiveCycleContractions = [](const std::vector<LocalDrawing>& drawings,
                                        const std::set<int>& allowedCrossedAttachments,

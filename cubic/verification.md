@@ -1,14 +1,10 @@
-# Verification of the five computational claims
+# Reproducing the five computational claims
 
-This document gives the commands needed to reproduce the five computational
-claims in `main_cubic.tex`.  The mathematical definitions, reductions, and
-proofs are given only in that paper.
+This file contains the commands used for the five claims in
+`main_cubic.tex`.  The paper contains the proofs.
 
-Run all command blocks in the same Bash session.  The commands are serial for
-clarity, as a proof-of-concept reproduction rather than a production
-scheduler.  A verification is successful only if every command exits
-successfully and the total number of processed records equals the stated
-family size.
+Run the commands in one Bash session.  They are written serially.  A claim
+passes only if every command succeeds and all generated graphs are checked.
 
 ## Prerequisites
 
@@ -37,7 +33,7 @@ Build OOPS and Minibaum, and identify the nauty executables:
 ```bash
 set -euo pipefail
 
-make -j
+make
 gcc -std=gnu89 -O3 /path/to/minibaum5.c -o minibaum5
 
 NAUTY=/path/to/nauty2_9_3
@@ -55,10 +51,8 @@ sha256sum ./oops ./prepare_cubic "$MINIBAUM" /path/to/minibaum5.c \
   > evidence/programs.sha256
 ```
 
-The following shell function generates only the biconnected, nonplanar graphs
-from a Minibaum enumeration, in 256 deterministic residue classes.  The
-unfiltered graphs are passed directly between the three programs and are not
-stored.
+This function divides Minibaum generation into 256 fixed parts.  It keeps
+only biconnected, nonplanar graphs.
 
 ```bash
 generate_biconnected_nonplanar() {
@@ -81,13 +75,11 @@ generate_biconnected_nonplanar() {
 }
 ```
 
-The program `pickg -c2` tests biconnectivity, while `planarg -v` tests
-nonplanarity.  Neither program performs both tests, so both filters are
-needed.  Passing `exact` as the fourth argument additionally applies
-`pickg -gN`, retaining only graphs of girth exactly `N`.
+`pickg -c2` keeps biconnected graphs.  `planarg -v` keeps nonplanar graphs.
+The optional argument `exact` also removes graphs whose girth is larger than
+the requested value.
 
-Before the graph families are processed, verify the finite local drawings
-used in the 4-cycle and 5-cycle expansion lemmas:
+Check the small drawing tables used in the paper:
 
 ```bash
 g++ -std=c++17 -O2 -Isrc \
@@ -122,14 +114,14 @@ for input in data/claim1/*.g6; do
 done
 ```
 
-The expected record counts, in increasing order, are
+Confirm that the counts, in the same order, are
 
 ```text
 1, 2, 5, 19, 85, 509, 4,060, 41,301, 97,141, 1,432,712.
 ```
 
-Their sum is 1,575,835.  Every nonplanar record must be reported as
-3-flexible; planar records satisfy the claim by a planar drawing.
+Their sum must be 1,575,835.  Accept the result only if every nonplanar graph
+is reported as 3-flexible.  Planar graphs require no further check.
 
 ## Verify Claim 2
 
@@ -151,14 +143,14 @@ for input in data/claim2-biconnected-nonplanar/*.g6; do
 done
 ```
 
-The family contains 1,620,470 records.  Every record must be reported as
-2-flexible.
+Confirm that the total is 1,620,470.  Accept the result only if every graph
+is reported as 2-flexible.
 
-## Verify Claim 3
+## Prepare Claim 3
 
-Generate the order-26 family once.  Girth-five graphs are mapped to their
-lexicographically least canonical 5-cycle contraction, while graphs of
-larger girth pass through unchanged.  Sorting discards equal order-22 cores:
+Generate the order-26 graphs.  For a graph of girth five,
+`prepare_cubic` replaces one 5-cycle by a degree-five vertex.  Equal results
+are removed.  Graphs of larger girth are kept unchanged.
 
 ```bash
 generate_biconnected_nonplanar 26 5 data/claim3-biconnected-nonplanar
@@ -169,61 +161,81 @@ for input in data/claim3-biconnected-nonplanar/*.g6; do
 done | sort -u > data/claim3.g6
 wc -l data/claim3.g6
 
-mkdir -p evidence/claim3
-./oops -i=data/claim3.g6 -verify-cubic -colors=0 \
-  > evidence/claim3/claim3.log 2>&1
+awk 'substr($0, 1, 1) == "U"' data/claim3.g6 \
+  > data/claim3-cores.g6
+awk 'substr($0, 1, 1) == "Y"' data/claim3.g6 \
+  > data/claim3-girth6.g6
 ```
 
-Every retained core must be reported as a 5-cycle core, and every direct
-order-26 record must be reported as 1-flexible.  The complete preparation
-records the exact counts; bounded samples project about 2.8 million cores.
-The connected input family contains 31,478,584 graphs before the
-biconnectivity and nonplanarity filters.
+Confirm that the input contains 31,478,584 graphs: 31,297,357 of girth five
+and 181,227 of larger girth.  Record the number left after removing
+duplicates; this is the output of `wc`.
 
-## Verify Claim 4
+## Prepare Claim 4 and combine it with Claim 3
 
-Generate every biconnected, nonplanar cubic graph with $n=28$ and girth
-exactly 5.  Each parent emits one canonical pair `(H,b)`.  Sorting removes
-duplicate pairs; the grouping pass combines all pairs with the same `H` into
-one graph carrying one pendant marker at each required vertex:
+Generate the order-28 graphs of girth five.  `prepare_cubic` prints one line
+for each input graph:
+
+- `D`: the proof reduces the graph to completed Claim 2;
+- `C code`: check the smaller graph given by `code`;
+- `R code`: check the original order-28 graph.
 
 ```bash
 generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
-wc -l data/claim4-biconnected-nonplanar/*.g6
+claim4_parents=$(
+  wc -l data/claim4-biconnected-nonplanar/*.g6 |
+    awk 'END {print $1}'
+)
 
 for input in data/claim4-biconnected-nonplanar/*.g6; do
-  ./prepare_cubic claim4 < "$input"
-done |
-  sort -u |
-  ./prepare_cubic group-claim4 > data/claim4-marked-groups.g6
-wc -l data/claim4-marked-groups.g6
+  ./prepare_cubic claim4-joint < "$input"
+done > data/claim4-classified.txt
 
-mkdir -p evidence/claim4
-./oops -i=data/claim4-marked-groups.g6 -verify-cubic -colors=0 \
-  > evidence/claim4/claim4.log 2>&1
+test "$(wc -l < data/claim4-classified.txt)" -eq "$claim4_parents"
+
+awk '$1 == "C" {print $2}' data/claim4-classified.txt |
+  sort -u > data/claim4-cores.g6
+awk '$1 == "R" {print $2}' data/claim4-classified.txt |
+  sort -u > data/claim4-residual.g6
+
+# Do not check the same smaller graph twice.
+comm -23 data/claim4-cores.g6 data/claim3-cores.g6 \
+  > data/claim4-extra-cores.g6
+./prepare_cubic mark-claim4-cores \
+  < data/claim4-extra-cores.g6 \
+  > data/claim4-extra-marked.g6
+
+awk '$1 == "D" {count++} END {print count + 0}' \
+  data/claim4-classified.txt
+wc -l data/claim4-cores.g6 data/claim4-extra-cores.g6 \
+  data/claim4-residual.g6
 ```
 
-Every record must be reported as a marked-star group.  The verifier removes
-the pendant markers, builds one SAT instance for `H`, and checks the
-three-edge star at every marked vertex.  The complete preparation records the
-exact number of groups; no complete group count is available yet.  An earlier
-29-million estimate came from only 50 reverse-expanded reduced graphs and
-must not be used as a production count.  Three residue parts already produced
-about 2.6 million groups before the global merge; the amount of cross-part
-overlap is unknown.
+`mark-claim4-cores` adds one leaf to each Claim 4 graph.  This tells OOPS
+which Claim 4 check to perform.  OOPS removes the leaf before solving.
 
-A 48-core server pilot measured 269 ms per partially merged group in the
-verifier, equivalent to 74.7 CPU-hours per million groups.  Its measured
-effective speedup is 25--30, so verification costs 2.99--2.49 wall-clock
-hours per million groups.  Two completely prepared residue parts merged to
-909,500 groups with a mean of 1.317 marked vertices, but their overlap does
-not justify an extrapolation to all 256 parts.  Verification alone fits in
-three days only if the final count is at most 24.1--28.9 million groups.
-Applying the measured preparation rate conservatively to all 652,159,389
-connected parents adds another 10.7 hours and lowers that threshold to about
-20.5--24.6 million groups, before allowing for generation, grouping,
-additional markers, or Claim 3.  The current pipeline therefore has no
-established three-day bound.
+Put all remaining Claim 3 and Claim 4 graphs in one file:
+
+```bash
+cat data/claim3.g6 data/claim4-extra-marked.g6 \
+  data/claim4-residual.g6 |
+  sort -u > data/claims3-4.g6
+
+wc -l data/claims3-4.g6
+```
+
+Verify the combined file:
+
+```bash
+mkdir -p evidence/claims3-4
+./oops -i=data/claims3-4.g6 -verify-cubic -colors=0 \
+  > evidence/claims3-4/claims3-4.log 2>&1
+```
+
+Accept Claims 3 and 4 only if every graph is reported as planar or 1-planar
+and the final counters account for every input line.  Order-22 Claim 3 graphs
+must be reported as `5-cycle-cores`; marked Claim 4 graphs as
+`5-cycle-star-cores`; and unchanged order-26 graphs as `1-flexible`.
 
 ## Verify Claim 5
 
@@ -242,10 +254,8 @@ for input in data/claim5-biconnected-nonplanar/*.g6; do
 done
 ```
 
-The family contains 4,624,501 records.  The completed verification reported
-4,624,501 1-planar graphs and no other verdict; every invocation exited
-successfully.  Its wall-clock time was approximately three days when the 256
-independent residue files were distributed over 48 workers.
+Confirm that the family contains 4,624,501 graphs.  Accept the result only if
+all 4,624,501 graphs are reported as 1-planar and every command succeeds.
 
 ## Final checks
 
