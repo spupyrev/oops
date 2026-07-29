@@ -294,6 +294,16 @@ Graph markAllAttachmentsCore(const Graph& base) {
   return marked;
 }
 
+Graph markVertex(const Graph& base, const int target) {
+  if (target < 0 || target >= base.n)
+    throw std::runtime_error("marked vertex is out of range");
+  Graph marked(base.n + 1);
+  for (const auto& edge : base.edges())
+    marked.addEdge(edge.first, edge.second);
+  marked.addEdge(target, base.n);
+  return marked;
+}
+
 struct PathReduction {
   Graph graph;
   int left;
@@ -373,6 +383,25 @@ void prepareClaim3(const Graph& graph) {
     std::cout << graph6(graph) << '\n';
   else
     std::cout << minimumCanonicalContraction(graph, fiveCycles) << '\n';
+}
+
+std::string minimumMarkedPathReduction(
+    const Graph& parent, const std::vector<std::vector<int>>& fiveCycles) {
+  std::string minimum;
+  for (const auto& cycle : fiveCycles) {
+    for (int middle = 0; middle < 5; middle++) {
+      const auto reduction = reduceFiveCycle(parent, cycle, middle);
+      if (!reduction)
+        throw std::runtime_error("claim4-joint path reduction failed");
+      const std::string code = canonicalGraph6(
+          markVertex(reduction->graph, reduction->middle));
+      if (minimum.empty() || code < minimum)
+        minimum = code;
+    }
+  }
+  if (minimum.empty())
+    throw std::runtime_error("claim4-joint selected no marked reduction");
+  return minimum;
 }
 
 char prepareClaim4Joint(const Graph& parent) {
@@ -462,7 +491,7 @@ char prepareClaim4Joint(const Graph& parent) {
     std::cout << "C " << bestExtraCore << '\n';
     return 'C';
   }
-  std::cout << "R " << graph6(parent) << '\n';
+  std::cout << "R " << minimumMarkedPathReduction(parent, fiveCycles) << '\n';
   return 'R';
 }
 

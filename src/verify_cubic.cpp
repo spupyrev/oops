@@ -45,6 +45,24 @@ void verifyDrawing(
     CHECK(!drawing.isCrossed[edge], "required edge %d is crossed", edge);
 }
 
+/// Remove crossing candidates incident with edges known to be uncrossed
+/// before encoding, then verify the same condition in the final drawing.
+void verifyDrawingWithFixedEdges(
+    Params& params, const InputGraph& graph,
+    const std::vector<int>& uncrossedEdges) {
+  CHECK(params.fixCross1.empty(),
+        "marked verification expects no fixed crossing");
+  for (int edge : uncrossedEdges) {
+    if (!params.fixCross1.empty())
+      params.fixCross1 += ';';
+    const auto& [first, second] = graph.edges[edge];
+    params.fixCross1 += std::to_string(first) + ':' +
+        std::to_string(second) + '-';
+  }
+  verifyDrawing(params, graph, uncrossedEdges);
+  params.fixCross1.clear();
+}
+
 /// Return the sorted set of original edges crossed in a verified drawing.
 std::vector<int> crossedEdges(const Result& drawing) {
   std::vector<int> crossed;
@@ -297,7 +315,8 @@ void verifyFlexibility(
 enum class VerificationInput {
   CUBIC,
   FIVE_CYCLE_CORE,
-  FIVE_CYCLE_STAR_CORE
+  FIVE_CYCLE_STAR_CORE,
+  FIVE_CYCLE_PATH_STAR
 };
 
 /// Check that an input record is cubic or is a marked reduced graph.
@@ -329,6 +348,30 @@ VerificationInput validateInput(const AdjListTy& adjList, const std::vector<Edge
       return VerificationInput::FIVE_CYCLE_STAR_CORE;
   }
 
+  if (n == 27) {
+    int leaf = -1;
+    int target = -1;
+    bool valid = true;
+    for (int vertex = 0; vertex < n; vertex++) {
+      const int degree = static_cast<int>(adjList[vertex].size());
+      int* location = nullptr;
+      if (degree == 1)
+        location = &leaf;
+      else if (degree == 4)
+        location = &target;
+      else if (degree != 3)
+        valid = false;
+      if (location != nullptr) {
+        if (*location != -1)
+          valid = false;
+        *location = vertex;
+      }
+    }
+    if (valid && leaf != -1 && target != -1 &&
+        contains(adjList[leaf], target))
+      return VerificationInput::FIVE_CYCLE_PATH_STAR;
+  }
+
   int exceptionalVertex = -1;
   int exceptionalDegree = -1;
   for (int vertex = 0; vertex < n; vertex++) {
@@ -345,11 +388,11 @@ VerificationInput validateInput(const AdjListTy& adjList, const std::vector<Edge
     return VerificationInput::FIVE_CYCLE_CORE;
   }
 
-  CHECK(4 <= n && n <= 28 && n % 2 == 0,
-        "verification expects an even order from 4 through 28");
+  CHECK(4 <= n && n <= 26 && n % 2 == 0,
+        "verification expects an even order from 4 through 26");
   if (n >= 24)
     CHECK(computeGirth(n, edges) >= 5,
-          "orders 24 through 28 require girth at least five");
+          "orders 24 and 26 require girth at least five");
   return VerificationInput::CUBIC;
 }
 
@@ -393,6 +436,39 @@ void verifyFiveCycleStarCore(
   CHECK(attachments.size() == 5,
         "marked 5-cycle core has an invalid attachment set");
   verifyDrawing(params, graph, attachments);
+}
+
+/// Remove the pendant marker and verify the clean three-edge star required
+/// by the order-28 5-cycle-to-path expansion.
+void verifyFiveCyclePathStar(
+    const AdjListTy& adjList, Params& params) {
+  const int n = static_cast<int>(adjList.size());
+  int markedTarget = -1;
+  std::vector<int> remap(n, -1);
+  int baseN = 0;
+  for (int vertex = 0; vertex < n; vertex++) {
+    const int degree = static_cast<int>(adjList[vertex].size());
+    if (degree == 4)
+      markedTarget = vertex;
+    if (degree >= 3)
+      remap[vertex] = baseN++;
+  }
+  CHECK(baseN == 26 && markedTarget != -1,
+        "invalid marked 5-cycle path reduction");
+
+  std::vector<EdgeTy> baseEdges;
+  for (int first = 0; first < n; first++)
+    for (int second : adjList[first])
+      if (first < second && remap[first] != -1 && remap[second] != -1)
+        baseEdges.push_back(make_edge(remap[first], remap[second]));
+  InputGraph graph(baseN, baseEdges, {});
+  CHECK(graph.edges.size() == 39,
+        "marked 5-cycle path reduction has an invalid base");
+  const std::vector<int> star =
+      incidentEdges(graph, remap[markedTarget]);
+  CHECK(star.size() == 3,
+        "marked 5-cycle path reduction has an invalid star");
+  verifyDrawingWithFixedEdges(params, graph, star);
 }
 
 /// Verify the cyclic-order-independent conditions for expanding a contracted
@@ -444,14 +520,6 @@ void verifyCubic26(const int n, const std::vector<EdgeTy>& edges, const Params& 
   verifyFlexibility(params, graph, 1);
 }
 
-/// Directly verify a residual order-28 graph from the joint reduction.
-void verifyCubic28(
-    const int n, const std::vector<EdgeTy>& edges, const Params& params) {
-  CHECK(n == 28);
-  InputGraph graph(n, edges, {});
-  verifyDrawing(params, graph, {});
-}
-
 }  // namespace
 
 /// Verify the claim or claims prescribed by the order of each input graph.
@@ -471,6 +539,7 @@ void verifyCubic(CMDOptions& options) {
   int num1Flexible = 0;
   int numFiveCycleCores = 0;
   int numFiveCycleStarCores = 0;
+  int numFiveCyclePathStars = 0;
 
   for (int i = 0; i < numGraphs; i++) {
     const auto& adj = graphs->next().second;
@@ -481,6 +550,8 @@ void verifyCubic(CMDOptions& options) {
       numFiveCycleCores++;
     else if (input == VerificationInput::FIVE_CYCLE_STAR_CORE)
       numFiveCycleStarCores++;
+    else if (input == VerificationInput::FIVE_CYCLE_PATH_STAR)
+      numFiveCyclePathStars++;
 
     if (isPlanar(n, edges, 0)) {
       numPlanar++;
@@ -489,6 +560,9 @@ void verifyCubic(CMDOptions& options) {
       num1Planar++;
     } else if (input == VerificationInput::FIVE_CYCLE_STAR_CORE) {
       verifyFiveCycleStarCore(adj, params);
+      num1Planar++;
+    } else if (input == VerificationInput::FIVE_CYCLE_PATH_STAR) {
+      verifyFiveCyclePathStar(adj, params);
       num1Planar++;
     } else if (n <= 22) {
       verifyCubic22(n, edges, params);
@@ -502,9 +576,6 @@ void verifyCubic(CMDOptions& options) {
       verifyCubic26(n, edges, params);
       num1Flexible++;
       num1Planar++;
-    } else if (n == 28) {
-      verifyCubic28(n, edges, params);
-      num1Planar++;
     } else {
       CHECK(false, "unsupported cubic verification input");
     }
@@ -516,6 +587,7 @@ void verifyCubic(CMDOptions& options) {
   LOG("#planar = %'d; #1-planar = %'d", numPlanar, num1Planar);
   LOG("#3-flexible = %'d; #2-flexible = %'d", num3Flexible, num2Flexible);
   LOG("#1-flexible = %'d; #5-cycle-cores = %'d; "
-      "#5-cycle-star-cores = %'d",
-      num1Flexible, numFiveCycleCores, numFiveCycleStarCores);
+      "#5-cycle-star-cores = %'d; #5-cycle-path-stars = %'d",
+      num1Flexible, numFiveCycleCores, numFiveCycleStarCores,
+      numFiveCyclePathStars);
 }

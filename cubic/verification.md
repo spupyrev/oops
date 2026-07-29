@@ -178,7 +178,7 @@ for each input graph:
 
 - `D`: the proof reduces the graph to completed Claim 2;
 - `C code`: check the smaller graph given by `code`;
-- `R code`: check the original order-28 graph.
+- `R code`: check the marked order-26 reduction given by `code`.
 
 ```bash
 generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
@@ -196,7 +196,7 @@ test "$(wc -l < data/claim4-classified.txt)" -eq "$claim4_parents"
 awk '$1 == "C" {print $2}' data/claim4-classified.txt |
   sort -u > data/claim4-cores.g6
 awk '$1 == "R" {print $2}' data/claim4-classified.txt |
-  sort -u > data/claim4-residual.g6
+  sort -u > data/claim4-path-stars.g6
 
 # Do not check the same smaller graph twice.
 comm -23 data/claim4-cores.g6 data/claim3-cores.g6 \
@@ -208,17 +208,18 @@ comm -23 data/claim4-cores.g6 data/claim3-cores.g6 \
 awk '$1 == "D" {count++} END {print count + 0}' \
   data/claim4-classified.txt
 wc -l data/claim4-cores.g6 data/claim4-extra-cores.g6 \
-  data/claim4-residual.g6
+  data/claim4-path-stars.g6
 ```
 
 `mark-claim4-cores` adds one leaf to each Claim 4 graph.  This tells OOPS
-which Claim 4 check to perform.  OOPS removes the leaf before solving.
+which Claim 4 check to perform.  Every `R` graph already has such a leaf.
+OOPS removes the leaf before solving.
 
 Put all remaining Claim 3 and Claim 4 graphs in one file:
 
 ```bash
 cat data/claim3.g6 data/claim4-extra-marked.g6 \
-  data/claim4-residual.g6 |
+  data/claim4-path-stars.g6 |
   sort -u > data/claims3-4.g6
 
 wc -l data/claims3-4.g6
@@ -235,7 +236,8 @@ mkdir -p evidence/claims3-4
 Accept Claims 3 and 4 only if every graph is reported as planar or 1-planar
 and the final counters account for every input line.  Order-22 Claim 3 graphs
 must be reported as `5-cycle-cores`; marked Claim 4 graphs as
-`5-cycle-star-cores`; and unchanged order-26 graphs as `1-flexible`.
+`5-cycle-star-cores` or `5-cycle-path-stars`; and unchanged order-26 graphs
+as `1-flexible`.
 
 ## Verify Claim 5
 

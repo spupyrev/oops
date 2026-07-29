@@ -743,10 +743,13 @@ planar graph, the empty crossing pattern suffices.
     which the star at $b$ is uncrossed, and
     \cref{lem:5-cycle-expansion} then expands $H$ to $G$.
 
-    If neither reduction is available, the parent $G$ itself is retained and
-    checked directly for 1-planarity.  Consequently the computation needs
-    no three-edge-star verification at order 26 and no flexibility
-    assumption beyond the ordinary Claim~3 statement.  The global
+    If neither lower-order certificate is available, one canonical
+    reduction $(H,b)$ is retained.  The computation checks directly that
+    $H$ has a 1-planar drawing in which the three edges incident with $b$ are
+    uncrossed; \cref{lem:5-cycle-expansion} then restores $G$.  Thus marked
+    order-26 reductions are used only for the residual class, and no
+    flexibility assumption beyond the ordinary Claim~3 statement is needed.
+    The global
     preparation and verification described in
     \texttt{cubic/verification.md} have not yet been run, so this proposed
     computation does not yet prove the claim.
@@ -767,13 +770,7 @@ The running times for the five computations are summarized in
 \cref{tab:cubic28-runtime}.  Claims 1, 2, and 5 are completed computations.
 The earlier marked-star preparation for \cref{clm:girth5-28} produced
 $38{,}120{,}815$ groups whose measured verification would take 392--470
-hours; that route was abandoned.  In a fixed 10,000-parent sample, the joint
-preparation above used a completed order-24 certificate for 4,465 parents,
-selected a contraction core for 5,535, and left no direct residual.  The
-4,080 distinct selected codes include the Claim~3 cores that will be removed
-by an exact set comparison.  Preparing the sample took 19.73 seconds in one
-process.  A separate 884-core stress sample of the extra all-attachment
-requirement took 33.15 seconds, and all records passed.
+hours; that route was abandoned.
 
 For Claim~3, a bounded parent-weighted pilot sampled 300 parents from 256
 spread-out fine Minibaum parts containing 1,370,731 parents.  Enumerating the
@@ -783,12 +780,33 @@ Timing the same cores gave
 \(\mathop{\rm E}(t/f)=0.06790\) seconds per parent; its 95\% sampling interval
 was \(0.05887\)--\(0.07693\).  Thus the girth-five part of Claim~3 projects
 to 19.7--23.6 hours at the measured 30--25-fold effective speedup, with a
-17.1--26.8 hour sampling envelope.  The smaller Claim~3 girth-six and
-Claim~4 checks add approximately 2.7--5.4 hours.  Combining these figures
-with the observed 15--24 hour preparation envelope gives a central
-37--53 hour projection and a 35--56 hour sampling envelope.  The final
-launch decision uses the exact globally merged count and a bounded timing
-sample from that file.
+17.1--26.8 hour sampling envelope.
+
+A server test of the joint Claim~4 preparation with direct order-28
+residuals processed
+$5{,}465{,}734$ parents from three complete Minibaum parts.  It classified
+$3{,}026{,}393$ as \texttt{D}, $2{,}381{,}534$ as \texttt{C}, and
+$57{,}807$ as \texttt{R}.  The \texttt{R} records were all distinct, and a
+uniformly spaced 100-record sample took 0.930 seconds per graph.  Scaling
+only preparation and the \texttt{R} class to the full connected family gives
+1,941 CPU-hours, or 64.7--77.6 wall-clock hours at 30--25-fold effective
+speedup.  This already exceeds the three-day target at 25-fold speedup and
+assigns zero cost to every \texttt{C} record.  Adding Claim~3 gives a joint
+floor of 84.9--101.9 hours, still without Claim~4 core verification or graph
+generation.  Thus direct verification of the residual parents was rejected.
+
+In the revised fallback, each residual parent retains one marked order-26
+reduction instead.  On 85 residuals from a uniformly spaced
+100,000-parent sample, the marked reductions were all distinct and all
+passed in 22.15 seconds, or 0.261 seconds per record.  Removing crossing
+candidates incident with the three prescribed edges before encoding reduced
+the matched time to 14.73 seconds, or 0.173 seconds per record.  At the
+server's measured residual fraction, this lowers the residual term from
+1,782 to approximately 332 CPU-hours.  Together with Claim~3 and Claim~4
+preparation, the resulting floor is 36.6--43.9 hours at 30--25-fold speedup.
+This is
+promising but is not yet a three-day bound: the server residual sample and
+the global Claim~4 core set remain to be measured.
 
 \begin{table}[!ht]
     \small
@@ -805,13 +823,13 @@ sample from that file.
         \cref{clm:girth5-28}  & joint with Claim 3 & see below & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        remaining Claims 3--4 & & 35--56 hours${}^\dagger$ (projected) & no \\
+        remaining Claims 3--4 & & at least 37--44 hours${}^\dagger$ & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
     {\footnotesize $^\ast$Projected number of distinct Claim 3 cores.
-    $^\dagger$Including the observed 15--24 hour preparation envelope, but
-    before the exact global set difference.\par}
+    $^\dagger$Floor for the revised residual fallback: Claim 4 core
+    verification and graph generation are assigned zero cost.\par}
 \end{table}
 
 Thus the present computations do not establish
