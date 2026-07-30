@@ -258,57 +258,12 @@ Graph contractCycle(const Graph& graph, const std::vector<int>& cycle) {
   return reduced;
 }
 
-std::optional<Graph> contractCleanFiveCycle(
-    const Graph& graph, const std::vector<int>& cycle) {
-  Graph reduced;
-  try {
-    reduced = contractCycle(graph, cycle);
-  } catch (const std::runtime_error&) {
-    return std::nullopt;
-  }
-  if (reduced.n != graph.n - 4 || reduced.degree(reduced.n - 1) != 5)
-    return std::nullopt;
-  for (int vertex = 0; vertex + 1 < reduced.n; vertex++)
-    if (reduced.degree(vertex) != 3)
-      return std::nullopt;
-  return reduced;
-}
-
-Graph markAllAttachmentsCore(const Graph& base) {
-  int hub = -1;
-  for (int vertex = 0; vertex < base.n; vertex++) {
-    if (base.degree(vertex) == 5) {
-      if (hub != -1)
-        throw std::runtime_error("5-cycle core has two hubs");
-      hub = vertex;
-    } else if (base.degree(vertex) != 3) {
-      throw std::runtime_error("5-cycle core has an invalid degree");
-    }
-  }
-  if (hub == -1)
-    throw std::runtime_error("5-cycle core has no hub");
-  Graph marked(base.n + 1);
-  for (const auto& edge : base.edges())
-    marked.addEdge(edge.first, edge.second);
-  marked.addEdge(hub, base.n);
-  return marked;
-}
-
-Graph markVertex(const Graph& base, const int target) {
-  if (target < 0 || target >= base.n)
-    throw std::runtime_error("marked vertex is out of range");
-  Graph marked(base.n + 1);
-  for (const auto& edge : base.edges())
-    marked.addEdge(edge.first, edge.second);
-  marked.addEdge(target, base.n);
-  return marked;
-}
-
 struct PathReduction {
   Graph graph;
   int left;
   int middle;
   int right;
+  int leftFar;
 };
 
 std::optional<PathReduction> reduceFiveCycle(
@@ -360,7 +315,10 @@ std::optional<PathReduction> reduceFiveCycle(
   }
   if (!isCubic(reduced) || !isConnected(reduced))
     return std::nullopt;
-  return PathReduction{std::move(reduced), left, middle, right};
+  const int leftFarPosition = (middlePosition + 3) % 5;
+  return PathReduction{
+      std::move(reduced), left, middle, right,
+      remap[outside[leftFarPosition]]};
 }
 
 std::string minimumCanonicalContraction(
@@ -385,23 +343,97 @@ void prepareClaim3(const Graph& graph) {
     std::cout << minimumCanonicalContraction(graph, fiveCycles) << '\n';
 }
 
-std::string minimumMarkedPathReduction(
-    const Graph& parent, const std::vector<std::vector<int>>& fiveCycles) {
-  std::string minimum;
-  for (const auto& cycle : fiveCycles) {
-    for (int middle = 0; middle < 5; middle++) {
-      const auto reduction = reduceFiveCycle(parent, cycle, middle);
-      if (!reduction)
-        throw std::runtime_error("claim4-joint path reduction failed");
-      const std::string code = canonicalGraph6(
-          markVertex(reduction->graph, reduction->middle));
-      if (minimum.empty() || code < minimum)
-        minimum = code;
+std::optional<std::vector<int>> overlapSequence(
+    const std::vector<int>& cycle, const PathReduction& reduction) {
+  const auto middleIt = std::find(
+      cycle.begin(), cycle.end(), reduction.middle);
+  if (middleIt == cycle.end())
+    return std::nullopt;
+  const int middlePosition =
+      static_cast<int>(middleIt - cycle.begin());
+  for (int direction : {-1, 1}) {
+    std::vector<int> sequence;
+    for (int offset = 0; offset < static_cast<int>(cycle.size()); offset++) {
+      int position =
+          (middlePosition + direction * offset) %
+          static_cast<int>(cycle.size());
+      if (position < 0)
+        position += static_cast<int>(cycle.size());
+      sequence.push_back(cycle[position]);
     }
+    // Starting at b, the required words are b-a-L-O-M and
+    // b-a-L-O-O-M.  The last vertex is forced to be the attachment at b:
+    // b's other two neighbors are a and the excluded path vertex c.
+    if (sequence[1] == reduction.left &&
+        sequence[2] == reduction.leftFar &&
+        sequence.back() != reduction.right)
+      return sequence;
   }
-  if (minimum.empty())
-    throw std::runtime_error("claim4-joint selected no marked reduction");
-  return minimum;
+  return std::nullopt;
+}
+
+std::optional<Graph> contractOverlap(
+    const Graph& graph, const std::vector<int>& sequence,
+    const int right) {
+  // Contract the complete overlap, including the path endpoint c, to one
+  // hub.  A 5-cycle overlap leaves six boundary edges; a 6-cycle overlap
+  // leaves seven.
+  const uint64_t selected = vertexMask(sequence);
+  std::vector<int> outside;
+  for (int position = 0;
+       position < static_cast<int>(sequence.size()); position++) {
+    const int previous =
+        sequence[(position + sequence.size() - 1) % sequence.size()];
+    const int next = sequence[(position + 1) % sequence.size()];
+    int found = -1;
+    for (int neighbor : graph.neighbors(sequence[position])) {
+      if (neighbor == previous || neighbor == next)
+        continue;
+      if (found != -1)
+        return std::nullopt;
+      found = neighbor;
+    }
+    if (found == -1)
+      return std::nullopt;
+    outside.push_back(found);
+  }
+  if (outside.front() != right)
+    return std::nullopt;
+  std::vector<int> endpoints(outside.begin() + 1, outside.end());
+  for (int neighbor : graph.neighbors(right))
+    if (neighbor != sequence.front())
+      endpoints.push_back(neighbor);
+  std::sort(endpoints.begin(), endpoints.end());
+  if (std::unique(endpoints.begin(), endpoints.end()) != endpoints.end())
+    return std::nullopt;
+
+  const uint64_t removed = selected | (uint64_t(1) << right);
+  for (int endpoint : endpoints)
+    if ((removed >> endpoint) & 1)
+      return std::nullopt;
+  std::vector<int> remap(graph.n, -1);
+  int reducedN = 0;
+  for (int vertex = 0; vertex < graph.n; vertex++)
+    if (((removed >> vertex) & 1) == 0)
+      remap[vertex] = reducedN++;
+  const int hub = reducedN++;
+  Graph quotient(reducedN);
+  try {
+    for (const auto& [first, second] : graph.edges())
+      if (remap[first] != -1 && remap[second] != -1)
+        quotient.addEdge(remap[first], remap[second]);
+    for (int endpoint : endpoints)
+      quotient.addEdge(hub, remap[endpoint]);
+  } catch (const std::runtime_error&) {
+    return std::nullopt;
+  }
+  if (!isConnected(quotient) ||
+      quotient.degree(hub) != static_cast<int>(sequence.size()) + 1)
+    return std::nullopt;
+  for (int vertex = 0; vertex < hub; vertex++)
+    if (quotient.degree(vertex) != 3)
+      return std::nullopt;
+  return quotient;
 }
 
 char prepareClaim4Joint(const Graph& parent) {
@@ -412,97 +444,73 @@ char prepareClaim4Joint(const Graph& parent) {
   const auto fiveCycles = cycles(parent, 5);
   if (fiveCycles.empty())
     throw std::runtime_error("claim4-joint input has no 5-cycle");
-  std::string bestExtraCore;
+  std::string bestSixHub;
+  std::string bestSevenHub;
   for (const auto& cycle : fiveCycles) {
-    for (int middle = 0; middle < 5; middle++) {
-      const auto reduction = reduceFiveCycle(parent, cycle, middle);
-      if (!reduction)
-        throw std::runtime_error("claim4-joint path reduction failed");
+    for (bool reverse : {false, true}) {
+      std::vector<int> oriented = cycle;
+      if (reverse)
+        std::reverse(oriented.begin() + 1, oriented.end());
+      for (int middle = 0; middle < 5; middle++) {
+        const auto reduction = reduceFiveCycle(parent, oriented, middle);
+        if (!reduction)
+          throw std::runtime_error("claim4-joint path reduction failed");
 
-      const auto secondCycles = cycles(reduction->graph, 5);
-      for (const auto& secondCycle : secondCycles) {
-        const auto middleIt = std::find(
-            secondCycle.begin(), secondCycle.end(), reduction->middle);
-        if (middleIt == secondCycle.end() ||
-            std::find(
-                secondCycle.begin(), secondCycle.end(), reduction->left) ==
-                secondCycle.end() ||
-            std::find(
-                secondCycle.begin(), secondCycle.end(), reduction->right) ==
-                secondCycle.end())
-          continue;
-        const auto order24 = reduceFiveCycle(
-            reduction->graph, secondCycle,
-            static_cast<int>(middleIt - secondCycle.begin()));
-        if (order24 && girth(order24->graph) >= 5 &&
-            isBiconnected(order24->graph)) {
-          std::cout << "D\n";
-          return 'D';
-        }
-      }
-
-      const bool canonicalFamily =
-          girth(reduction->graph) >= 5 &&
-          isBiconnected(reduction->graph);
-      std::vector<std::string> contractionCodes(secondCycles.size());
-      if (canonicalFamily) {
-        for (int index = 0;
-             index < static_cast<int>(secondCycles.size()); index++) {
-          const auto core = contractCleanFiveCycle(
-              reduction->graph, secondCycles[index]);
-          if (!core)
-            throw std::runtime_error(
-                "girth-five contraction is not clean");
-          contractionCodes[index] = canonicalGraph6(*core);
-        }
-      }
-
-      std::vector<std::string> orderedCodes = contractionCodes;
-      std::sort(orderedCodes.begin(), orderedCodes.end());
-      orderedCodes.erase(
-          std::unique(orderedCodes.begin(), orderedCodes.end()),
-          orderedCodes.end());
-      for (int index = 0;
-           index < static_cast<int>(secondCycles.size()); index++) {
-        if (std::find(
-                secondCycles[index].begin(), secondCycles[index].end(),
-                reduction->middle) == secondCycles[index].end())
-          continue;
-        std::string code;
-        if (canonicalFamily) {
-          code = contractionCodes[index];
-          if (code == orderedCodes.front()) {
-            std::cout << "C " << code << '\n';
-            return 'C';
+        const auto secondCycles = cycles(reduction->graph, 5);
+        for (const auto& secondCycle : secondCycles) {
+          const auto middleIt = std::find(
+              secondCycle.begin(), secondCycle.end(), reduction->middle);
+          if (middleIt != secondCycle.end() &&
+              std::find(
+                  secondCycle.begin(), secondCycle.end(), reduction->left) !=
+                  secondCycle.end() &&
+              std::find(
+                  secondCycle.begin(), secondCycle.end(), reduction->right) !=
+                  secondCycle.end()) {
+            const auto order24 = reduceFiveCycle(
+                reduction->graph, secondCycle,
+                static_cast<int>(middleIt - secondCycle.begin()));
+            if (order24 && girth(order24->graph) >= 5 &&
+                isBiconnected(order24->graph)) {
+              std::cout << "D\n";
+              return 'D';
+            }
           }
-        } else {
-          const auto core = contractCleanFiveCycle(
-              reduction->graph, secondCycles[index]);
-          if (!core)
-            continue;
-          code = canonicalGraph6(*core);
+          const auto sequence = overlapSequence(secondCycle, *reduction);
+          if (sequence) {
+            const auto quotient = contractOverlap(
+                reduction->graph, *sequence, reduction->right);
+            if (quotient) {
+              const std::string code = canonicalGraph6(*quotient);
+              if (bestSixHub.empty() || code < bestSixHub)
+                bestSixHub = code;
+            }
+          }
         }
-        if (bestExtraCore.empty() || code < bestExtraCore)
-          bestExtraCore = std::move(code);
+        for (const auto& secondCycle : cycles(reduction->graph, 6)) {
+          const auto sequence = overlapSequence(secondCycle, *reduction);
+          if (!sequence)
+            continue;
+          const auto quotient = contractOverlap(
+              reduction->graph, *sequence, reduction->right);
+          if (quotient) {
+            const std::string code = canonicalGraph6(*quotient);
+            if (bestSevenHub.empty() || code < bestSevenHub)
+              bestSevenHub = code;
+          }
+        }
       }
     }
   }
-  if (!bestExtraCore.empty()) {
-    std::cout << "C " << bestExtraCore << '\n';
+  if (!bestSixHub.empty()) {
+    std::cout << "B " << bestSixHub << '\n';
+    return 'B';
+  }
+  if (!bestSevenHub.empty()) {
+    std::cout << "C " << bestSevenHub << '\n';
     return 'C';
   }
-  std::cout << "R " << minimumMarkedPathReduction(parent, fiveCycles) << '\n';
-  return 'R';
-}
-
-void markAllAttachmentCores() {
-  std::string line;
-  while (std::getline(std::cin, line)) {
-    if (line.empty())
-      continue;
-    const Graph core = parseGraph6(line);
-    std::cout << canonicalGraph6(markAllAttachmentsCore(core)) << '\n';
-  }
+  throw std::runtime_error("claim4-joint found no overlap certificate");
 }
 
 }  // namespace
@@ -511,20 +519,14 @@ int main(int argc, char** argv) {
   try {
     if (argc != 2) {
       std::cerr << "usage: prepare_cubic MODE\n"
-                << "MODE is claim3, claim4-joint, or mark-claim4-cores\n";
+                << "MODE is claim3 or claim4-joint\n";
       return 2;
     }
     const std::string mode = argv[1];
-    if (mode == "mark-claim4-cores") {
-      markAllAttachmentCores();
-      return 0;
-    }
-
     std::string line;
     uint64_t processed = 0;
     uint64_t jointDirect = 0;
     uint64_t jointExtraCores = 0;
-    uint64_t jointResiduals = 0;
     while (std::getline(std::cin, line)) {
       if (line.empty())
         continue;
@@ -535,10 +537,8 @@ int main(int argc, char** argv) {
         const char classification = prepareClaim4Joint(graph);
         if (classification == 'D')
           jointDirect++;
-        else if (classification == 'C')
+        else if (classification == 'B' || classification == 'C')
           jointExtraCores++;
-        else if (classification == 'R')
-          jointResiduals++;
         else
           throw std::runtime_error("invalid claim4-joint classification");
       } else
@@ -548,8 +548,7 @@ int main(int argc, char** argv) {
     std::cerr << "processed " << processed << " graph6 records\n";
     if (mode == "claim4-joint")
       std::cerr << "claim4-joint: D=" << jointDirect
-                << " C=" << jointExtraCores
-                << " R=" << jointResiduals << '\n';
+                << " hubs=" << jointExtraCores << '\n';
   } catch (const std::exception& error) {
     std::cerr << "prepare_cubic: " << error.what() << '\n';
     return 1;

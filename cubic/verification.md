@@ -10,9 +10,9 @@ passes only if every command succeeds and all generated graphs are checked.
 
 The verification uses the following software:
 
-- A C++17 compiler, a C compiler, GNU Make, Bash, and standard Unix utilities
-  including `awk`, `sha256sum`, `find`, `sort`, `xargs`, and `wc`.  Building
-  OOPS also requires the zlib development headers and library.
+- A C++17 compiler, a C compiler, Python 3, GNU Make, Bash, and standard Unix
+  utilities including `awk`, `sha256sum`, `find`, `sort`, `xargs`, and `wc`.
+  Building OOPS also requires the zlib development headers and library.
 - **nauty and Traces 2.9.3**, which supplies the `geng`, `pickg`, and `planarg`
   executables used for Claims 1--5.  Obtain the sources from the
   [official nauty page](https://users.cecs.anu.edu.au/~bdm/nauty/) or download
@@ -48,6 +48,7 @@ g++ -std=c++17 -O3 -Isrc -I"$NAUTY" \
 mkdir -p data evidence
 sha256sum ./oops ./prepare_cubic "$MINIBAUM" /path/to/minibaum5.c \
   "$NAUTY/geng" "$NAUTY/pickg" "$NAUTY/planarg" \
+  cubic/test_cycle_expansions.cpp cubic/test_hub_expansions.py \
   > evidence/programs.sha256
 ```
 
@@ -86,7 +87,11 @@ g++ -std=c++17 -O2 -Isrc \
   cubic/test_cycle_expansions.cpp src/planarity_test.cpp \
   -o test_cycle_expansions
 ./test_cycle_expansions
+python3 cubic/test_hub_expansions.py
 ```
+
+The last command must report 60 expandable `BALOM` orders and 355 expandable
+`BALOOM` orders.
 
 ## Verify Claim 1
 
@@ -171,14 +176,14 @@ Confirm that the input contains 31,478,584 graphs: 31,297,357 of girth five
 and 181,227 of larger girth.  Record the number left after removing
 duplicates; this is the output of `wc`.
 
-## Prepare Claim 4 and combine it with Claim 3
+## Prepare Claim 4
 
-Generate the order-28 graphs of girth five.  `prepare_cubic` prints one line
-for each input graph:
+Generate the order-28 graphs of girth five.  For each graph,
+`prepare_cubic` prints one of:
 
-- `D`: the proof reduces the graph to completed Claim 2;
-- `C code`: check the smaller graph given by `code`;
-- `R code`: check the marked order-26 reduction given by `code`.
+- `D`, when Claim 2 completes the proof;
+- `B code`, for a smaller graph with one degree-6 vertex; or
+- `C code`, for a smaller graph with one degree-7 vertex.
 
 ```bash
 generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
@@ -192,42 +197,33 @@ for input in data/claim4-biconnected-nonplanar/*.g6; do
 done > data/claim4-classified.txt
 
 test "$(wc -l < data/claim4-classified.txt)" -eq "$claim4_parents"
+awk '
+  ($1 == "D" && NF == 1) ||
+  (($1 == "B" || $1 == "C") && NF == 2) { next }
+  { exit 1 }
+' data/claim4-classified.txt
 
-awk '$1 == "C" {print $2}' data/claim4-classified.txt |
-  sort -u > data/claim4-cores.g6
-awk '$1 == "R" {print $2}' data/claim4-classified.txt |
-  sort -u > data/claim4-path-stars.g6
-
-# Do not check the same smaller graph twice.
-comm -23 data/claim4-cores.g6 data/claim3-cores.g6 \
-  > data/claim4-extra-cores.g6
-./prepare_cubic mark-claim4-cores \
-  < data/claim4-extra-cores.g6 \
-  > data/claim4-extra-marked.g6
+awk '$1 != "D" {print $2}' data/claim4-classified.txt |
+  sort -u > data/claim4.g6
 
 awk '$1 == "D" {count++} END {print count + 0}' \
   data/claim4-classified.txt
-wc -l data/claim4-cores.g6 data/claim4-extra-cores.g6 \
-  data/claim4-path-stars.g6
+awk '$1 == "B" {count++} END {print count + 0}' \
+  data/claim4-classified.txt
+awk '$1 == "C" {count++} END {print count + 0}' \
+  data/claim4-classified.txt
+wc -l data/claim4.g6
 ```
 
-`mark-claim4-cores` adds one leaf to each Claim 4 graph.  This tells OOPS
-which Claim 4 check to perform.  Every `R` graph already has such a leaf.
-OOPS removes the leaf before solving.
+The three printed class counts must add up to `claim4_parents`.  There must
+be no other line type.
 
-Put all remaining Claim 3 and Claim 4 graphs in one file:
+## Verify Claims 3 and 4
 
 ```bash
-cat data/claim3.g6 data/claim4-extra-marked.g6 \
-  data/claim4-path-stars.g6 |
-  sort -u > data/claims3-4.g6
-
+cat data/claim3.g6 data/claim4.g6 > data/claims3-4.g6
 wc -l data/claims3-4.g6
-```
 
-Verify the combined file:
-
-```bash
 mkdir -p evidence/claims3-4
 ./oops -i=data/claims3-4.g6 -verify-cubic -colors=0 \
   > evidence/claims3-4/claims3-4.log 2>&1
@@ -235,9 +231,8 @@ mkdir -p evidence/claims3-4
 
 Accept Claims 3 and 4 only if every graph is reported as planar or 1-planar
 and the final counters account for every input line.  Order-22 Claim 3 graphs
-must be reported as `5-cycle-cores`; marked Claim 4 graphs as
-`5-cycle-star-cores` or `5-cycle-path-stars`; and unchanged order-26 graphs
-as `1-flexible`.
+must be reported as `5-cycle-cores`, unchanged order-26 graphs as
+`1-flexible`, and Claim 4 graphs as `degree-6-hubs` or `degree-7-hubs`.
 
 ## Verify Claim 5
 

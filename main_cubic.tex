@@ -719,38 +719,56 @@ planar graph, the empty crossing pattern suffices.
     1-planar.
 \end{claim}
 
-\begin{proof}[Proposed joint computational proof]
+\begin{proof}[Proposed computational proof]
     For every graph $G$ in this family, the preparation enumerates the
     5-cycle-to-path reductions $(H,b)$ from
     \cref{lem:5-cycle-expansion}.  Girth five makes every first reduction
-    simple.  It seeks one of the following certificates.
+    simple.  Write the replacement path as $a b c$.
 
-    First, if the replacement path lies on a second 5-cycle, the preparation
+    If the replacement path lies on a second 5-cycle, the preparation
     performs the second path reduction with $b$ assigned to its middle
     attachment.  When the resulting order-24 graph $K$ is biconnected and
     has girth at least five, it is either planar or covered by
     \cref{clm:flexible24}.  Thus its two path edges can be kept uncrossed, and
     \cref{lem:overlapping-5-cycle-expansion} proves that $G$ is 1-planar.
 
-    Otherwise, the preparation looks for a clean 5-cycle $D$ of $H$ that
-    contains $b$, and contracts it to a degree-five vertex.  Let $J$ be one
-    selected canonical contraction.  If the code of $J$ is among the
-    retained Claim~3 cores, its drawing with all five attachments uncrossed
-    is already one of the requirements checked in
-    \cref{clm:flexible26}.  Every other selected code is checked once for
-    precisely this all-five-attachments requirement.  Part~(i) of
-    \cref{lem:5-cycle-star-expansion} expands $J$ to a drawing of $H$ in
-    which the star at $b$ is uncrossed, and
-    \cref{lem:5-cycle-expansion} then expands $H$ to $G$.
+    Otherwise the preparation finds one of two overlapping cycles.  With
+    $L,M$ denoting attachments at $a,b$, respectively, their cyclic words are
+    \[
+        b\,a\,L\,O\,M
+        \qquad\hbox{or}\qquad
+        b\,a\,L\,O\,O\,M .
+    \]
+    Contract the complete union of the original 5-cycle and this overlap to
+    one vertex.  The resulting quotient has order 21 and one vertex of
+    degree six in the first case, or order 20 and one vertex of degree seven
+    in the second case; every other vertex has degree three.  Equal
+    canonical quotients are checked only once.
 
-    If neither lower-order certificate is available, one canonical
-    reduction $(H,b)$ is retained.  The computation checks directly that
-    $H$ has a 1-planar drawing in which the three edges incident with $b$ are
-    uncrossed; \cref{lem:5-cycle-expansion} then restores $G$.  Thus marked
-    order-26 reductions are used only for the residual class, and no
-    flexibility assumption beyond the ordinary Claim~3 statement is needed.
-    The global
-    preparation and verification described in
+    The finite local check in \texttt{cubic/test\_hub\_expansions.py} gives
+    the following exact expansion rule.  Every one of the 60 boundary orders
+    of the degree-six patch expands.  For the degree-seven patch, 355 of the
+    360 boundary orders expand; the five exceptions are
+    \[
+      0245136,\quad0246135,\quad0264153,\quad
+      0315426,\quad0316425.
+    \]
+    The check surrounds the patch by an uncrossed wheel in the prescribed
+    order and verifies the resulting crossing pattern and planarization.
+
+    For a degree-six quotient, the computation finds a drawing in which all
+    six hub edges are uncrossed.  For a degree-seven quotient, it considers
+    every bijection between the seven patch attachments and the seven hub
+    edges.  For each bijection it finds a drawing with all hub edges
+    uncrossed whose rotation avoids the five exceptional orders.  Drawings
+    are shared among all bijections they cover.  The rotation is read from
+    the verified two-page embedding of the planarization, so it is part of
+    the certificate rather than a postulated embedding choice.  Replacing
+    the hub by the corresponding local drawing restores $G$.
+
+    The preparation fails unless every input graph obtains one of these
+    three certificates.  Thus a completed run proves the claim without using
+    Claim~3.  The global preparation and verification described in
     \texttt{cubic/verification.md} have not yet been run, so this proposed
     computation does not yet prove the claim.
 \end{proof}
@@ -782,31 +800,29 @@ was \(0.05887\)--\(0.07693\).  Thus the girth-five part of Claim~3 projects
 to 19.7--23.6 hours at the measured 30--25-fold effective speedup, with a
 17.1--26.8 hour sampling envelope.
 
-A server test of the joint Claim~4 preparation with direct order-28
-residuals processed
-$5{,}465{,}734$ parents from three complete Minibaum parts.  It classified
-$3{,}026{,}393$ as \texttt{D}, $2{,}381{,}534$ as \texttt{C}, and
-$57{,}807$ as \texttt{R}.  The \texttt{R} records were all distinct, and a
-uniformly spaced 100-record sample took 0.930 seconds per graph.  Scaling
-only preparation and the \texttt{R} class to the full connected family gives
-1,941 CPU-hours, or 64.7--77.6 wall-clock hours at 30--25-fold effective
-speedup.  This already exceeds the three-day target at 25-fold speedup and
-assigns zero cost to every \texttt{C} record.  Adding Claim~3 gives a joint
-floor of 84.9--101.9 hours, still without Claim~4 core verification or graph
-generation.  Thus direct verification of the residual parents was rejected.
+For Claim~4, a conservative 60,000-parent structural sample contained 20,056 direct
+Claim~2 certificates, 28,391 degree-six overlaps, and 11,553 degree-seven
+overlaps.  The final orientation-complete selector can reclassify some
+degree-seven cases as the faster degree-six type, so these weights do not
+underestimate the verification cost.  A bounded parent-weighted pilot then selected ten quotients of
+each overlap type and enumerated their complete reverse fibers.  The
+degree-six fibers ranged from 47 to 328 and the degree-seven fibers from 18
+to 458.  Timing the same quotients gave
+\(\mathop{\rm E}(t/f)=0.000395\) and \(0.001196\) seconds per parent,
+respectively.  Weighting these values by the structural sample projects
+about 76 CPU-hours for Claim~4 verification.  The complete preparation is
+expected to remain the larger Claim~4 term; the previous server preparation
+measurements took 15--24 wall-clock hours.
 
-In the revised fallback, each residual parent retains one marked order-26
-reduction instead.  On 85 residuals from a uniformly spaced
-100,000-parent sample, the marked reductions were all distinct and all
-passed in 22.15 seconds, or 0.261 seconds per record.  Removing crossing
-candidates incident with the three prescribed edges before encoding reduced
-the matched time to 14.73 seconds, or 0.173 seconds per record.  At the
-server's measured residual fraction, this lowers the residual term from
-1,782 to approximately 332 CPU-hours.  Together with Claim~3 and Claim~4
-preparation, the resulting floor is 36.6--43.9 hours at 30--25-fold speedup.
-This is
-promising but is not yet a three-day bound: the server residual sample and
-the global Claim~4 core set remain to be measured.
+For the production budget we use the largest observed matched value of
+\(t/f\) in each overlap class for every parent, rather than the sample mean.
+This gives 298 CPU-hours, or about 12 hours at the measured 25-fold effective
+speedup.  Combining this conservative verifier budget, the 15--24-hour
+Claim~4 preparation range, and the current 20--27-hour Claim~3 estimate gives
+47--63 hours in total.  Generation, sorting, and the local expansion check
+are not included in this sum, but their earlier measured rates fit within
+the remaining nine-hour margin.  The estimate authorizes the production
+run; it is not reported as a completed computation.
 
 \begin{table}[!ht]
     \small
@@ -820,16 +836,16 @@ the global Claim~4 core set remain to be measured.
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
         \cref{clm:flexible26} & $4.54$ million${}^\ast$ & 20--27 hours (projected) & no \\
-        \cref{clm:girth5-28}  & joint with Claim 3 & see below & no \\
+        \cref{clm:girth5-28}  & $5.3$ million${}^\dagger$ & 27--36 hours (projected) & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        remaining Claims 3--4 & & at least 37--44 hours${}^\dagger$ & no \\
+        remaining Claims 3--4 & & 47--63 hours (projected) & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
     {\footnotesize $^\ast$Projected number of distinct Claim 3 cores.
-    $^\dagger$Floor for the revised residual fallback: Claim 4 core
-    verification and graph generation are assigned zero cost.\par}
+    $^\dagger$Projected number of distinct degree-six and degree-seven
+    quotients; the running time includes Claim~4 preparation.\par}
 \end{table}
 
 Thus the present computations do not establish

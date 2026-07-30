@@ -9,6 +9,7 @@
 #include <climits>
 #include <functional>
 #include <memory>
+#include <set>
 #include <vector>
 
 std::unique_ptr<GraphList> genGraphs(CMDOptions& options);
@@ -315,62 +316,14 @@ void verifyFlexibility(
 enum class VerificationInput {
   CUBIC,
   FIVE_CYCLE_CORE,
-  FIVE_CYCLE_STAR_CORE,
-  FIVE_CYCLE_PATH_STAR
+  SIX_HUB,
+  SEVEN_HUB
 };
 
 /// Check that an input record is cubic or is a marked reduced graph.
 VerificationInput validateInput(const AdjListTy& adjList, const std::vector<EdgeTy>& edges) {
   const int n = static_cast<int>(adjList.size());
   CHECK(isConnected(n, edges), "verification inputs contain connected graphs");
-
-  if (n == 23) {
-    int leaf = -1;
-    int hub = -1;
-    bool valid = true;
-    for (int vertex = 0; vertex < n; vertex++) {
-      const int degree = static_cast<int>(adjList[vertex].size());
-      int* location = nullptr;
-      if (degree == 1)
-        location = &leaf;
-      else if (degree == 6)
-        location = &hub;
-      else if (degree != 3)
-        valid = false;
-      if (location != nullptr) {
-        if (*location != -1)
-          valid = false;
-        *location = vertex;
-      }
-    }
-    if (valid && leaf != -1 && hub != -1 &&
-        contains(adjList[leaf], hub))
-      return VerificationInput::FIVE_CYCLE_STAR_CORE;
-  }
-
-  if (n == 27) {
-    int leaf = -1;
-    int target = -1;
-    bool valid = true;
-    for (int vertex = 0; vertex < n; vertex++) {
-      const int degree = static_cast<int>(adjList[vertex].size());
-      int* location = nullptr;
-      if (degree == 1)
-        location = &leaf;
-      else if (degree == 4)
-        location = &target;
-      else if (degree != 3)
-        valid = false;
-      if (location != nullptr) {
-        if (*location != -1)
-          valid = false;
-        *location = vertex;
-      }
-    }
-    if (valid && leaf != -1 && target != -1 &&
-        contains(adjList[leaf], target))
-      return VerificationInput::FIVE_CYCLE_PATH_STAR;
-  }
 
   int exceptionalVertex = -1;
   int exceptionalDegree = -1;
@@ -383,6 +336,10 @@ VerificationInput validateInput(const AdjListTy& adjList, const std::vector<Edge
     exceptionalDegree = degree;
   }
   if (exceptionalVertex != -1) {
+    if (n == 21 && exceptionalDegree == 6)
+      return VerificationInput::SIX_HUB;
+    if (n == 20 && exceptionalDegree == 7)
+      return VerificationInput::SEVEN_HUB;
     CHECK(n == 22 && exceptionalDegree == 5,
           "invalid contracted graph for Claim 3");
     return VerificationInput::FIVE_CYCLE_CORE;
@@ -396,6 +353,41 @@ VerificationInput validateInput(const AdjListTy& adjList, const std::vector<Edge
   return VerificationInput::CUBIC;
 }
 
+std::string normalizedRotation(std::vector<int> rotation) {
+  const auto zero = std::find(rotation.begin(), rotation.end(), 0);
+  std::rotate(rotation.begin(), zero, rotation.end());
+  std::vector<int> reverse = {0};
+  reverse.insert(reverse.end(), rotation.rbegin(), rotation.rend() - 1);
+  const std::vector<int>& selected = std::min(rotation, reverse);
+  std::string result;
+  for (int label : selected)
+    result.push_back(static_cast<char>('0' + label));
+  return result;
+}
+
+std::string hubRotation(
+    const std::vector<int>& positions, const int hub,
+    const std::vector<int>& divisions) {
+  // In the two-page embedding, the incident arcs on each page are nested.
+  // Reading around the hub therefore gives the left division vertices from
+  // farthest to nearest, followed by the right division vertices from
+  // farthest to nearest.  Reversing the whole list represents reflection.
+  std::vector<std::pair<int, int>> left;
+  std::vector<std::pair<int, int>> right;
+  for (int label = 0; label < static_cast<int>(divisions.size()); label++) {
+    auto& side = positions[divisions[label]] < positions[hub] ? left : right;
+    side.emplace_back(positions[divisions[label]], label);
+  }
+  std::sort(left.begin(), left.end());
+  std::sort(right.rbegin(), right.rend());
+  std::vector<int> rotation;
+  for (const auto& [_, label] : left)
+    rotation.push_back(label);
+  for (const auto& [_, label] : right)
+    rotation.push_back(label);
+  return normalizedRotation(std::move(rotation));
+}
+
 /// Return the edge indices incident with one vertex.
 std::vector<int> incidentEdges(const InputGraph& graph, const int vertex) {
   std::vector<int> result;
@@ -405,70 +397,121 @@ std::vector<int> incidentEdges(const InputGraph& graph, const int vertex) {
   return result;
 }
 
-/// Remove the pendant marker and verify the all-attachments requirement used
-/// jointly by the order-26 contraction and the order-28 path reduction.
-void verifyFiveCycleStarCore(
-    const AdjListTy& adjList, const Params& params) {
-  const int n = static_cast<int>(adjList.size());
-  int markedHub = -1;
-  std::vector<int> remap(n, -1);
-  int baseN = 0;
-  for (int vertex = 0; vertex < n; vertex++) {
-    const int degree = static_cast<int>(adjList[vertex].size());
-    if (degree == 6)
-      markedHub = vertex;
-    if (degree >= 3)
-      remap[vertex] = baseN++;
-  }
-  CHECK(baseN == 22 && markedHub != -1,
-        "invalid marked 5-cycle core");
-
-  std::vector<EdgeTy> baseEdges;
-  for (int first = 0; first < n; first++)
-    for (int second : adjList[first])
-      if (first < second && remap[first] != -1 && remap[second] != -1)
-        baseEdges.push_back(make_edge(remap[first], remap[second]));
-  InputGraph graph(baseN, baseEdges, {});
-  CHECK(graph.edges.size() == 34,
-        "marked 5-cycle core has an invalid base");
-  const std::vector<int> attachments =
-      incidentEdges(graph, remap[markedHub]);
-  CHECK(attachments.size() == 5,
-        "marked 5-cycle core has an invalid attachment set");
-  verifyDrawing(params, graph, attachments);
+void verifySixHub(
+    const std::vector<EdgeTy>& edges, const AdjListTy& adjList,
+    Params& params) {
+  const int hub = static_cast<int>(
+      std::find_if(adjList.begin(), adjList.end(),
+                   [](const auto& neighbors) { return neighbors.size() == 6; }) -
+      adjList.begin());
+  CHECK(hub < static_cast<int>(adjList.size()), "degree-6 quotient has no hub");
+  InputGraph graph(static_cast<int>(adjList.size()), edges, {});
+  const std::vector<int> attachments = incidentEdges(graph, hub);
+  CHECK(attachments.size() == 6, "degree-6 quotient has invalid attachments");
+  verifyDrawingWithFixedEdges(params, graph, attachments);
 }
 
-/// Remove the pendant marker and verify the clean three-edge star required
-/// by the order-28 5-cycle-to-path expansion.
-void verifyFiveCyclePathStar(
-    const AdjListTy& adjList, Params& params) {
-  const int n = static_cast<int>(adjList.size());
-  int markedTarget = -1;
-  std::vector<int> remap(n, -1);
-  int baseN = 0;
-  for (int vertex = 0; vertex < n; vertex++) {
-    const int degree = static_cast<int>(adjList[vertex].size());
-    if (degree == 4)
-      markedTarget = vertex;
-    if (degree >= 3)
-      remap[vertex] = baseN++;
-  }
-  CHECK(baseN == 26 && markedTarget != -1,
-        "invalid marked 5-cycle path reduction");
+std::string findSevenHubDrawing(
+    const std::vector<EdgeTy>& edges, const AdjListTy& adjList,
+    const Params& params, const std::set<std::string>& forbidden) {
+  const int hub = static_cast<int>(
+      std::find_if(adjList.begin(), adjList.end(),
+                   [](const auto& neighbors) { return neighbors.size() == 7; }) -
+      adjList.begin());
+  CHECK(hub < static_cast<int>(adjList.size()), "degree-7 quotient has no hub");
+  InputGraph graph(static_cast<int>(adjList.size()), edges, {});
+  const std::vector<int> attachments = incidentEdges(graph, hub);
+  CHECK(attachments.size() == 7, "degree-7 quotient has invalid attachments");
+  std::vector<int> divisions;
+  for (int edge : attachments)
+    divisions.push_back(graph.n + edge);
 
-  std::vector<EdgeTy> baseEdges;
-  for (int first = 0; first < n; first++)
-    for (int second : adjList[first])
-      if (first < second && remap[first] != -1 && remap[second] != -1)
-        baseEdges.push_back(make_edge(remap[first], remap[second]));
-  InputGraph graph(baseN, baseEdges, {});
-  CHECK(graph.edges.size() == 39,
-        "marked 5-cycle path reduction has an invalid base");
-  const std::vector<int> star =
-      incidentEdges(graph, remap[markedTarget]);
-  CHECK(star.size() == 3,
-        "marked 5-cycle path reduction has an invalid star");
-  verifyDrawingWithFixedEdges(params, graph, star);
+  initCrossablePairs(params, graph);
+  SATModel model;
+  encodeStackPlanar(model, graph, params);
+  std::vector<int> order = {hub};
+  order.insert(order.end(), divisions.begin(), divisions.end());
+  std::sort(order.begin(), order.end());
+  int forbiddenLinearOrders = 0;
+  do {
+    std::vector<int> positions(graph.n + static_cast<int>(graph.edges.size()));
+    for (int position = 0; position < static_cast<int>(order.size()); position++)
+      positions[order[position]] = position;
+    if (!forbidden.count(hubRotation(positions, hub, divisions)))
+      continue;
+    forbiddenLinearOrders++;
+    MClause clause;
+    for (int index = 0; index + 1 < static_cast<int>(order.size()); index++)
+      clause.vars.push_back(
+          model.getRelVar(order[index], order[index + 1], false));
+    model.addClause(std::move(clause));
+  } while (std::next_permutation(order.begin(), order.end()));
+  CHECK(
+      forbiddenLinearOrders == 112 * static_cast<int>(forbidden.size()),
+      "degree-7 rotation encoding has an incomplete forbidden-order orbit");
+
+  Solver solver;
+  initSATSolver(params, graph, model, solver);
+  vec<Lit> assumptions;
+  for (int edge : attachments)
+    assumptions.push(
+        model.getSolverLit(model.getCross1Var(graph.n + edge, false)));
+  CHECK(solver.solveLimited(assumptions) == l_True,
+        "failed degree-7 quotient requirement");
+  const Result drawing = verifiedDrawing(params, graph, model, solver);
+  std::vector<int> positions(graph.n + static_cast<int>(graph.edges.size()), -1);
+  for (int position = 0; position < static_cast<int>(drawing.order.size()); position++)
+    for (int vertex : drawing.order[position])
+      positions[vertex] = position;
+  const std::string rotation = hubRotation(positions, hub, divisions);
+  CHECK(!forbidden.count(rotation),
+        "degree-7 quotient has forbidden rotation %s", rotation.c_str());
+  return rotation;
+}
+
+void verifySevenHub(
+    const std::vector<EdgeTy>& edges, const AdjListTy& adjList,
+    const Params& params) {
+  const std::set<std::string> patchForbidden = {
+      "0245136", "0246135", "0264153", "0315426", "0316425"};
+  std::vector<std::vector<int>> assignments;
+  std::vector<int> assignment = {0, 1, 2, 3, 4, 5, 6};
+  do {
+    assignments.push_back(assignment);
+  } while (std::next_permutation(assignment.begin(), assignment.end()));
+  std::vector<bool> covered(assignments.size(), false);
+
+  auto patchRotation = [](const std::string& quotientRotation,
+                          const std::vector<int>& assignment) {
+    std::vector<int> inverse(7);
+    for (int patch = 0; patch < 7; patch++)
+      inverse[assignment[patch]] = patch;
+    std::vector<int> rotation;
+    for (char label : quotientRotation)
+      rotation.push_back(inverse[label - '0']);
+    return normalizedRotation(std::move(rotation));
+  };
+
+  std::set<std::string> forbidden;
+  while (true) {
+    const std::string rotation =
+        findSevenHubDrawing(edges, adjList, params, forbidden);
+    for (int index = 0; index < static_cast<int>(assignments.size()); index++)
+      if (!patchForbidden.count(patchRotation(rotation, assignments[index])))
+        covered[index] = true;
+    const auto uncovered = std::find(covered.begin(), covered.end(), false);
+    if (uncovered == covered.end())
+      return;
+    const std::vector<int>& selected =
+        assignments[static_cast<int>(uncovered - covered.begin())];
+    forbidden.clear();
+    for (const std::string& patchOrder : patchForbidden) {
+      std::vector<int> mapped;
+      for (char label : patchOrder)
+        mapped.push_back(selected[label - '0']);
+      forbidden.insert(normalizedRotation(std::move(mapped)));
+    }
+  }
 }
 
 /// Verify the cyclic-order-independent conditions for expanding a contracted
@@ -538,8 +581,8 @@ void verifyCubic(CMDOptions& options) {
   int num2Flexible = 0;
   int num1Flexible = 0;
   int numFiveCycleCores = 0;
-  int numFiveCycleStarCores = 0;
-  int numFiveCyclePathStars = 0;
+  int numSixHubs = 0;
+  int numSevenHubs = 0;
 
   for (int i = 0; i < numGraphs; i++) {
     const auto& adj = graphs->next().second;
@@ -548,21 +591,21 @@ void verifyCubic(CMDOptions& options) {
     const VerificationInput input = validateInput(adj, edges);
     if (input == VerificationInput::FIVE_CYCLE_CORE)
       numFiveCycleCores++;
-    else if (input == VerificationInput::FIVE_CYCLE_STAR_CORE)
-      numFiveCycleStarCores++;
-    else if (input == VerificationInput::FIVE_CYCLE_PATH_STAR)
-      numFiveCyclePathStars++;
+    else if (input == VerificationInput::SIX_HUB)
+      numSixHubs++;
+    else if (input == VerificationInput::SEVEN_HUB)
+      numSevenHubs++;
 
     if (isPlanar(n, edges, 0)) {
       numPlanar++;
     } else if (input == VerificationInput::FIVE_CYCLE_CORE) {
       verifyFiveCycleCore(edges, adj, params);
       num1Planar++;
-    } else if (input == VerificationInput::FIVE_CYCLE_STAR_CORE) {
-      verifyFiveCycleStarCore(adj, params);
+    } else if (input == VerificationInput::SIX_HUB) {
+      verifySixHub(edges, adj, params);
       num1Planar++;
-    } else if (input == VerificationInput::FIVE_CYCLE_PATH_STAR) {
-      verifyFiveCyclePathStar(adj, params);
+    } else if (input == VerificationInput::SEVEN_HUB) {
+      verifySevenHub(edges, adj, params);
       num1Planar++;
     } else if (n <= 22) {
       verifyCubic22(n, edges, params);
@@ -587,7 +630,6 @@ void verifyCubic(CMDOptions& options) {
   LOG("#planar = %'d; #1-planar = %'d", numPlanar, num1Planar);
   LOG("#3-flexible = %'d; #2-flexible = %'d", num3Flexible, num2Flexible);
   LOG("#1-flexible = %'d; #5-cycle-cores = %'d; "
-      "#5-cycle-star-cores = %'d; #5-cycle-path-stars = %'d",
-      num1Flexible, numFiveCycleCores, numFiveCycleStarCores,
-      numFiveCyclePathStars);
+      "#degree-6-hubs = %'d; #degree-7-hubs = %'d",
+      num1Flexible, numFiveCycleCores, numSixHubs, numSevenHubs);
 }
