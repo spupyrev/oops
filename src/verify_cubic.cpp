@@ -347,10 +347,14 @@ void verifyFlexibility(
           index == selectedCoverage ? activations[index] : ~activations[index]);
     for (int edge : prescribed)
       assumptions.push(model.getSolverLit(model.getCross1Var(graph.n + edge, false)));
+    const std::string stage =
+        selectedCoverage == -1
+            ? "flexibility requirement"
+            : "coverage requirement " + std::to_string(selectedCoverage);
     requireSatisfiable(
         solver,
         solver.solveLimited(assumptions),
-        "coverage requirement " + std::to_string(selectedCoverage));
+        stage);
 
     drawing = verifiedDrawing(params, graph, model, solver);
     if (minimizeWitnesses)
@@ -617,6 +621,148 @@ void verifyCubic26(const int n, const std::vector<EdgeTy>& edges, const Params& 
   verifyFlexibility(params, graph, 1);
 }
 
+/// Expand a degree-five Claim 3 core in every cyclic order, retaining the
+/// biconnected, nonplanar, girth-at-least-five parents covered by Claim 3.
+std::vector<AdjListTy> claim3Parents(
+    const std::vector<EdgeTy>& coreEdges, const AdjListTy& coreAdj) {
+  const int coreN = static_cast<int>(coreAdj.size());
+  CHECK(coreN == 22, "Claim 3b expects order-22 cores");
+  const int hub = static_cast<int>(
+      std::find_if(coreAdj.begin(), coreAdj.end(),
+                   [](const auto& neighbors) { return neighbors.size() == 5; }) -
+      coreAdj.begin());
+  CHECK(hub < coreN, "Claim 3b core has no degree-five hub");
+
+  std::vector<int> remap(coreN, -1);
+  int reducedN = 0;
+  for (int vertex = 0; vertex < coreN; vertex++)
+    if (vertex != hub)
+      remap[vertex] = reducedN++;
+  CHECK(reducedN == 21, "Claim 3b core remapping failed");
+
+  std::vector<EdgeTy> baseEdges;
+  for (const auto& [first, second] : coreEdges)
+    if (first != hub && second != hub)
+      baseEdges.emplace_back(remap[first], remap[second]);
+
+  std::vector<int> attachments;
+  for (int neighbor : coreAdj[hub])
+    attachments.push_back(remap[neighbor]);
+  std::sort(attachments.begin(), attachments.end());
+  CHECK(attachments.size() == 5, "Claim 3b has invalid attachments");
+
+  const int parentN = 26;
+  const int cycleStart = 21;
+  std::vector<AdjListTy> parents;
+  std::vector<int> order = attachments;
+  int numCyclicOrders = 0;
+  do {
+    // Fix rotation and reflection.  The remaining 4!/2 orders are the 12
+    // cyclic orders of the five incident hub edges.
+    if (order.front() != attachments.front() || order[1] > order.back())
+      continue;
+    numCyclicOrders++;
+    std::vector<EdgeTy> edges = baseEdges;
+    for (int position = 0; position < 5; position++) {
+      const int cycleVertex = cycleStart + position;
+      edges.emplace_back(
+          std::min(order[position], cycleVertex),
+          std::max(order[position], cycleVertex));
+      const int nextCycleVertex = cycleStart + (position + 1) % 5;
+      edges.emplace_back(
+          std::min(cycleVertex, nextCycleVertex),
+          std::max(cycleVertex, nextCycleVertex));
+    }
+    std::sort(edges.begin(), edges.end());
+    const AdjListTy parent = edges_to_adj(parentN, edges);
+    CHECK(
+        std::all_of(
+            parent.begin(), parent.end(),
+            [](const auto& neighbors) { return neighbors.size() == 3; }),
+        "Claim 3b expansion is not cubic");
+    if (!is2Connected(parentN, edges) ||
+        computeGirth(parentN, edges) < 5 ||
+        isPlanar(parentN, edges, 0))
+      continue;
+    parents.push_back(parent);
+  } while (std::next_permutation(order.begin(), order.end()));
+  CHECK(numCyclicOrders == 12, "Claim 3b missed a cyclic order");
+  CHECK(!parents.empty(), "Claim 3b core has no relevant parent");
+  CHECK(parents.size() <= 12, "Claim 3b generated too many parents");
+  return parents;
+}
+
+void verifyClaim3b(
+    GraphList& graphs, const Params& params, std::ofstream& residue,
+    const std::string& residueFilename) {
+  const int numRecords = static_cast<int>(graphs.size());
+  const auto start = std::chrono::steady_clock::now();
+  int numCompletedRecords = 0;
+  int numParents = 0;
+  int num1Flexible = 0;
+  int numUnknown = 0;
+
+  for (int recordIndex = 0; recordIndex < numRecords; recordIndex++) {
+    const auto [graphName, recordAdj] = graphs.next();
+    const std::vector<EdgeTy> recordEdges = adj_to_edges(recordAdj);
+    const VerificationInput input =
+        validateInput(recordAdj, recordEdges);
+    std::vector<AdjListTy> parents;
+    if (input == VerificationInput::FIVE_CYCLE_CORE) {
+      parents = claim3Parents(recordEdges, recordAdj);
+    } else {
+      CHECK(
+          input == VerificationInput::CUBIC &&
+              recordAdj.size() == 26,
+          "Claim 3b accepts only Claim 3 cores or order-26 graphs");
+      parents.push_back(recordAdj);
+    }
+    bool completed = true;
+    for (int parentIndex = 0;
+         parentIndex < static_cast<int>(parents.size()); parentIndex++) {
+      const AdjListTy& parentAdj = parents[parentIndex];
+      const std::vector<EdgeTy> parentEdges = adj_to_edges(parentAdj);
+      numParents++;
+      try {
+        verifyCubic26(26, parentEdges, params);
+        num1Flexible++;
+      } catch (const VerificationTimedOut& timeout) {
+        CHECK(residue.good(), "Claim 3b timeout has no residue file");
+        residue << graph6(parentAdj) << '\n';
+        residue.flush();
+        CHECK(residue.good(), "failed to write Claim 3b residue");
+        numUnknown++;
+        completed = false;
+        LOG(
+            "Claim 3b timed out for %s parent %d/%d after %d seconds "
+            "during %s (%'llu conflicts, %'llu decisions); wrote it to %s",
+            graphName.c_str(), parentIndex + 1,
+            static_cast<int>(parents.size()), params.timeout,
+            timeout.stage.c_str(), timeout.conflicts, timeout.decisions,
+            residueFilename.c_str());
+      }
+    }
+    if (completed)
+      numCompletedRecords++;
+    LOG_EVERY_MS(
+        30000, "Claim 3b processed %'d of %'d records",
+        recordIndex + 1, numRecords);
+  }
+
+  CHECK(
+      num1Flexible + numUnknown == numParents,
+      "Claim 3b counters do not account for every parent");
+  LOG(
+      "Claim 3b processed %'d records and %'d parents in %s",
+      numRecords, numParents,
+      ms_to_str(start, std::chrono::steady_clock::now()).c_str());
+  LOG(
+      "#claim3b-records = %'d; #claim3b-completed = %'d; "
+      "#claim3b-parents = %'d; #1-flexible = %'d; #unknown = %'d",
+      numRecords, numCompletedRecords, numParents,
+      num1Flexible, numUnknown);
+}
+
 }  // namespace
 
 /// Verify the claim or claims prescribed by the order of each input graph.
@@ -640,6 +786,11 @@ void verifyCubic(CMDOptions& options) {
   }
 
   auto graphs = genGraphs(options);
+  if (options.hasCustomValue("claim3b")) {
+    verifyClaim3b(
+        *graphs, params, residue, residueFilename);
+    return;
+  }
   const int numGraphs = graphs->size();
   const auto start = std::chrono::steady_clock::now();
 

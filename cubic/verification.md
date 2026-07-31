@@ -226,21 +226,32 @@ wc -l data/claims3-4.g6
 
 mkdir -p evidence/claims3-4
 ./oops -i=data/claims3-4.g6 -verify-cubic -timeout=5 \
-  -Cverify-cubic-residue=evidence/claims3-4/residue.g6 -colors=0 \
+  -Cverify-cubic-residue=evidence/claims3-4/claim3b-input.g6 -colors=0 \
   > evidence/claims3-4/claims3-4.log 2>&1
-test ! -s evidence/claims3-4/residue.g6
+
+if [ -s evidence/claims3-4/claim3b-input.g6 ]; then
+  ./oops -i=evidence/claims3-4/claim3b-input.g6 \
+    -verify-cubic -Cclaim3b -timeout=120 \
+    -Cverify-cubic-residue=evidence/claims3-4/claim3b-residue.g6 \
+    -colors=0 > evidence/claims3-4/claim3b.log 2>&1
+else
+  : > evidence/claims3-4/claim3b-residue.g6
+fi
+test ! -s evidence/claims3-4/claim3b-residue.g6
 ```
 
-Accept Claims 3 and 4 only if every graph is reported as planar or 1-planar
-and the final counters account for every input line.  The log must report
-`#unknown = 0`, and the residue file must be empty.  Order-22 Claim 3 graphs
-must be reported as `5-cycle-cores`, unchanged order-26 graphs as
-`1-flexible`, and Claim 4 graphs as `degree-6-hubs` or `degree-7-hubs`.
-
-For a Claim 3 record, the five-second limit covers its incremental SAT
-solver.  If the limit is reached, OOPS writes that graph to the residue and
-continues with the next one.  When several OOPS processes are used, give
+The first pass verifies the routine records and retains five-second
+timeouts.  Claim 3b expands each retained order-22 Claim 3 core into at most
+12 relevant order-26 parents and verifies them directly.  A retained
+order-26 Claim 3 graph is retried directly.  Claim 3b rejects Claim 4
+records.  The limit is 120 seconds per parent.  Accept Claims 3 and 4 only
+if the two logs account for every input and parent, and
+`claim3b-residue.g6` is empty.  When several OOPS processes are used, give
 each process a different residue filename.
+
+In the first log, `#unknown` must equal the number of lines in
+`claim3b-input.g6`.  In the Claim 3b log, `#claim3b-records` and
+`#claim3b-completed` must both equal that number, and `#unknown` must be zero.
 
 ## Verify Claim 5
 

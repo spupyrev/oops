@@ -689,7 +689,7 @@ planar graph, the empty crossing pattern suffices.
     at least five is $1$-flexible.
 \end{claim}
 
-\begin{proof}[Proof (computational)]
+\begin{proof}[Proposed computational proof]
     First consider the graphs of girth five.  For each such graph $G$, the
     computation contracted every 5-cycle, canonically labeled the resulting
     order-22 graph, and retained the lexicographically least code.  Equal
@@ -697,21 +697,30 @@ planar graph, the empty crossing pattern suffices.
     graph and $s_0,\ldots,s_4$ for the five edges incident with its
     degree-five vertex.
 
-    The computation found a crossing pattern with all five $s_i$ uncrossed.
-    In addition, for every edge $e\in E(J)$ it found a crossing pattern in
-    which $e$ and at least three suitable attachments are uncrossed: all five
-    attachments are eligible when $e$ is not one of them, and the other four
-    are eligible when $e$ is an attachment.  Each resulting planarization was
-    checked.  These conditions do not depend on the cyclic order at the
-    contracted vertex.  An edge on the contracted 5-cycle is preserved using
-    part (i) of \cref{lem:5-cycle-star-expansion}; every other edge is
-    preserved using part (ii).  Thus every parent represented by $J$ is
-    $1$-flexible.
+    For every core completed by the first pass, the computation found a
+    crossing pattern with all five $s_i$ uncrossed.  In addition, for every
+    edge $e\in E(J)$ it found a crossing pattern in which $e$ and at least
+    three suitable attachments are uncrossed: all five attachments are
+    eligible when $e$ is not one of them, and the other four are eligible
+    when $e$ is an attachment.  Each resulting planarization was checked.
+    These conditions do not depend on the cyclic order at the contracted
+    vertex.  An edge on the contracted 5-cycle is preserved using part (i)
+    of \cref{lem:5-cycle-star-expansion}; every other edge is preserved using
+    part (ii).
+
+    A five-second limit retains the cores not completed by this first pass.
+    For each retained core, the second pass expands its degree-five vertex in
+    all \(4!/2=12\) cyclic orders.  It keeps the biconnected, nonplanar
+    order-26 expansions of girth at least five and verifies their
+    \(1\)-flexibility directly.  Every original parent represented by the
+    retained core is one of these expansions.  Hence the two passes together
+    cover every girth-five graph.
 
     The remaining order-26 graphs have girth at least six.  For every such
     graph $G$ and every edge $e\in E(G)$, the computation directly found a
     crossing pattern whose planarization is planar and whose support avoids
-    $e$.
+    $e$.  Any such graph retained by the five-second first pass is retried
+    directly in the second pass.
 \end{proof}
 
 \begin{claim}\label{clm:girth5-28}
