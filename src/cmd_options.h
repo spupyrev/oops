@@ -151,6 +151,14 @@ class CMDOptions {
     return values.count(optionName) > 0;
   }
 
+  // Returns a custom option's string value, or the supplied default.
+  std::string getCustomValue(
+      const std::string& optionName,
+      const std::string& defaultValue = "") const {
+    const auto value = values.find(optionName);
+    return value == values.end() ? defaultValue : value->second;
+  }
+
 private:
   void parseOption(const std::string& s) {
     const size_t equalIndex = s.find('=');

@@ -796,9 +796,14 @@ complete reverse fiber of each selected contraction gave
 \(\mathop{\rm E}(1/f)=0.1450\), projecting 4.54 million distinct cores.
 Timing the same cores gave
 \(\mathop{\rm E}(t/f)=0.06790\) seconds per parent; its 95\% sampling interval
-was \(0.05887\)--\(0.07693\).  Thus the girth-five part of Claim~3 projects
-to 19.7--23.6 hours at the measured 30--25-fold effective speedup, with a
-17.1--26.8 hour sampling envelope.
+was \(0.05887\)--\(0.07693\).  Thus the girth-five part of Claim~3 pilot
+projected 19.7--23.6 hours at the measured 30--25-fold effective speedup,
+with a 17.1--26.8 hour sampling envelope.  This pilot did not bound the
+tail: the production run subsequently encountered long-running cores that
+were absent from the sample.  Claim~3 is therefore now run with a
+five-second solver limit per core.  Timed-out cores are retained in a
+residue for separate verification, and the pilot interval is no longer used
+as a completion-time forecast.
 
 For Claim~4, a conservative 60,000-parent structural sample contained 20,056 direct
 Claim~2 certificates, 28,391 degree-six overlaps, and 11,553 degree-seven
@@ -817,12 +822,10 @@ measurements took 15--24 wall-clock hours.
 For the production budget we use the largest observed matched value of
 \(t/f\) in each overlap class for every parent, rather than the sample mean.
 This gives 298 CPU-hours, or about 12 hours at the measured 25-fold effective
-speedup.  Combining this conservative verifier budget, the 15--24-hour
-Claim~4 preparation range, and the current 20--27-hour Claim~3 estimate gives
-47--63 hours in total.  Generation, sorting, and the local expansion check
-are not included in this sum, but their earlier measured rates fit within
-the remaining nine-hour margin.  The estimate authorizes the production
-run; it is not reported as a completed computation.
+speedup.  Together with the 15--24-hour Claim~4 preparation range, this
+still projects 27--36 hours for Claim~4.  There is no reliable joint
+Claims~3--4 estimate until the bounded Claim~3 run has measured its hard
+residue.
 
 \begin{table}[!ht]
     \small
@@ -835,11 +838,11 @@ run; it is not reported as a completed computation.
         \midrule
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
-        \cref{clm:flexible26} & $4.54$ million${}^\ast$ & 20--27 hours (projected) & no \\
+        \cref{clm:flexible26} & $4.54$ million${}^\ast$ & bounded pass in progress & no \\
         \cref{clm:girth5-28}  & $5.3$ million${}^\dagger$ & 27--36 hours (projected) & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        remaining Claims 3--4 & & 47--63 hours (projected) & no \\
+        remaining Claims 3--4 & & not yet estimated & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip

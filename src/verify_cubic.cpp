@@ -7,14 +7,54 @@
 #include <algorithm>
 #include <chrono>
 #include <climits>
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <set>
+#include <string>
 #include <vector>
 
 std::unique_ptr<GraphList> genGraphs(CMDOptions& options);
 
 namespace {
+
+struct VerificationTimedOut {
+  std::string stage;
+  uint64_t conflicts;
+  uint64_t decisions;
+};
+
+void requireSatisfiable(
+    Solver& solver, const lbool result, const std::string& failure) {
+  if (result == l_Undef)
+    throw VerificationTimedOut{
+        failure, solver.conflicts, solver.decisions};
+  CHECK(result == l_True, "%s", failure.c_str());
+}
+
+/// Encode an order-at-most-62 adjacency list as one graph6 record.
+std::string graph6(const AdjListTy& adjList) {
+  const int n = static_cast<int>(adjList.size());
+  CHECK(1 <= n && n <= 62, "cubic residue requires small graph6 order");
+  std::string result(1, static_cast<char>(n + 63));
+  int value = 0;
+  int bits = 0;
+  for (int second = 1; second < n; second++) {
+    for (int first = 0; first < second; first++) {
+      value = (value << 1) | contains(adjList[first], second);
+      if (++bits == 6) {
+        result.push_back(static_cast<char>(value + 63));
+        value = 0;
+        bits = 0;
+      }
+    }
+  }
+  if (bits != 0) {
+    value <<= 6 - bits;
+    result.push_back(static_cast<char>(value + 63));
+  }
+  return result;
+}
 
 /// Reconstruct the drawing represented by a satisfying assignment and check
 /// independently that its proposed crossings produce a planarization.
@@ -39,7 +79,10 @@ void verifyDrawing(
     CHECK(0 <= edge && edge < static_cast<int>(graph.edges.size()), "uncrossed-edge requirement is out of range");
     assumptions.push(model.getSolverLit(model.getCross1Var(graph.n + edge, false)));
   }
-  CHECK(solver.solveLimited(assumptions) == l_True, "failed to find a required 1-planar drawing");
+  requireSatisfiable(
+      solver,
+      solver.solveLimited(assumptions),
+      "failed to find a required 1-planar drawing");
 
   const Result drawing = verifiedDrawing(params, graph, model, solver);
   for (int edge : uncrossedEdges)
@@ -166,8 +209,10 @@ void verifyFlexibility(
     for (int edge : coverageRequirements.front().fixed)
       assumptions.push(
           model.getSolverLit(model.getCross1Var(graph.n + edge, false)));
-    CHECK(solver.solveLimited(assumptions) == l_True,
-          "failed uncrossed-edge coverage requirement");
+    requireSatisfiable(
+        solver,
+        solver.solveLimited(assumptions),
+        "failed uncrossed-edge coverage requirement");
     const Result drawing = verifiedDrawing(params, graph, model, solver);
     CHECK(
         isCovered(coverageRequirements.front(), crossedEdges(drawing)),
@@ -176,14 +221,18 @@ void verifyFlexibility(
   }
 
   if (activations.empty()) {
-    CHECK(solveSATModel(params, model, solver) == l_True,
-          "failed to find an initial 1-planar drawing");
+    requireSatisfiable(
+        solver,
+        solveSATModel(params, model, solver),
+        "failed to find an initial 1-planar drawing");
   } else {
     vec<Lit> assumptions;
     for (Lit activation : activations)
       assumptions.push(~activation);
-    CHECK(solver.solveLimited(assumptions) == l_True,
-          "failed to find an initial 1-planar drawing");
+    requireSatisfiable(
+        solver,
+        solver.solveLimited(assumptions),
+        "failed to find an initial 1-planar drawing");
   }
 
   Result drawing = verifiedDrawing(params, graph, model, solver);
@@ -298,7 +347,10 @@ void verifyFlexibility(
           index == selectedCoverage ? activations[index] : ~activations[index]);
     for (int edge : prescribed)
       assumptions.push(model.getSolverLit(model.getCross1Var(graph.n + edge, false)));
-    CHECK(solver.solveLimited(assumptions) == l_True, "failed uncrossed-edge requirement");
+    requireSatisfiable(
+        solver,
+        solver.solveLimited(assumptions),
+        "coverage requirement " + std::to_string(selectedCoverage));
 
     drawing = verifiedDrawing(params, graph, model, solver);
     if (minimizeWitnesses)
@@ -456,8 +508,10 @@ std::string findSevenHubDrawing(
   for (int edge : attachments)
     assumptions.push(
         model.getSolverLit(model.getCross1Var(graph.n + edge, false)));
-  CHECK(solver.solveLimited(assumptions) == l_True,
-        "failed degree-7 quotient requirement");
+  requireSatisfiable(
+      solver,
+      solver.solveLimited(assumptions),
+      "failed degree-7 quotient requirement");
   const Result drawing = verifiedDrawing(params, graph, model, solver);
   std::vector<int> positions(graph.n + static_cast<int>(graph.edges.size()), -1);
   for (int position = 0; position < static_cast<int>(drawing.order.size()); position++)
@@ -570,6 +624,20 @@ void verifyCubic(CMDOptions& options) {
   Params params;
   params.cubicVerification = true;
   params.crossPriority = true;
+  params.timeout = options.getInt("-timeout");
+  CHECK(params.timeout >= 0, "verification timeout must be nonnegative");
+
+  const std::string residueFilename =
+      options.getCustomValue("verify-cubic-residue");
+  CHECK(
+      params.timeout == 0 || !residueFilename.empty(),
+      "-verify-cubic with -timeout requires "
+      "-Cverify-cubic-residue=FILE");
+  std::ofstream residue;
+  if (!residueFilename.empty()) {
+    residue.open(residueFilename, std::ios::out | std::ios::trunc);
+    CHECK(residue.good(), "cannot open cubic-verification residue file");
+  }
 
   auto graphs = genGraphs(options);
   const int numGraphs = graphs->size();
@@ -583,9 +651,10 @@ void verifyCubic(CMDOptions& options) {
   int numFiveCycleCores = 0;
   int numSixHubs = 0;
   int numSevenHubs = 0;
+  int numUnknown = 0;
 
   for (int i = 0; i < numGraphs; i++) {
-    const auto& adj = graphs->next().second;
+    const auto [graphName, adj] = graphs->next();
     const int n = static_cast<int>(adj.size());
     const std::vector<EdgeTy> edges = adj_to_edges(adj);
     const VerificationInput input = validateInput(adj, edges);
@@ -596,38 +665,55 @@ void verifyCubic(CMDOptions& options) {
     else if (input == VerificationInput::SEVEN_HUB)
       numSevenHubs++;
 
-    if (isPlanar(n, edges, 0)) {
-      numPlanar++;
-    } else if (input == VerificationInput::FIVE_CYCLE_CORE) {
-      verifyFiveCycleCore(edges, adj, params);
-      num1Planar++;
-    } else if (input == VerificationInput::SIX_HUB) {
-      verifySixHub(edges, adj, params);
-      num1Planar++;
-    } else if (input == VerificationInput::SEVEN_HUB) {
-      verifySevenHub(edges, adj, params);
-      num1Planar++;
-    } else if (n <= 22) {
-      verifyCubic22(n, edges, params);
-      num3Flexible++;
-      num1Planar++;
-    } else if (n == 24) {
-      verifyCubic24(n, edges, params);
-      num2Flexible++;
-      num1Planar++;
-    } else if (n == 26) {
-      verifyCubic26(n, edges, params);
-      num1Flexible++;
-      num1Planar++;
-    } else {
-      CHECK(false, "unsupported cubic verification input");
+    try {
+      if (isPlanar(n, edges, 0)) {
+        numPlanar++;
+      } else if (input == VerificationInput::FIVE_CYCLE_CORE) {
+        verifyFiveCycleCore(edges, adj, params);
+        num1Planar++;
+      } else if (input == VerificationInput::SIX_HUB) {
+        verifySixHub(edges, adj, params);
+        num1Planar++;
+      } else if (input == VerificationInput::SEVEN_HUB) {
+        verifySevenHub(edges, adj, params);
+        num1Planar++;
+      } else if (n <= 22) {
+        verifyCubic22(n, edges, params);
+        num3Flexible++;
+        num1Planar++;
+      } else if (n == 24) {
+        verifyCubic24(n, edges, params);
+        num2Flexible++;
+        num1Planar++;
+      } else if (n == 26) {
+        verifyCubic26(n, edges, params);
+        num1Flexible++;
+        num1Planar++;
+      } else {
+        CHECK(false, "unsupported cubic verification input");
+      }
+    } catch (const VerificationTimedOut& timeout) {
+      CHECK(residue.good(), "cubic-verification timeout has no residue file");
+      residue << graph6(adj) << '\n';
+      residue.flush();
+      CHECK(residue.good(), "failed to write cubic-verification residue");
+      numUnknown++;
+      LOG(
+          "verification timed out for %s after %d seconds during %s "
+          "(%'llu conflicts, %'llu decisions); wrote it to %s",
+          graphName.c_str(), params.timeout, timeout.stage.c_str(),
+          timeout.conflicts, timeout.decisions, residueFilename.c_str());
     }
 
     LOG_EVERY_MS(30000, "verified %'d of %'d graphs", i + 1, numGraphs);
   }
 
+  CHECK(
+      numPlanar + num1Planar + numUnknown == numGraphs,
+      "cubic-verification counters do not account for every input");
   LOG("processed %'d graphs in %s", numGraphs, ms_to_str(start, std::chrono::steady_clock::now()).c_str());
   LOG("#planar = %'d; #1-planar = %'d", numPlanar, num1Planar);
+  LOG("#unknown = %'d", numUnknown);
   LOG("#3-flexible = %'d; #2-flexible = %'d", num3Flexible, num2Flexible);
   LOG("#1-flexible = %'d; #5-cycle-cores = %'d; "
       "#degree-6-hubs = %'d; #degree-7-hubs = %'d",

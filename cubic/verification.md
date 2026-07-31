@@ -225,14 +225,22 @@ cat data/claim3.g6 data/claim4.g6 > data/claims3-4.g6
 wc -l data/claims3-4.g6
 
 mkdir -p evidence/claims3-4
-./oops -i=data/claims3-4.g6 -verify-cubic -colors=0 \
+./oops -i=data/claims3-4.g6 -verify-cubic -timeout=5 \
+  -Cverify-cubic-residue=evidence/claims3-4/residue.g6 -colors=0 \
   > evidence/claims3-4/claims3-4.log 2>&1
+test ! -s evidence/claims3-4/residue.g6
 ```
 
 Accept Claims 3 and 4 only if every graph is reported as planar or 1-planar
-and the final counters account for every input line.  Order-22 Claim 3 graphs
+and the final counters account for every input line.  The log must report
+`#unknown = 0`, and the residue file must be empty.  Order-22 Claim 3 graphs
 must be reported as `5-cycle-cores`, unchanged order-26 graphs as
 `1-flexible`, and Claim 4 graphs as `degree-6-hubs` or `degree-7-hubs`.
+
+For a Claim 3 record, the five-second limit covers its incremental SAT
+solver.  If the limit is reached, OOPS writes that graph to the residue and
+continues with the next one.  When several OOPS processes are used, give
+each process a different residue filename.
 
 ## Verify Claim 5
 
