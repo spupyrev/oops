@@ -307,7 +307,9 @@ edges, it has a 1-planar drawing in which all those edges are uncrossed.
     drawings in disjoint wedges at their common cut vertices, gives the
     required drawing of $G$.  Hence $G$ is biconnected.
 
-    It remains to exclude a vertex $v$ of degree two.  Let its neighbors be
+    A biconnected graph with a vertex of degree at most one is either a single
+    vertex or a single edge, and is therefore $k$-flexible.  It remains to
+    exclude a vertex $v$ of degree two.  Let its neighbors be
     $u$ and $w$.  If $uw\notin E(G)$, delete $v$ and add $uw$.  Retain every
     prescribed edge outside $uv,vw$, and prescribe $uw$ if $uv$ or $vw$
     belongs to $F$.  Subdividing an uncrossed drawing of $uw$ restores both
@@ -336,92 +338,43 @@ edges, it has a 1-planar drawing in which all those edges are uncrossed.
     graph, a contradiction.
 \end{proof}
 
-\begin{lemma}[Drawing criterion for flexibility]\label{lem:drawing-coverage}
-    Let $\mathcal D$ be a collection of 1-planar drawings of a graph
-    $G$.  For each $D\in\mathcal D$, let $X_D\subseteq E(G)$ contain every
-    edge crossed in $D$.  If, for every $F\subseteq E(G)$ with $|F|\leq k$,
-    there exists $D\in\mathcal D$ such that $F\cap X_D=\varnothing$, then
-    $G$ is $k$-flexible.
-\end{lemma}
-
-\begin{proof}
-    Fix $F\subseteq E(G)$ with $|F|\leq k$.  By hypothesis, some
-    $D\in\mathcal D$ satisfies $F\cap X_D=\varnothing$.  Since $X_D$ contains
-    every crossed edge of $D$, every edge of $F$ is uncrossed in $D$.
-\end{proof}
-
-To establish $k$-flexibility, we construct $\mathcal D$ iteratively.  If some
-set $F\subseteq E(G)$ with $|F|\leq k$ intersects $X_D$ for every
-$D\in\mathcal D$, we add a 1-planar drawing in which every edge of $F$ is
-uncrossed.  If no such $F$ exists, \cref{lem:drawing-coverage} applies.  The
-procedure terminates because the drawing added in an iteration has a
-crossed-edge set disjoint from the corresponding set $F$; hence that $F$
-cannot occur again.  Only finitely many subsets of $E(G)$ have size at most
-$k$.
-
-The following local observation will be used when prescribing uncrossed
-edges.
-
-\begin{lemma}[Local crossing elimination]\label{lem:local-crossing-elimination}
-    Let $v$ have neighbors $x,y,z$ in a 1-planar drawing, and suppose that
-    $vx$ crosses $yz$.  The drawing can be modified so that this crossing is
-    removed and no new crossing is introduced.  In particular, every edge
-    that was uncrossed before the modification remains uncrossed.
-\end{lemma}
-
-\begin{proof}
-    Move $v$ into a sufficiently small disk beside the crossing, on the
-    $x$-side of $yz$.  Draw $vx$ along the crossing-free portion of its original
-    curve, and draw $vy$ and $vz$ in narrow neighborhoods of the two
-    crossing-free portions of $yz$.  The modification removes the crossing
-    between $vx$ and $yz$ and introduces none.
-\end{proof}
-
 \begin{lemma}[4-cycle expansion]\label{lem:4-cycle-expansion}
     Let $G$ be a triangle-free cubic graph containing the cycle
     $C=(v_0,v_1,v_2,v_3)$, and let $x_i$ be the neighbor of $v_i$ outside
     $C$.  Form $H$ by deleting $C$, adding adjacent vertices $a,b$, joining
-    $a$ to $x_0,x_1$, and joining $b$ to $x_2,x_3$.  If $H$ has a 1-planar
-    drawing in which $ab$ is uncrossed, then $G$ is 1-planar.
+    $a$ to $x_0,x_1$, and joining $b$ to $x_2,x_3$.  Write
+    $c_i=v_iv_{i+1}$ and $s_i=v_ix_i$, with indices modulo four.
+    \begin{enumerate}[(i)]
+        \item If $H$ has a 1-planar drawing in which $ab$ is uncrossed, then
+        $G$ is 1-planar.
+        \item If $H$ has a 1-planar drawing in which $ab$ and the image of
+        $s_1$ are uncrossed, then $G$ has a 1-planar drawing in which
+        $c_0,c_1,c_2$ are uncrossed.
+    \end{enumerate}
 \end{lemma}
 
 \begin{proof}
     Triangle-freeness implies $x_0\ne x_1$ and $x_2\ne x_3$, so $H$ is a
     simple cubic graph; equality between opposite external neighbors does not
-    create parallel edges.  Take a narrow disk containing the curve $ab$ and small
-    neighborhoods of its endpoints, but no crossing.  Inside the disk, split
-    $a$ into $v_0,v_1$, split $b$ into $v_2,v_3$, preserve the four external
-    incidences, and draw the edges of $C$.  Depending on the rotations at
-    $a,b$, the two remaining cycle edges can be drawn either without a
-    crossing or crossing each other once.  Every edge inherited from $H$
-    retains its crossings, and each new edge has at most one crossing.
+    create parallel edges.  Take a narrow disk containing the uncrossed curve
+    $ab$ and small neighborhoods of its endpoints.  Inside the disk, split
+    $a$ into $v_0,v_1$, split $b$ into $v_2,v_3$, and preserve the four
+    external incidences.  Up to reflection, the four possible boundary orders
+    are
+    \[
+       0123,\quad 0132,\quad 0231,\quad 0321.
+    \]
+    For part (i), the first and last orders require no crossing, while the
+    other two use the single crossing $c_1\mathbin\times c_3$.  For part (ii),
+    the first and last again require no crossing, while the other two use
+    $c_3\mathbin\times s_1$.  These cases exhaust the endpoint rotations.  In
+    every case the crossing pairs form a matching, their planarizations were
+    verified to be planar with the prescribed boundary order, and the edges
+    required in the corresponding part remain uncrossed.
 \end{proof}
 
 The analogous construction pairing $x_1,x_2$ at $a$ and $x_3,x_0$ at $b$
 gives the corresponding second expansion.
-
-\begin{lemma}[Adjacent-edge 4-cycle expansion]\label{lem:adjacent-4-cycle}
-    In the setting of \cref{lem:4-cycle-expansion}, let
-    $c_i=v_iv_{i+1}$ and $s_i=v_ix_i$, with indices modulo four.  If $H$ has
-    a 1-planar drawing in which $ab$ and the image of $s_1$ are uncrossed,
-    then $G$ has a 1-planar drawing in which the three consecutive cycle
-    edges $c_0,c_1,c_2$ are all uncrossed.
-\end{lemma}
-
-\begin{proof}
-    Again take a disk around the uncrossed curve $ab$ and its endpoints.  The
-    four attachment portions have one of the boundary orders
-
-    \[
-       0123,\quad 0132,\quad 0231,\quad 0321,
-    \]
-    according to the two endpoint rotations.  For orders $0123$ and $0321$,
-    restore the 4-cycle without a crossing.  For orders $0132$ and $0231$,
-    use the single crossing $c_3\mathbin\times s_1$.  The edges $c_0,c_1,c_2$
-    remain uncrossed in every case.  The edge $c_3$ is new, and $s_1$ is
-    uncrossed outside the disk; hence neither edge has another crossing.
-
-\end{proof}
 
 \begin{lemma}[4-cycle reduction through order 24]\label{lem:order24-reduction}
     Suppose every subcubic graph of order at most 22 is $3$-flexible and
@@ -433,8 +386,9 @@ gives the corresponding second expansion.
 \begin{proof}
     By \cref{lem:flexibility-core}, it is enough to consider a biconnected
     triangle-free cubic graph $G$ of order 24 and a prescribed set $F$ of at
-    most two edges.  We may assume that $G$ is nonplanar.  If $G$ has no
-    4-cycle, the second hypothesis applies.  Otherwise choose a 4-cycle $C$.
+    most two edges, since a smaller counterexample is covered by the first
+    hypothesis.  We may assume that $G$ is nonplanar.  If $G$ has no 4-cycle,
+    the second hypothesis applies.  Otherwise choose a 4-cycle $C$.
 
     First suppose that $F$ is not a pair of adjacent edges of $C$.  Choose
     one of the two 4-cycle reductions so that every prescribed cycle
@@ -448,70 +402,30 @@ gives the corresponding second expansion.
 
     The remaining case is $F=\{c_i,c_{i+1}\}$.  Rotate the labels so that
     these are $c_0,c_1$, use the displayed split, and prescribe only $ab$ and
-    the image of $s_1$.  By \cref{lem:adjacent-4-cycle}, the resulting
-    $3$-flexible order-22 drawing expands while keeping both prescribed edges
-    uncrossed.
+    the image of $s_1$.  By part (ii) of \cref{lem:4-cycle-expansion}, the
+    resulting $3$-flexible order-22 drawing expands while keeping both
+    prescribed edges uncrossed.
 \end{proof}
 
 Consequently, it suffices to verify $3$-flexibility for biconnected,
 triangle-free cubic graphs of order at most 22 and $2$-flexibility for
 biconnected, nonplanar cubic graphs of order 24 and girth at least five.
 
-\begin{lemma}[5-cycle expansion]\label{lem:5-cycle-expansion}
-    Let $C=(v_0,\ldots,v_4)$ be a chordless 5-cycle in a cubic graph $G$,
+\begin{lemma}[Overlapping 5-cycle expansion]
+    \label{lem:overlapping-5-cycle-expansion}
+    Let $C=(v_0,\ldots,v_4)$ be a 5-cycle in a cubic graph $G$ of girth five,
     and let $x_i$ be the neighbor of $v_i$ outside $C$.  Suppose that the
     vertices $x_0,\ldots,x_4$ are distinct.  Form $H$ by deleting $C$,
-    introducing a path $a b c$, and adding the edges
-    $ax_0,ax_1,bx_2,cx_3,cx_4$.  If $H$ has a 1-planar drawing in which the
-    three edges incident with $b$ are uncrossed, then $G$ is 1-planar.
+    introducing a path $abc$, and adding the edges
+    $ax_0,ax_1,bx_2,cx_3,cx_4$.  Suppose that $abc$ lies on another 5-cycle
+    $D$ of $H$.  Replace $D$ by a three-vertex path, assigning the attachment
+    at $b$ to its middle vertex, and call the resulting order-24 graph $K$.
+    Suppose that this reduction is simple and connected.  If $K$ has a
+    1-planar drawing in which the two edges of the new path are uncrossed,
+    then $G$ is 1-planar.
 \end{lemma}
 
 \begin{proof}
-    Take a sufficiently small regular neighborhood of the drawn path
-    $a b c$.  It contains no crossing and meets the five attachment edges in
-    five boundary points.  The rotations at $a,b,c$ give, up to reflection,
-    exactly the four boundary orders in \cref{tab:5-cycle-expansion}.  Inside
-    the neighborhood, replace the path by the 5-cycle and its five attachment
-    portions using the corresponding row.  Here
-    $c_i=v_iv_{i+1}$ and $s_i=v_ix_i$, with indices modulo five.
-
-    Every row is a matching of local edges.  The only old edge that occurs in
-    a listed crossing is $s_2$, which replaces the uncrossed edge $bx_2$.
-    Every new cycle edge is crossed at most once, and all crossings outside
-    the neighborhood are unchanged.  Planarizing each displayed crossing
-    gives a planar graph in a disk with the stated boundary order and
-    alternating incidences at its crossing vertices.  Thus the four rows
-    give valid local 1-planar drawings and complete the expansion.
-\end{proof}
-
-\begin{table}[!ht]
-    \centering
-    \caption{Crossing pairs for the 5-cycle expansion.}
-    \label{tab:5-cycle-expansion}
-    \begin{tabular}{@{}>{$}c<{$}@{\qquad}>{$}l<{$}@{}}
-        \toprule
-        \multicolumn{1}{c}{boundary order} & \multicolumn{1}{c}{crossing pairs} \\
-        \midrule
-        01234&\varnothing\\
-        01243&c_2\mathbin\times c_4\\
-        01342&c_4\mathbin\times s_2\\
-        01432&c_1\mathbin\times c_4\\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
-\begin{lemma}[Overlapping 5-cycle expansion]
-    \label{lem:overlapping-5-cycle-expansion}
-    Use the notation of \cref{lem:5-cycle-expansion}, with $v_2$ assigned
-    to the middle vertex $b$.  Suppose that the path $abc$ lies on another
-    5-cycle $D$ of $H$.  Replace $D$ by a three-vertex path, assigning the
-    attachment at $b$ to its middle vertex, and call the resulting order-24
-    graph $K$.  Suppose that this reduction is simple and connected.  If
-    $K$ has a 1-planar drawing in which the two edges of the new path are
-    uncrossed, then $G$ is 1-planar.
-\end{lemma}
-
-\begin{proof}[Proof (computational)]
     The two vertices of $D-\{a,b,c\}$ are outside the original 5-cycle.
     Girth five excludes the case in which they attach at consecutive
     vertices of the original cycle.  Up to a dihedral relabeling, the patch
@@ -520,14 +434,14 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     $v_0x_0,v_3x_3,x_0x_3$.
 
     Take a regular neighborhood of the uncrossed path in $K$.  Its five
-    attachment portions occur in the same four boundary orders as in
-    \cref{tab:5-cycle-expansion}.  The local drawings in
+    attachment portions occur, up to reflection, in the four boundary orders
+    listed in \cref{tab:overlapping-5-cycle-expansion}.  The local drawings in
     \cref{tab:overlapping-5-cycle-expansion} restore the seven-vertex patch.
     Here $d_0=v_0x_0$ and $d_3=v_3x_3$.  Every displayed crossing uses two
     edges of the restored patch, so no further edge of the drawing of $K$
-    must be kept uncrossed.  As for the other local tables, the computation
-    planarized every displayed crossing and checked planarity in a disk with
-    the prescribed boundary order.
+    must be kept uncrossed.  The four rows exhaust the boundary orders.  In
+    every row the crossing pairs form a matching, and their planarizations
+    were verified to be planar with the prescribed boundary order.
 \end{proof}
 
 \begin{table}[!ht]
@@ -567,10 +481,14 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     \end{enumerate}
 \end{lemma}
 
-\begin{proof}[Proof (computational)]
+\begin{proof}
     Take a disk around the contracted vertex.  Fixing $s_0$ as the first
     attachment and identifying an order with its reversal leaves twelve
-    possible cyclic orders on the boundary of the disk.  The second column
+    possible cyclic orders on the boundary of the disk.  These are exactly
+    the rows of \cref{tab:5-cycle-star-expansion}.  In every row, the crossing
+    pairs in each column form a matching, avoid the edges required to remain
+    uncrossed, and yield a planar graph after planarization with the prescribed
+    boundary order.  The second column
     of \cref{tab:5-cycle-star-expansion} gives a local drawing for each order
     whose attachment crossings use only $s_0,s_1$.  Relabeling the cycle maps
     any chosen consecutive pair $s_j,s_{j+1}$ to this pair.  Any three
@@ -584,10 +502,7 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     $\{c_4,c_0,s_0\}$.  The third column gives a local drawing for every
     boundary order in which these three edges are uncrossed.  Its attachment
     crossings use only $s_1,s_2,s_3,s_4$, all of which are uncrossed outside
-    the disk.  Each listed set of crossings is a matching.  Replacing every
-    listed crossing by a degree-four vertex gives a planar graph in the disk
-    with the prescribed boundary order and alternating continuations at each
-    crossing.  Thus every listed local drawing is 1-planar, and inserting it
+    the disk.  Thus every listed local drawing is 1-planar, and inserting it
     into the disk proves both statements.
 \end{proof}
 
@@ -689,13 +604,15 @@ planar graph, the empty crossing pattern suffices.
     at least five is $1$-flexible.
 \end{claim}
 
-\begin{proof}[Proposed computational proof]
+\begin{proof}[Proof (computational)]
+    The filtered input contains $31{,}478{,}465$ isomorphism classes.  Of
+    these, $31{,}297{,}238$ have girth five and $181{,}227$ have larger girth.
     First consider the graphs of girth five.  For each such graph $G$, the
     computation contracted every 5-cycle, canonically labeled the resulting
     order-22 graph, and retained the lexicographically least code.  Equal
     retained graphs were verified only once.  Write $J$ for one retained
     graph and $s_0,\ldots,s_4$ for the five edges incident with its
-    degree-five vertex.
+    degree-five vertex.  This produced $4{,}700{,}649$ distinct cores.
 
     For every core completed by the first pass, the computation found a
     crossing pattern with all five $s_i$ uncrossed.  In addition, for every
@@ -708,7 +625,7 @@ planar graph, the empty crossing pattern suffices.
     of \cref{lem:5-cycle-star-expansion}; every other edge is preserved using
     part (ii).
 
-    A five-second limit retains the cores not completed by this first pass.
+    A 120-second limit retains the cores not completed by this first pass.
     For each retained core, the second pass expands its degree-five vertex in
     all \(4!/2=12\) cyclic orders.  It keeps the biconnected, nonplanar
     order-26 expansions of girth at least five and verifies their
@@ -719,8 +636,15 @@ planar graph, the empty crossing pattern suffices.
     The remaining order-26 graphs have girth at least six.  For every such
     graph $G$ and every edge $e\in E(G)$, the computation directly found a
     crossing pattern whose planarization is planar and whose support avoids
-    $e$.  Any such graph retained by the five-second first pass is retried
+    $e$.  Any such graph retained by the first pass is retried
     directly in the second pass.
+
+    Together with the $181{,}227$ unchanged graphs of larger girth, the first
+    pass processed $4{,}881{,}876$ records.  It completed $4{,}881{,}171$ of
+    them and retained 705 cores.  The second pass expanded these cores into
+    $8{,}460$ order-26 parents and verified every parent as $1$-flexible.  No
+    record remained unresolved.  The two solver passes took 22.97 hours and
+    26 minutes, respectively, on the 48-core machine.
 \end{proof}
 
 \begin{claim}\label{clm:girth5-28}
@@ -730,9 +654,9 @@ planar graph, the empty crossing pattern suffices.
 
 \begin{proof}[Proposed computational proof]
     For every graph $G$ in this family, the preparation enumerates the
-    5-cycle-to-path reductions $(H,b)$ from
-    \cref{lem:5-cycle-expansion}.  Girth five makes every first reduction
-    simple.  Write the replacement path as $a b c$.
+    5-cycle-to-path reductions $(H,b)$ defined in
+    \cref{lem:overlapping-5-cycle-expansion}.  Girth five makes every first
+    reduction simple.  Write the replacement path as $a b c$.
 
     If the replacement path lies on a second 5-cycle, the preparation
     performs the second path reduction with $b$ assigned to its middle
@@ -754,8 +678,8 @@ planar graph, the empty crossing pattern suffices.
     in the second case; every other vertex has degree three.  Equal
     canonical quotients are checked only once.
 
-    The finite local check in \texttt{cubic/test\_hub\_expansions.py} gives
-    the following exact expansion rule.  Every one of the 60 boundary orders
+    A finite exhaustive check gives the following exact expansion rule.
+    Every one of the 60 boundary orders
     of the degree-six patch expands.  For the degree-seven patch, 355 of the
     360 boundary orders expand; the five exceptions are
     \[
@@ -777,9 +701,8 @@ planar graph, the empty crossing pattern suffices.
 
     The preparation fails unless every input graph obtains one of these
     three certificates.  Thus a completed run proves the claim without using
-    Claim~3.  The global preparation and verification described in
-    \texttt{cubic/verification.md} have not yet been run, so this proposed
-    computation does not yet prove the claim.
+    Claim~3.  The global preparation and verification have not yet been run,
+    so this proposed computation does not yet prove the claim.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
@@ -794,25 +717,16 @@ planar graph, the empty crossing pattern suffices.
 \end{proof}
 
 The running times for the five computations are summarized in
-\cref{tab:cubic28-runtime}.  Claims 1, 2, and 5 are completed computations.
+\cref{tab:cubic28-runtime}.  Claims 1, 2, 3, and 5 are completed computations.
 The earlier marked-star preparation for \cref{clm:girth5-28} produced
 $38{,}120{,}815$ groups whose measured verification would take 392--470
 hours; that route was abandoned.
 
-For Claim~3, a bounded parent-weighted pilot sampled 300 parents from 256
-spread-out fine Minibaum parts containing 1,370,731 parents.  Enumerating the
-complete reverse fiber of each selected contraction gave
-\(\mathop{\rm E}(1/f)=0.1450\), projecting 4.54 million distinct cores.
-Timing the same cores gave
-\(\mathop{\rm E}(t/f)=0.06790\) seconds per parent; its 95\% sampling interval
-was \(0.05887\)--\(0.07693\).  Thus the girth-five part of Claim~3 pilot
-projected 19.7--23.6 hours at the measured 30--25-fold effective speedup,
-with a 17.1--26.8 hour sampling envelope.  This pilot did not bound the
-tail: the production run subsequently encountered long-running cores that
-were absent from the sample.  Claim~3 is therefore now run with a
-five-second solver limit per core.  Timed-out cores are retained in a
-residue for separate verification, and the pilot interval is no longer used
-as a completion-time forecast.
+For Claim~3, preparation reduced the $31{,}478{,}465$ input graphs to
+$4{,}881{,}876$ records.  The first solver pass took 22.97 hours and retained
+705 hard cores.  Expanding these cores into $8{,}460$ concrete parents and
+verifying them directly took another 26 minutes.  Thus Claim~3 took about
+23 hours 24 minutes of measured solver time.
 
 For Claim~4, a conservative 60,000-parent structural sample contained 20,056 direct
 Claim~2 certificates, 28,391 degree-six overlaps, and 11,553 degree-seven
@@ -832,9 +746,7 @@ For the production budget we use the largest observed matched value of
 \(t/f\) in each overlap class for every parent, rather than the sample mean.
 This gives 298 CPU-hours, or about 12 hours at the measured 25-fold effective
 speedup.  Together with the 15--24-hour Claim~4 preparation range, this
-still projects 27--36 hours for Claim~4.  There is no reliable joint
-Claims~3--4 estimate until the bounded Claim~3 run has measured its hard
-residue.
+still projects 27--36 hours for Claim~4.
 
 \begin{table}[!ht]
     \small
@@ -847,23 +759,22 @@ residue.
         \midrule
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
-        \cref{clm:flexible26} & $4.54$ million${}^\ast$ & bounded pass in progress & no \\
+        \cref{clm:flexible26} & $4{,}881{,}876+8{,}460^\ast$ & 23 hours 24 minutes (measured) & yes \\
         \cref{clm:girth5-28}  & $5.3$ million${}^\dagger$ & 27--36 hours (projected) & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        remaining Claims 3--4 & & not yet estimated & no \\
+        remaining Claim 4 & & 27--36 hours (projected) & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
-    {\footnotesize $^\ast$Projected number of distinct Claim 3 cores.
+    {\footnotesize $^\ast$First-pass records plus directly verified fallback parents.
     $^\dagger$Projected number of distinct degree-six and degree-seven
     quotients; the running time includes Claim~4 preparation.\par}
 \end{table}
 
-Thus the present computations do not establish
-\cref{clm:flexible26,clm:girth5-28}, and the theorem below remains
-conditional on completing or
-replacing those two computations.
+Thus the present computations do not yet establish
+\cref{clm:girth5-28}, and the theorem below remains conditional on completing
+or replacing that computation.
 
 \begin{theorem}\label{thm:cubic28}
     Every simple cubic graph with at most 28 vertices is 1-planar.

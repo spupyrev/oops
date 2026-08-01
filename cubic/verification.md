@@ -172,9 +172,10 @@ awk 'substr($0, 1, 1) == "Y"' data/claim3.g6 \
   > data/claim3-girth6.g6
 ```
 
-Confirm that the input contains 31,478,584 graphs: 31,297,357 of girth five
-and 181,227 of larger girth.  Record the number left after removing
-duplicates; this is the output of `wc`.
+Confirm that the filtered input contains 31,478,465 graphs: 31,297,238 of
+girth five and 181,227 of larger girth.  (The unfiltered connected family has
+31,478,584 graphs.)  Record the number left after removing duplicates; this
+is the output of `wc`.
 
 ## Prepare Claim 4
 
@@ -225,7 +226,7 @@ cat data/claim3.g6 data/claim4.g6 > data/claims3-4.g6
 wc -l data/claims3-4.g6
 
 mkdir -p evidence/claims3-4
-./oops -i=data/claims3-4.g6 -verify-cubic -timeout=5 \
+./oops -i=data/claims3-4.g6 -verify-cubic -timeout=120 \
   -Cverify-cubic-residue=evidence/claims3-4/claim3b-input.g6 -colors=0 \
   > evidence/claims3-4/claims3-4.log 2>&1
 
@@ -240,7 +241,7 @@ fi
 test ! -s evidence/claims3-4/claim3b-residue.g6
 ```
 
-The first pass verifies the routine records and retains five-second
+The first pass verifies the routine records and retains 120-second
 timeouts.  Claim 3b expands each retained order-22 Claim 3 core into at most
 12 relevant order-26 parents and verifies them directly.  A retained
 order-26 Claim 3 graph is retried directly.  Claim 3b rejects Claim 4
