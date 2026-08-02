@@ -184,10 +184,17 @@ Generate the order-28 graphs of girth five.  For each graph,
 
 - `D`, when Claim 2 completes the proof;
 - `B code`, for a smaller graph with one degree-6 vertex; or
-- `C code`, for a smaller graph with one degree-7 vertex.
+- `C code`, for a smaller graph with one degree-7 vertex; or
+- `R code`, for a 5-cycle-to-path reduction whose marked three-edge star
+  must remain uncrossed.
+
+The first three outputs are the fast certificates.  `R` is the fallback
+when none of them applies; it is a valid output, not a preparation failure.
+Thus every input graph must produce exactly one output line.
 
 ```bash
 generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
+mkdir -p evidence/claim4
 claim4_parents=$(
   wc -l data/claim4-biconnected-nonplanar/*.g6 |
     awk 'END {print $1}'
@@ -195,12 +202,12 @@ claim4_parents=$(
 
 for input in data/claim4-biconnected-nonplanar/*.g6; do
   ./prepare_cubic claim4-joint < "$input"
-done > data/claim4-classified.txt
+done > data/claim4-classified.txt 2> evidence/claim4/preparation.log
 
 test "$(wc -l < data/claim4-classified.txt)" -eq "$claim4_parents"
 awk '
   ($1 == "D" && NF == 1) ||
-  (($1 == "B" || $1 == "C") && NF == 2) { next }
+  (($1 == "B" || $1 == "C" || $1 == "R") && NF == 2) { next }
   { exit 1 }
 ' data/claim4-classified.txt
 
@@ -213,46 +220,61 @@ awk '$1 == "B" {count++} END {print count + 0}' \
   data/claim4-classified.txt
 awk '$1 == "C" {count++} END {print count + 0}' \
   data/claim4-classified.txt
+awk '$1 == "R" {count++} END {print count + 0}' \
+  data/claim4-classified.txt
 wc -l data/claim4.g6
 ```
 
-The three printed class counts must add up to `claim4_parents`.  There must
-be no other line type.
+The four printed class counts must add up to `claim4_parents`.  There must
+be no other line type.  The preparation log also reports separate D, B, C,
+and R counts for each of the 256 generated parts.
 
-## Verify Claims 3 and 4
+## Verify Claim 3
 
 ```bash
-cat data/claim3.g6 data/claim4.g6 > data/claims3-4.g6
-wc -l data/claims3-4.g6
+mkdir -p evidence/claim3
+./oops -i=data/claim3.g6 -verify-cubic -timeout=120 \
+  -Cverify-cubic-residue=evidence/claim3/claim3b-input.g6 -colors=0 \
+  > evidence/claim3/claim3.log 2>&1
 
-mkdir -p evidence/claims3-4
-./oops -i=data/claims3-4.g6 -verify-cubic -timeout=120 \
-  -Cverify-cubic-residue=evidence/claims3-4/claim3b-input.g6 -colors=0 \
-  > evidence/claims3-4/claims3-4.log 2>&1
-
-if [ -s evidence/claims3-4/claim3b-input.g6 ]; then
-  ./oops -i=evidence/claims3-4/claim3b-input.g6 \
+if [ -s evidence/claim3/claim3b-input.g6 ]; then
+  ./oops -i=evidence/claim3/claim3b-input.g6 \
     -verify-cubic -Cclaim3b -timeout=120 \
-    -Cverify-cubic-residue=evidence/claims3-4/claim3b-residue.g6 \
-    -colors=0 > evidence/claims3-4/claim3b.log 2>&1
+    -Cverify-cubic-residue=evidence/claim3/claim3b-residue.g6 \
+    -colors=0 > evidence/claim3/claim3b.log 2>&1
 else
-  : > evidence/claims3-4/claim3b-residue.g6
+  : > evidence/claim3/claim3b-residue.g6
 fi
-test ! -s evidence/claims3-4/claim3b-residue.g6
+test ! -s evidence/claim3/claim3b-residue.g6
 ```
 
-The first pass verifies the routine records and retains 120-second
-timeouts.  Claim 3b expands each retained order-22 Claim 3 core into at most
-12 relevant order-26 parents and verifies them directly.  A retained
-order-26 Claim 3 graph is retried directly.  Claim 3b rejects Claim 4
-records.  The limit is 120 seconds per parent.  Accept Claims 3 and 4 only
-if the two logs account for every input and parent, and
+The first pass retains records that reach the 120-second limit.  Claim 3b
+expands each retained order-22 Claim 3 core into at most 12 relevant
+order-26 parents and verifies them directly; it retries a retained order-26
+Claim 3 graph directly.  Accept Claim 3 only if the two logs account for
+every input and parent and
 `claim3b-residue.g6` is empty.  When several OOPS processes are used, give
 each process a different residue filename.
 
 In the first log, `#unknown` must equal the number of lines in
 `claim3b-input.g6`.  In the Claim 3b log, `#claim3b-records` and
 `#claim3b-completed` must both equal that number, and `#unknown` must be zero.
+
+## Verify Claim 4
+
+```bash
+./oops -i=data/claim4.g6 -verify-cubic -timeout=120 \
+  -Cverify-cubic-residue=evidence/claim4/residue.g6 -colors=0 \
+  > evidence/claim4/verification.log 2>&1
+test ! -s evidence/claim4/residue.g6
+```
+
+A B record requires an uncrossed degree-6 hub, a C record requires a
+permitted drawing of an uncrossed degree-7 hub, and an R record requires the
+marked three-edge star to be uncrossed.  The D records need no solver input
+because Claim 2 already proves them.  Accept Claim 4 only if `#unknown` is
+zero and the sum of `#planar` and `#1-planar` equals the number of lines in
+`data/claim4.g6`.
 
 ## Verify Claim 5
 

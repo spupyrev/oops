@@ -258,6 +258,16 @@ Graph contractCycle(const Graph& graph, const std::vector<int>& cycle) {
   return reduced;
 }
 
+Graph markVertex(const Graph& graph, const int target) {
+  if (target < 0 || target >= graph.n)
+    throw std::runtime_error("marked vertex is out of range");
+  Graph marked(graph.n + 1);
+  for (const auto& edge : graph.edges())
+    marked.addEdge(edge.first, edge.second);
+  marked.addEdge(target, graph.n);
+  return marked;
+}
+
 struct PathReduction {
   Graph graph;
   int left;
@@ -341,6 +351,25 @@ void prepareClaim3(const Graph& graph) {
     std::cout << graph6(graph) << '\n';
   else
     std::cout << minimumCanonicalContraction(graph, fiveCycles) << '\n';
+}
+
+std::string minimumMarkedPathReduction(
+    const Graph& parent, const std::vector<std::vector<int>>& fiveCycles) {
+  std::string minimum;
+  for (const auto& cycle : fiveCycles) {
+    for (int middle = 0; middle < 5; middle++) {
+      const auto reduction = reduceFiveCycle(parent, cycle, middle);
+      if (!reduction)
+        throw std::runtime_error("claim4-joint path reduction failed");
+      const std::string code = canonicalGraph6(
+          markVertex(reduction->graph, reduction->middle));
+      if (minimum.empty() || code < minimum)
+        minimum = code;
+    }
+  }
+  if (minimum.empty())
+    throw std::runtime_error("claim4-joint selected no marked reduction");
+  return minimum;
 }
 
 std::optional<std::vector<int>> overlapSequence(
@@ -510,7 +539,9 @@ char prepareClaim4Joint(const Graph& parent) {
     std::cout << "C " << bestSevenHub << '\n';
     return 'C';
   }
-  throw std::runtime_error("claim4-joint found no overlap certificate");
+  // No short-overlap certificate: retain one marked path reduction.
+  std::cout << "R " << minimumMarkedPathReduction(parent, fiveCycles) << '\n';
+  return 'R';
 }
 
 }  // namespace
@@ -526,7 +557,9 @@ int main(int argc, char** argv) {
     std::string line;
     uint64_t processed = 0;
     uint64_t jointDirect = 0;
-    uint64_t jointExtraCores = 0;
+    uint64_t jointSixHubs = 0;
+    uint64_t jointSevenHubs = 0;
+    uint64_t jointResiduals = 0;
     while (std::getline(std::cin, line)) {
       if (line.empty())
         continue;
@@ -537,8 +570,12 @@ int main(int argc, char** argv) {
         const char classification = prepareClaim4Joint(graph);
         if (classification == 'D')
           jointDirect++;
-        else if (classification == 'B' || classification == 'C')
-          jointExtraCores++;
+        else if (classification == 'B')
+          jointSixHubs++;
+        else if (classification == 'C')
+          jointSevenHubs++;
+        else if (classification == 'R')
+          jointResiduals++;
         else
           throw std::runtime_error("invalid claim4-joint classification");
       } else
@@ -548,7 +585,9 @@ int main(int argc, char** argv) {
     std::cerr << "processed " << processed << " graph6 records\n";
     if (mode == "claim4-joint")
       std::cerr << "claim4-joint: D=" << jointDirect
-                << " hubs=" << jointExtraCores << '\n';
+                << " B=" << jointSixHubs
+                << " C=" << jointSevenHubs
+                << " R=" << jointResiduals << '\n';
   } catch (const std::exception& error) {
     std::cerr << "prepare_cubic: " << error.what() << '\n';
     return 1;

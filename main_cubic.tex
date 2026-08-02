@@ -411,6 +411,44 @@ Consequently, it suffices to verify $3$-flexibility for biconnected,
 triangle-free cubic graphs of order at most 22 and $2$-flexibility for
 biconnected, nonplanar cubic graphs of order 24 and girth at least five.
 
+\begin{lemma}[5-cycle-to-path expansion]\label{lem:5-cycle-path-expansion}
+    Let $C=(v_0,\ldots,v_4)$ be a chordless 5-cycle in a cubic graph $G$,
+    and let $x_i$ be the neighbor of $v_i$ outside $C$.  Suppose that the
+    vertices $x_0,\ldots,x_4$ are distinct.  Write $c_i=v_iv_{i+1}$ and
+    $s_i=v_ix_i$, with indices modulo five.  Form $H$ by deleting $C$,
+    introducing a path $abc$, and adding the edges
+    $ax_0,ax_1,bx_2,cx_3,cx_4$.  If $H$ has a 1-planar drawing in which the
+    three edges incident with $b$ are uncrossed, then $G$ is 1-planar.
+\end{lemma}
+
+\begin{proof}
+    Take a regular neighborhood of the uncrossed path $abc$.  Up to
+    reflection, the five attachment portions have the four boundary orders
+    shown in \cref{tab:5-cycle-path-expansion}.  For each order, the table
+    lists a matching of crossing pairs whose planarization was verified to be
+    planar with the prescribed boundary order.  The only old attachment used
+    in a local crossing is $s_2=v_2x_2$, which is uncrossed outside the
+    neighborhood.  Replacing the path by the corresponding local drawing of
+    the 5-cycle therefore gives a 1-planar drawing of $G$.
+\end{proof}
+
+\begin{table}[!ht]
+    \centering
+    \caption{Crossing pairs for the 5-cycle-to-path expansion.}
+    \label{tab:5-cycle-path-expansion}
+    \begin{tabular}{@{}>{$}c<{$}@{\qquad}>{$}l<{$}@{}}
+        \toprule
+        \multicolumn{1}{c}{boundary order} &
+        \multicolumn{1}{c}{crossing pairs} \\
+        \midrule
+        01234&\varnothing\\
+        01243&c_2\mathbin\times c_4\\
+        01342&c_4\mathbin\times s_2\\
+        01432&c_1\mathbin\times c_4\\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \begin{lemma}[Overlapping 5-cycle expansion]
     \label{lem:overlapping-5-cycle-expansion}
     Let $C=(v_0,\ldots,v_4)$ be a 5-cycle in a cubic graph $G$ of girth five,
@@ -655,7 +693,7 @@ planar graph, the empty crossing pattern suffices.
 \begin{proof}[Proposed computational proof]
     For every graph $G$ in this family, the preparation enumerates the
     5-cycle-to-path reductions $(H,b)$ defined in
-    \cref{lem:overlapping-5-cycle-expansion}.  Girth five makes every first
+    \cref{lem:5-cycle-path-expansion}.  Girth five makes every first
     reduction simple.  Write the replacement path as $a b c$.
 
     If the replacement path lies on a second 5-cycle, the preparation
@@ -699,10 +737,14 @@ planar graph, the empty crossing pattern suffices.
     the certificate rather than a postulated embedding choice.  Replacing
     the hub by the corresponding local drawing restores $G$.
 
-    The preparation fails unless every input graph obtains one of these
-    three certificates.  Thus a completed run proves the claim without using
-    Claim~3.  The global preparation and verification have not yet been run,
-    so this proposed computation does not yet prove the claim.
+    If none of these certificates exists, the preparation retains the
+    lexicographically least canonically labeled reduction $(H,b)$.  The
+    computation then finds a drawing of $H$ in which the three edges incident
+    with $b$ are uncrossed, and \cref{lem:5-cycle-path-expansion} restores
+    $G$.  Thus every input obtains a direct, degree-six, degree-seven, or
+    marked-path certificate, without using Claim~3.  The global preparation
+    and verification have not yet been completed, so this proposed
+    computation does not yet prove the claim.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
@@ -718,9 +760,10 @@ planar graph, the empty crossing pattern suffices.
 
 The running times for the five computations are summarized in
 \cref{tab:cubic28-runtime}.  Claims 1, 2, 3, and 5 are completed computations.
-The earlier marked-star preparation for \cref{clm:girth5-28} produced
+The earlier use of marked-path certificates for every input to
+\cref{clm:girth5-28} produced
 $38{,}120{,}815$ groups whose measured verification would take 392--470
-hours; that route was abandoned.
+hours; using them only as a fallback avoids that cost.
 
 For Claim~3, preparation reduced the $31{,}478{,}465$ input graphs to
 $4{,}881{,}876$ records.  The first solver pass took 22.97 hours and retained
@@ -728,25 +771,13 @@ $4{,}881{,}876$ records.  The first solver pass took 22.97 hours and retained
 verifying them directly took another 26 minutes.  Thus Claim~3 took about
 23 hours 24 minutes of measured solver time.
 
-For Claim~4, a conservative 60,000-parent structural sample contained 20,056 direct
-Claim~2 certificates, 28,391 degree-six overlaps, and 11,553 degree-seven
-overlaps.  The final orientation-complete selector can reclassify some
-degree-seven cases as the faster degree-six type, so these weights do not
-underestimate the verification cost.  A bounded parent-weighted pilot then selected ten quotients of
-each overlap type and enumerated their complete reverse fibers.  The
-degree-six fibers ranged from 47 to 328 and the degree-seven fibers from 18
-to 458.  Timing the same quotients gave
-\(\mathop{\rm E}(t/f)=0.000395\) and \(0.001196\) seconds per parent,
-respectively.  Weighting these values by the structural sample projects
-about 76 CPU-hours for Claim~4 verification.  The complete preparation is
-expected to remain the larger Claim~4 term; the previous server preparation
-measurements took 15--24 wall-clock hours.
-
-For the production budget we use the largest observed matched value of
-\(t/f\) in each overlap class for every parent, rather than the sample mean.
-This gives 298 CPU-hours, or about 12 hours at the measured 25-fold effective
-speedup.  Together with the 15--24-hour Claim~4 preparation range, this
-still projects 27--36 hours for Claim~4.
+The earlier Claim~4 estimate used a 60,000-parent structural sample in which
+every graph had a direct, degree-six, or degree-seven certificate.  The
+production preparation found graphs with none of these three certificates,
+so that estimate is withdrawn.  On a 401-parent prefix, four graphs required
+the marked-path fallback; their four distinct reductions were verified in
+104 milliseconds.  The complete run must measure the total number of
+fallback records before a new running-time estimate is stated.
 
 \begin{table}[!ht]
     \small
@@ -760,16 +791,14 @@ still projects 27--36 hours for Claim~4.
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
         \cref{clm:flexible26} & $4{,}881{,}876+8{,}460^\ast$ & 23 hours 24 minutes (measured) & yes \\
-        \cref{clm:girth5-28}  & $5.3$ million${}^\dagger$ & 27--36 hours (projected) & no \\
+        \cref{clm:girth5-28}  & not yet measured & not yet measured & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \midrule
-        remaining Claim 4 & & 27--36 hours (projected) & no \\
+        remaining Claim 4 & & not yet measured & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
-    {\footnotesize $^\ast$First-pass records plus directly verified fallback parents.
-    $^\dagger$Projected number of distinct degree-six and degree-seven
-    quotients; the running time includes Claim~4 preparation.\par}
+    {\footnotesize $^\ast$First-pass records plus directly verified fallback parents.\par}
 \end{table}
 
 Thus the present computations do not yet establish
