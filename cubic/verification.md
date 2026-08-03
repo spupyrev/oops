@@ -182,15 +182,13 @@ is the output of `wc`.
 Generate the order-28 graphs of girth five.  For each graph,
 `prepare_cubic` prints one of:
 
-- `D`, when Claim 2 completes the proof;
-- `B code`, for a smaller graph with one degree-6 vertex; or
-- `C code`, for a smaller graph with one degree-7 vertex; or
-- `R code`, for a 5-cycle-to-path reduction whose marked three-edge star
+- `D parent`, when Claim 2 completes the proof;
+- `B parent code`, for a smaller graph with one degree-6 vertex;
+- `C parent code`, for a smaller graph with one degree-7 vertex; or
+- `R parent code`, for a 5-cycle-to-path reduction whose marked three-edge star
   must remain uncrossed.
 
-The first three outputs are the fast certificates.  `R` is the fallback
-when none of them applies; it is a valid output, not a preparation failure.
-Thus every input graph must produce exactly one output line.
+Every input graph must produce exactly one output line.
 
 ```bash
 generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
@@ -206,28 +204,24 @@ done > data/claim4-classified.txt 2> evidence/claim4/preparation.log
 
 test "$(wc -l < data/claim4-classified.txt)" -eq "$claim4_parents"
 awk '
-  ($1 == "D" && NF == 1) ||
-  (($1 == "B" || $1 == "C" || $1 == "R") && NF == 2) { next }
+  ($1 == "D" && NF == 2) ||
+  (($1 == "B" || $1 == "C" || $1 == "R") && NF == 3) { next }
   { exit 1 }
 ' data/claim4-classified.txt
+awk '{print $2}' data/claim4-classified.txt |
+  cmp - <(cat data/claim4-biconnected-nonplanar/*.g6)
 
-awk '$1 != "D" {print $2}' data/claim4-classified.txt |
+awk 'NF == 3 {print $3}' data/claim4-classified.txt |
   sort -u > data/claim4.g6
 
-awk '$1 == "D" {count++} END {print count + 0}' \
-  data/claim4-classified.txt
-awk '$1 == "B" {count++} END {print count + 0}' \
-  data/claim4-classified.txt
-awk '$1 == "C" {count++} END {print count + 0}' \
-  data/claim4-classified.txt
-awk '$1 == "R" {count++} END {print count + 0}' \
-  data/claim4-classified.txt
+for class in D B C R; do
+  awk -v c="$class" '$1 == c {count++} END {print c, count + 0}' \
+    data/claim4-classified.txt
+done
 wc -l data/claim4.g6
 ```
 
-The four printed class counts must add up to `claim4_parents`.  There must
-be no other line type.  The preparation log also reports separate D, B, C,
-and R counts for each of the 256 generated parts.
+The four class counts must add up to `claim4_parents`.
 
 ## Verify Claim 3
 
@@ -263,18 +257,38 @@ In the first log, `#unknown` must equal the number of lines in
 ## Verify Claim 4
 
 ```bash
-./oops -i=data/claim4.g6 -verify-cubic -timeout=120 \
+./oops -i=data/claim4.g6 -verify-cubic -timeout=60 \
   -Cverify-cubic-residue=evidence/claim4/residue.g6 -colors=0 \
   > evidence/claim4/verification.log 2>&1
-test ! -s evidence/claim4/residue.g6
 ```
 
 A B record requires an uncrossed degree-6 hub, a C record requires a
 permitted drawing of an uncrossed degree-7 hub, and an R record requires the
 marked three-edge star to be uncrossed.  The D records need no solver input
-because Claim 2 already proves them.  Accept Claim 4 only if `#unknown` is
-zero and the sum of `#planar` and `#1-planar` equals the number of lines in
-`data/claim4.g6`.
+because Claim 2 already proves them.
+
+Verify the parents represented by records that reached the time limit:
+
+```bash
+awk '
+  FILENAME == ARGV[1] { residue[$1] = 1; next }
+  NF == 3 && ($3 in residue) { print $2; found[$3] = 1 }
+  END { for (code in residue) if (!(code in found)) exit 1 }
+' evidence/claim4/residue.g6 data/claim4-classified.txt |
+  sort -u > data/claim4-residue-parents.g6
+
+./oops -i=data/claim4-residue-parents.g6 -sat=1 -unsat=0 \
+  -timeout=900 -colors=0 > evidence/claim4/residue-parents.log 2>&1
+```
+
+Accept Claim 4 only if:
+
+- in `verification.log`, `#planar + #1-planar + #unknown` equals the number
+  of lines in `data/claim4.g6`, and `#unknown` equals the number of lines in
+  `residue.g6`;
+- in `residue-parents.log`, `#planar + #1-planar` equals the number of lines
+  in `data/claim4-residue-parents.g6`, while `#non-1-planar` and `#unknown`
+  are both zero.
 
 ## Verify Claim 5
 

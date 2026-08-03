@@ -727,24 +727,29 @@ planar graph, the empty crossing pattern suffices.
     The check surrounds the patch by an uncrossed wheel in the prescribed
     order and verifies the resulting crossing pattern and planarization.
 
-    For a degree-six quotient, the computation finds a drawing in which all
-    six hub edges are uncrossed.  For a degree-seven quotient, it considers
-    every bijection between the seven patch attachments and the seven hub
-    edges.  For each bijection it finds a drawing with all hub edges
-    uncrossed whose rotation avoids the five exceptional orders.  Drawings
-    are shared among all bijections they cover.  The rotation is read from
-    the verified two-page embedding of the planarization, so it is part of
-    the certificate rather than a postulated embedding choice.  Replacing
-    the hub by the corresponding local drawing restores $G$.
+    A degree-six quotient is certified by a drawing in which all six hub
+    edges are uncrossed.  A degree-seven quotient is certified if, for every
+    bijection between the seven patch attachments and the seven hub edges,
+    there is such a drawing whose rotation avoids the five exceptional
+    orders.  The rotation is obtained from the checked planarization and is
+    therefore part of the certificate.  Replacing the hub by the appropriate
+    local drawing then restores $G$.
 
-    If none of these certificates exists, the preparation retains the
-    lexicographically least canonically labeled reduction $(H,b)$.  The
-    computation then finds a drawing of $H$ in which the three edges incident
-    with $b$ are uncrossed, and \cref{lem:5-cycle-path-expansion} restores
-    $G$.  Thus every input obtains a direct, degree-six, degree-seven, or
-    marked-path certificate, without using Claim~3.  The global preparation
-    and verification have not yet been completed, so this proposed
-    computation does not yet prove the claim.
+    If no direct or hub certificate is found, the computation retains the
+    lexicographically least canonically labeled reduction $(H,b)$ and seeks a
+    drawing of $H$ in which the three edges incident with $b$ are uncrossed.
+    Such a drawing restores $G$ by
+    \cref{lem:5-cycle-path-expansion}.  Isomorphic hub and marked reductions
+    are checked only once.
+
+    Some of these constrained checks are substantially harder than ordinary
+    1-planarity.  A fixed time limit is therefore used only to divide the
+    exhaustive computation: for each unfinished reduction, every original
+    graph assigned to that reduction is tested directly for 1-planarity.
+    Consequently, each graph is covered either by one of the preceding
+    expansion arguments or by a direct checked drawing; no conclusion is
+    drawn from reaching the time limit.  The direct checks have not yet been
+    completed, so this proposed computation does not yet prove the claim.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
@@ -774,10 +779,11 @@ verifying them directly took another 26 minutes.  Thus Claim~3 took about
 The earlier Claim~4 estimate used a 60,000-parent structural sample in which
 every graph had a direct, degree-six, or degree-seven certificate.  The
 production preparation found graphs with none of these three certificates,
-so that estimate is withdrawn.  On a 401-parent prefix, four graphs required
-the marked-path fallback; their four distinct reductions were verified in
-104 milliseconds.  The complete run must measure the total number of
-fallback records before a new running-time estimate is stated.
+so that estimate is withdrawn.  The first solver pass also retained about
+70,000 records at its earlier 120-second limit.  The final computation uses a
+60-second limit and checks every original graph represented by an unfinished
+record directly.  The number and total running time of these direct checks
+have not yet been measured.
 
 \begin{table}[!ht]
     \small
