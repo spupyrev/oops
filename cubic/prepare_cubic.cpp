@@ -465,12 +465,7 @@ std::optional<Graph> contractOverlap(
   return quotient;
 }
 
-struct Claim4Record {
-  char classification;
-  std::string certificate;
-};
-
-Claim4Record prepareClaim4Joint(const Graph& parent) {
+char prepareClaim4Joint(const Graph& parent) {
   if (parent.n != 28 || !isCubic(parent) || girth(parent) != 5)
     throw std::runtime_error(
         "claim4-joint expects cubic order-28 graphs of girth 5");
@@ -506,7 +501,8 @@ Claim4Record prepareClaim4Joint(const Graph& parent) {
                 static_cast<int>(middleIt - secondCycle.begin()));
             if (order24 && girth(order24->graph) >= 5 &&
                 isBiconnected(order24->graph)) {
-              return {'D', {}};
+              std::cout << "D\n";
+              return 'D';
             }
           }
           const auto sequence = overlapSequence(secondCycle, *reduction);
@@ -535,12 +531,17 @@ Claim4Record prepareClaim4Joint(const Graph& parent) {
       }
     }
   }
-  if (!bestSixHub.empty())
-    return {'B', bestSixHub};
-  if (!bestSevenHub.empty())
-    return {'C', bestSevenHub};
+  if (!bestSixHub.empty()) {
+    std::cout << "B " << bestSixHub << '\n';
+    return 'B';
+  }
+  if (!bestSevenHub.empty()) {
+    std::cout << "C " << bestSevenHub << '\n';
+    return 'C';
+  }
   // No short-overlap certificate: retain one marked path reduction.
-  return {'R', minimumMarkedPathReduction(parent, fiveCycles)};
+  std::cout << "R " << minimumMarkedPathReduction(parent, fiveCycles) << '\n';
+  return 'R';
 }
 
 }  // namespace
@@ -566,12 +567,7 @@ int main(int argc, char** argv) {
       if (mode == "claim3")
         prepareClaim3(graph);
       else if (mode == "claim4-joint") {
-        const Claim4Record record = prepareClaim4Joint(graph);
-        const char classification = record.classification;
-        std::cout << classification << ' ' << line;
-        if (!record.certificate.empty())
-          std::cout << ' ' << record.certificate;
-        std::cout << '\n';
+        const char classification = prepareClaim4Joint(graph);
         if (classification == 'D')
           jointDirect++;
         else if (classification == 'B')

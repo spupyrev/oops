@@ -3,15 +3,17 @@
 This file contains the commands used for the five claims in
 `main_cubic.tex`.  The paper contains the proofs.
 
-Run the commands in one Bash session.  They are written serially.  A claim
-passes only if every command succeeds and all generated graphs are checked.
+Run the commands in one Bash session.  `JOBS` defaults to the number of
+available cores and may be overridden.  A claim passes only if every command
+succeeds and all generated graphs are checked.
 
 ## Prerequisites
 
 The verification uses the following software:
 
 - A C++17 compiler, a C compiler, Python 3, GNU Make, Bash, and standard Unix
-  utilities including `awk`, `sha256sum`, `find`, `sort`, `xargs`, and `wc`.
+  utilities including `awk`, `cmp`, `find`, `nproc`, `paste`, `sha256sum`,
+  `sort`, `split`, `xargs`, and `wc`.
   Building OOPS also requires the zlib development headers and library.
 - **nauty and Traces 2.9.3**, which supplies the `geng`, `pickg`, and `planarg`
   executables used for Claims 1--5.  Obtain the sources from the
@@ -39,7 +41,10 @@ gcc -std=gnu89 -O3 /path/to/minibaum5.c -o minibaum5
 NAUTY=/path/to/nauty2_9_3
 MINIBAUM=./minibaum5
 PARTS=256
+JOBS=${JOBS:-$(nproc)}
+SHARDS=${SHARDS:-256}
 export LC_ALL=C
+export NAUTY MINIBAUM PARTS
 
 g++ -std=c++17 -O3 -Isrc -I"$NAUTY" \
   cubic/prepare_cubic.cpp "$NAUTY/nauty.a" \
@@ -61,18 +66,35 @@ generate_biconnected_nonplanar() {
   local girth=$2
   local output=$3
   local girth_mode=${4:-minimum}
-  local pickg_args=(-q -c2)
-  if [ "$girth_mode" = exact ]; then
-    pickg_args+=("-g$girth")
-  fi
   mkdir -p "$output"
-  for part in $(seq 0 $((PARTS - 1))); do
-    local file
-    file=$(printf '%s/part-%03d.g6' "$output" "$part")
-    "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
-      "$NAUTY/pickg" "${pickg_args[@]}" |
-      "$NAUTY/planarg" -q -v > "$file"
-  done
+  seq 0 $((PARTS - 1)) |
+    xargs -n1 -P "$JOBS" bash -c '
+      set -euo pipefail
+      n=$1
+      girth=$2
+      output=$3
+      girth_mode=$4
+      part=$5
+      file=$(printf "%s/part-%03d.g6" "$output" "$part")
+      if [ "$girth_mode" = exact ]; then
+        "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
+          "$NAUTY/pickg" -q -c2 "-g$girth" |
+          "$NAUTY/planarg" -q -v > "$file"
+      else
+        "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
+          "$NAUTY/pickg" -q -c2 |
+          "$NAUTY/planarg" -q -v > "$file"
+      fi
+    ' bash "$n" "$girth" "$output" "$girth_mode"
+}
+
+make_shards() {
+  local input=$1
+  local output=$2
+  mkdir "$output"
+  split -n "l/$SHARDS" -d -a 3 --additional-suffix=.g6 \
+    "$input" "$output/shard-"
+  cat "$output"/*.g6 | cmp - "$input"
 }
 ```
 
@@ -161,9 +183,15 @@ are removed.  Graphs of larger girth are kept unchanged.
 generate_biconnected_nonplanar 26 5 data/claim3-biconnected-nonplanar
 wc -l data/claim3-biconnected-nonplanar/*.g6
 
-for input in data/claim3-biconnected-nonplanar/*.g6; do
-  ./prepare_cubic claim3 < "$input"
-done | sort -u > data/claim3.g6
+mkdir data/claim3-prepared
+find data/claim3-biconnected-nonplanar -type f -name '*.g6' -print0 |
+  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
+    set -euo pipefail
+    input=$1
+    name=$(basename "$input" .g6)
+    ./prepare_cubic claim3 < "$input" > "data/claim3-prepared/$name.g6"
+  ' bash
+cat data/claim3-prepared/*.g6 | sort -u > data/claim3.g6
 wc -l data/claim3.g6
 
 awk 'substr($0, 1, 1) == "U"' data/claim3.g6 \
@@ -182,10 +210,10 @@ is the output of `wc`.
 Generate the order-28 graphs of girth five.  For each graph,
 `prepare_cubic` prints one of:
 
-- `D parent`, when Claim 2 completes the proof;
-- `B parent code`, for a smaller graph with one degree-6 vertex;
-- `C parent code`, for a smaller graph with one degree-7 vertex; or
-- `R parent code`, for a 5-cycle-to-path reduction whose marked three-edge star
+- `D`, when Claim 2 completes the proof;
+- `B code`, for a smaller graph with one degree-6 vertex;
+- `C code`, for a smaller graph with one degree-7 vertex; or
+- `R code`, for a 5-cycle-to-path reduction whose marked three-edge star
   must remain uncrossed.
 
 Every input graph must produce exactly one output line.
@@ -193,73 +221,113 @@ Every input graph must produce exactly one output line.
 ```bash
 generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
 mkdir -p evidence/claim4
-claim4_parents=$(
-  wc -l data/claim4-biconnected-nonplanar/*.g6 |
-    awk 'END {print $1}'
-)
+mkdir data/claim4-classified evidence/claim4/preparation
 
+find data/claim4-biconnected-nonplanar -type f -name '*.g6' -print0 |
+  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
+    set -euo pipefail
+    input=$1
+    name=$(basename "$input" .g6)
+    ./prepare_cubic claim4-joint < "$input" \
+      > "data/claim4-classified/$name.txt" \
+      2> "evidence/claim4/preparation/$name.log"
+  ' bash
+
+claim4_parents=$(cat data/claim4-biconnected-nonplanar/*.g6 | wc -l)
+test "$claim4_parents" -eq 652157758
 for input in data/claim4-biconnected-nonplanar/*.g6; do
-  ./prepare_cubic claim4-joint < "$input"
-done > data/claim4-classified.txt 2> evidence/claim4/preparation.log
-
-test "$(wc -l < data/claim4-classified.txt)" -eq "$claim4_parents"
-awk '
-  ($1 == "D" && NF == 2) ||
-  (($1 == "B" || $1 == "C" || $1 == "R") && NF == 3) { next }
-  { exit 1 }
-' data/claim4-classified.txt
-awk '{print $2}' data/claim4-classified.txt |
-  cmp - <(cat data/claim4-biconnected-nonplanar/*.g6)
-
-awk 'NF == 3 {print $3}' data/claim4-classified.txt |
-  sort -u > data/claim4.g6
-
-for class in D B C R; do
-  awk -v c="$class" '$1 == c {count++} END {print c, count + 0}' \
-    data/claim4-classified.txt
+  name=$(basename "$input" .g6)
+  test "$(wc -l < "$input")" -eq \
+       "$(wc -l < "data/claim4-classified/$name.txt")"
 done
+
+awk '
+  ($1 == "D" && NF == 1) ||
+  (($1 == "B" || $1 == "C" || $1 == "R") && NF == 2) {
+    count[$1]++
+    next
+  }
+  { exit 1 }
+  END {
+    print "D", count["D"] + 0
+    print "B", count["B"] + 0
+    print "C", count["C"] + 0
+    print "R", count["R"] + 0
+  }
+' data/claim4-classified/*.txt
+
+awk 'NF == 2 {print $2}' data/claim4-classified/*.txt |
+  sort -u > data/claim4.g6
 wc -l data/claim4.g6
 ```
 
-The four class counts must add up to `claim4_parents`.
+The class counts must be 254,354,420 `D`, 350,383,009 `B`, 45,970,275
+`C`, and 1,450,054 `R`; they sum to `claim4_parents`.  There must be
+3,788,793 distinct records in `data/claim4.g6`.  Keep the classification
+files: they are the expensive artifact, whereas the parent files can be
+regenerated quickly.
 
 ## Verify Claim 3
 
 ```bash
 mkdir -p evidence/claim3
-./oops -i=data/claim3.g6 -verify-cubic -timeout=120 \
-  -Cverify-cubic-residue=evidence/claim3/claim3b-input.g6 -colors=0 \
-  > evidence/claim3/claim3.log 2>&1
+mkdir evidence/claim3/pass1-logs evidence/claim3/pass1-residues
+make_shards data/claim3.g6 evidence/claim3/pass1-shards
 
-if [ -s evidence/claim3/claim3b-input.g6 ]; then
-  ./oops -i=evidence/claim3/claim3b-input.g6 \
-    -verify-cubic -Cclaim3b -timeout=120 \
-    -Cverify-cubic-residue=evidence/claim3/claim3b-residue.g6 \
-    -colors=0 > evidence/claim3/claim3b.log 2>&1
-else
-  : > evidence/claim3/claim3b-residue.g6
-fi
+find evidence/claim3/pass1-shards -type f -name '*.g6' -size +0c -print0 |
+  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
+    set -euo pipefail
+    input=$1
+    name=$(basename "$input" .g6)
+    ./oops -i="$input" -verify-cubic -timeout=120 \
+      -Cverify-cubic-residue="evidence/claim3/pass1-residues/$name.g6" \
+      -colors=0 > "evidence/claim3/pass1-logs/$name.log" 2>&1
+  ' bash
+
+cat evidence/claim3/pass1-residues/*.g6 |
+  sort -u > evidence/claim3/claim3b-input.g6
+test "$(wc -l < evidence/claim3/claim3b-input.g6)" -eq 705
+
+mkdir evidence/claim3/claim3b-logs evidence/claim3/claim3b-residues
+make_shards evidence/claim3/claim3b-input.g6 evidence/claim3/claim3b-shards
+find evidence/claim3/claim3b-shards -type f -name '*.g6' -size +0c -print0 |
+  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
+    set -euo pipefail
+    input=$1
+    name=$(basename "$input" .g6)
+    ./oops -i="$input" -verify-cubic -Cclaim3b -timeout=120 \
+      -Cverify-cubic-residue="evidence/claim3/claim3b-residues/$name.g6" \
+      -colors=0 > "evidence/claim3/claim3b-logs/$name.log" 2>&1
+  ' bash
+
+cat evidence/claim3/claim3b-residues/*.g6 |
+  sort -u > evidence/claim3/claim3b-residue.g6
 test ! -s evidence/claim3/claim3b-residue.g6
 ```
 
-The first pass retains records that reach the 120-second limit.  Claim 3b
-expands each retained order-22 Claim 3 core into at most 12 relevant
-order-26 parents and verifies them directly; it retries a retained order-26
-Claim 3 graph directly.  Accept Claim 3 only if the two logs account for
-every input and parent and
-`claim3b-residue.g6` is empty.  When several OOPS processes are used, give
-each process a different residue filename.
-
-In the first log, `#unknown` must equal the number of lines in
-`claim3b-input.g6`.  In the Claim 3b log, `#claim3b-records` and
-`#claim3b-completed` must both equal that number, and `#unknown` must be zero.
+The first-pass logs must account for all 4,881,876 records and report 705
+unknown.  Claim 3b expands these records into 8,460 parents.  Its logs must
+report 705 completed records, 8,460 1-flexible parents, and no unknown.
 
 ## Verify Claim 4
 
 ```bash
-./oops -i=data/claim4.g6 -verify-cubic -timeout=60 \
-  -Cverify-cubic-residue=evidence/claim4/residue.g6 -colors=0 \
-  > evidence/claim4/verification.log 2>&1
+mkdir evidence/claim4/certificate-logs \
+      evidence/claim4/certificate-residues
+make_shards data/claim4.g6 evidence/claim4/certificate-shards
+
+find evidence/claim4/certificate-shards -type f -name '*.g6' -print0 |
+  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
+    set -euo pipefail
+    input=$1
+    name=$(basename "$input" .g6)
+    ./oops -i="$input" -verify-cubic -timeout=60 \
+      -Cverify-cubic-residue="evidence/claim4/certificate-residues/$name.g6" \
+      -colors=0 > "evidence/claim4/certificate-logs/$name.log" 2>&1
+  ' bash
+
+cat evidence/claim4/certificate-residues/*.g6 |
+  sort -u > evidence/claim4/residue.g6
 ```
 
 A B record requires an uncrossed degree-6 hub, a C record requires a
@@ -267,28 +335,52 @@ permitted drawing of an uncrossed degree-7 hub, and an R record requires the
 marked three-edge star to be uncrossed.  The D records need no solver input
 because Claim 2 already proves them.
 
-Verify the parents represented by records that reached the time limit:
+Recover and verify the parents represented by records that reached the time
+limit:
 
 ```bash
+mkdir evidence/claim4/residue-parent-records
+for input in data/claim4-biconnected-nonplanar/*.g6; do
+  name=$(basename "$input" .g6)
+  paste "$input" "data/claim4-classified/$name.txt" |
+    awk '
+      FILENAME == ARGV[1] { residue[$1] = 1; next }
+      NF == 3 && ($3 in residue) { print $1, $3 }
+    ' evidence/claim4/residue.g6 - \
+    > "evidence/claim4/residue-parent-records/$name.txt"
+done
+
 awk '
   FILENAME == ARGV[1] { residue[$1] = 1; next }
-  NF == 3 && ($3 in residue) { print $2; found[$3] = 1 }
+  { found[$2] = 1 }
   END { for (code in residue) if (!(code in found)) exit 1 }
-' evidence/claim4/residue.g6 data/claim4-classified.txt |
+' evidence/claim4/residue.g6 \
+  evidence/claim4/residue-parent-records/*.txt
+
+awk '{print $1}' evidence/claim4/residue-parent-records/*.txt |
   sort -u > data/claim4-residue-parents.g6
 
-./oops -i=data/claim4-residue-parents.g6 -sat=1 -unsat=0 \
-  -timeout=900 -colors=0 > evidence/claim4/residue-parents.log 2>&1
+mkdir evidence/claim4/parent-logs
+make_shards data/claim4-residue-parents.g6 evidence/claim4/parent-shards
+
+find evidence/claim4/parent-shards -type f -name '*.g6' -print0 |
+  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
+    set -euo pipefail
+    input=$1
+    name=$(basename "$input" .g6)
+    ./oops -i="$input" -sat=1 -unsat=0 -timeout=900 -colors=0 \
+      > "evidence/claim4/parent-logs/$name.log" 2>&1
+  ' bash
 ```
 
 Accept Claim 4 only if:
 
-- in `verification.log`, `#planar + #1-planar + #unknown` equals the number
-  of lines in `data/claim4.g6`, and `#unknown` equals the number of lines in
-  `residue.g6`;
-- in `residue-parents.log`, `#planar + #1-planar` equals the number of lines
-  in `data/claim4-residue-parents.g6`, while `#non-1-planar` and `#unknown`
-  are both zero.
+- the counters in `certificate-logs` account for all 3,788,793 records, and
+  their total `#unknown` equals the number of lines in `residue.g6`;
+- the counters in `parent-logs` account for every line of
+  `data/claim4-residue-parents.g6`, with `#non-1-planar = 0` and
+  `#unknown = 0`.  These parents are nonplanar by construction, so their
+  total `#planar` is also zero.
 
 ## Verify Claim 5
 

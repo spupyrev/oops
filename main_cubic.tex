@@ -691,19 +691,20 @@ planar graph, the empty crossing pattern suffices.
 \end{claim}
 
 \begin{proof}[Proposed computational proof]
-    For every graph $G$ in this family, the preparation enumerates the
-    5-cycle-to-path reductions $(H,b)$ defined in
+    The exhaustive enumeration contains $652{,}157{,}758$ isomorphism
+    classes.  For every graph $G$ in this family, the computation enumerates
+    the 5-cycle-to-path reductions $(H,b)$ defined in
     \cref{lem:5-cycle-path-expansion}.  Girth five makes every first
     reduction simple.  Write the replacement path as $a b c$.
 
-    If the replacement path lies on a second 5-cycle, the preparation
+    If the replacement path lies on a second 5-cycle, the computation
     performs the second path reduction with $b$ assigned to its middle
     attachment.  When the resulting order-24 graph $K$ is biconnected and
     has girth at least five, it is either planar or covered by
     \cref{clm:flexible24}.  Thus its two path edges can be kept uncrossed, and
     \cref{lem:overlapping-5-cycle-expansion} proves that $G$ is 1-planar.
 
-    Otherwise the preparation finds one of two overlapping cycles.  With
+    Otherwise the computation finds one of two overlapping cycles.  With
     $L,M$ denoting attachments at $a,b$, respectively, their cyclic words are
     \[
         b\,a\,L\,O\,M
@@ -765,10 +766,6 @@ planar graph, the empty crossing pattern suffices.
 
 The running times for the five computations are summarized in
 \cref{tab:cubic28-runtime}.  Claims 1, 2, 3, and 5 are completed computations.
-The earlier use of marked-path certificates for every input to
-\cref{clm:girth5-28} produced
-$38{,}120{,}815$ groups whose measured verification would take 392--470
-hours; using them only as a fallback avoids that cost.
 
 For Claim~3, preparation reduced the $31{,}478{,}465$ input graphs to
 $4{,}881{,}876$ records.  The first solver pass took 22.97 hours and retained
@@ -776,14 +773,16 @@ $4{,}881{,}876$ records.  The first solver pass took 22.97 hours and retained
 verifying them directly took another 26 minutes.  Thus Claim~3 took about
 23 hours 24 minutes of measured solver time.
 
-The earlier Claim~4 estimate used a 60,000-parent structural sample in which
-every graph had a direct, degree-six, or degree-seven certificate.  The
-production preparation found graphs with none of these three certificates,
-so that estimate is withdrawn.  The first solver pass also retained about
-70,000 records at its earlier 120-second limit.  The final computation uses a
-60-second limit and checks every original graph represented by an unfinished
-record directly.  The number and total running time of these direct checks
-have not yet been measured.
+For Claim~4, classifying the $652{,}157{,}758$ input graphs took about 12 hours
+on the 48-core machine.  The computation found $254{,}354{,}420$ direct
+certificates, $350{,}383{,}009$ degree-six quotients, $45{,}970{,}275$
+degree-seven quotients, and $1{,}450{,}054$ marked reductions.  Canonical
+labeling reduced the latter three classes to $3{,}788{,}793$ distinct records.
+A preliminary five-second verification completed $3{,}717{,}680$ records and
+retained $71{,}113$; a 120-second retry completed all but $4{,}177$ of these,
+all of which were degree-six or degree-seven quotients.  The final computation
+uses a 60-second division and checks every original graph represented by an
+unfinished record directly.  These direct checks have not yet been completed.
 
 \begin{table}[!ht]
     \small
@@ -797,10 +796,8 @@ have not yet been measured.
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
         \cref{clm:flexible26} & $4{,}881{,}876+8{,}460^\ast$ & 23 hours 24 minutes (measured) & yes \\
-        \cref{clm:girth5-28}  & not yet measured & not yet measured & no \\
+        \cref{clm:girth5-28}  & $3{,}788{,}793+\text{fallback}$ & not yet measured & no \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
-        \midrule
-        remaining Claim 4 & & not yet measured & no \\
         \bottomrule
     \end{tabular}
     \par\smallskip
