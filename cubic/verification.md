@@ -6,9 +6,9 @@ It uses 48 parallel jobs; change `JOBS` below for a different machine.
 ## Prerequisites
 
 - C and C++17 compilers, Python 3, GNU Make, Bash, zlib, and standard GNU utilities;
-- [nauty and Traces 2.9.3](https://users.cecs.anu.edu.au/~bdm/nauty/)
-  (`geng`, `pickg`, and `planarg`);
-- [Minibaum 5](https://caagt.ugent.be/minibaum/) (`minibaum5.c`).
+- [nauty and Traces 2.9.3](https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz)
+  (`pickg` and `planarg`);
+- [Minibaum 5](https://caagt.ugent.be/minibaum/minibaum5.c).
 
 ## Preparation
 
@@ -69,7 +69,7 @@ generate_minibaum_parts() {
   mkdir -p "$output"
   seq 0 $((PARTS - 1)) | tr '\n' '\0' | run_in_parallel '
     part=$1
-    file=$(printf "%s/part-%03d.g6" "$output" "$part")
+    file=$(printf "%s/n%02d-part-%03d.g6" "$output" "$n" "$part")
     if [ "$girth_mode" = exact ]; then
       "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
         "$NAUTY/pickg" -q -c2 "-g$girth" |
@@ -123,8 +123,7 @@ $n\le 22$:
 mkdir data/claim1 evidence/claim1
 
 for n in 4 6 8 10 12 14 16 18 20 22; do
-  "$NAUTY/geng" -Cq -t -d3 -D3 "$n" |
-    "$NAUTY/planarg" -v > "data/claim1/cub${n}-core.g6"
+  generate_minibaum_parts "$n" 4 data/claim1
 done
 
 cat data/claim1/*.g6 > data/claim1.g6
