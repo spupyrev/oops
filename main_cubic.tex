@@ -690,7 +690,7 @@ planar graph, the empty crossing pattern suffices.
     1-planar.
 \end{claim}
 
-\begin{proof}[Proposed computational proof]
+\begin{proof}[Proof (computational)]
     The exhaustive enumeration contains $652{,}157{,}758$ isomorphism
     classes.  For every graph $G$ in this family, the computation enumerates
     the 5-cycle-to-path reductions $(H,b)$ defined in
@@ -744,13 +744,23 @@ planar graph, the empty crossing pattern suffices.
     are checked only once.
 
     Some of these constrained checks are substantially harder than ordinary
-    1-planarity.  A fixed time limit is therefore used only to divide the
+    1-planarity.  A fixed time limit was therefore used only to divide the
     exhaustive computation: for each unfinished reduction, every original
-    graph assigned to that reduction is tested directly for 1-planarity.
-    Consequently, each graph is covered either by one of the preceding
-    expansion arguments or by a direct checked drawing; no conclusion is
-    drawn from reaching the time limit.  The direct checks have not yet been
-    completed, so this proposed computation does not yet prove the claim.
+    graph assigned to that reduction was tested directly for 1-planarity.
+    No conclusion was drawn from reaching the time limit.
+
+    The classification assigned one record to each of the
+    $652{,}157{,}758$ input graphs.  Of these, $254{,}354{,}420$ were covered
+    by the first expansion argument using \cref{clm:flexible24}; the remaining
+    $397{,}803{,}338$ were assigned a degree-six, degree-seven, or
+    marked-reduction record.  After
+    canonical labeling, the latter records gave $3{,}788{,}793$ distinct
+    constrained instances.  The computation settled $3{,}784{,}587$ of
+    them and retained $4{,}206$ at the time limit.  These retained records
+    represented $1{,}508{,}639$ original graphs, each of which was verified
+    directly as 1-planar.  Thus every graph in the enumeration is covered
+    either by one of the expansion arguments above or by a directly checked
+    drawing.
 \end{proof}
 
 \begin{claim}\label{clm:girth6-28}
@@ -765,7 +775,7 @@ planar graph, the empty crossing pattern suffices.
 \end{proof}
 
 The running times for the five computations are summarized in
-\cref{tab:cubic28-runtime}.  Claims 1, 2, 3, and 5 are completed computations.
+\cref{tab:cubic28-runtime}.  All five computations are complete.
 
 For Claim~3, preparation reduced the $31{,}478{,}465$ input graphs to
 $4{,}881{,}876$ records.  The first solver pass took 22.97 hours and retained
@@ -778,16 +788,16 @@ on the 48-core machine.  The computation found $254{,}354{,}420$ direct
 certificates, $350{,}383{,}009$ degree-six quotients, $45{,}970{,}275$
 degree-seven quotients, and $1{,}450{,}054$ marked reductions.  Canonical
 labeling reduced the latter three classes to $3{,}788{,}793$ distinct records.
-A preliminary five-second verification completed $3{,}717{,}680$ records and
-retained $71{,}113$; a 120-second retry completed all but $4{,}177$ of these,
-all of which were degree-six or degree-seven quotients.  The final computation
-uses a 60-second division and checks every original graph represented by an
-unfinished record directly.  These direct checks have not yet been completed.
+With a 60-second limit, the certificate computation found 17 planar records,
+verified $3{,}784{,}570$ further records, and retained $4{,}206$.  The retained
+records represented $1{,}508{,}639$ original graphs, all of which were verified
+directly as 1-planar.  The complete computation took 52.5 hours on the
+48-core machine.
 
 \begin{table}[!ht]
     \small
     \centering
-    \caption{Measured and projected wall-clock times on 48 cores.}
+    \caption{Measured wall-clock times on 48 cores.}
     \label{tab:cubic28-runtime}
     \begin{tabular}{@{}lrrc@{}}
         \toprule
@@ -796,17 +806,13 @@ unfinished record directly.  These direct checks have not yet been completed.
         \cref{clm:flexible22} & $1{,}575{,}835$ & 14 hours 41 minutes (measured) & yes \\
         \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
         \cref{clm:flexible26} & $4{,}881{,}876+8{,}460^\ast$ & 23 hours 24 minutes (measured) & yes \\
-        \cref{clm:girth5-28}  & $3{,}788{,}793+\text{fallback}$ & not yet measured & no \\
+        \cref{clm:girth5-28}  & $3{,}788{,}793+1{,}508{,}639^\ast$ & 52.5 hours (measured) & yes \\
         \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
         \bottomrule
     \end{tabular}
     \par\smallskip
     {\footnotesize $^\ast$First-pass records plus directly verified fallback parents.\par}
 \end{table}
-
-Thus the present computations do not yet establish
-\cref{clm:girth5-28}, and the theorem below remains conditional on completing
-or replacing that computation.
 
 \begin{theorem}\label{thm:cubic28}
     Every simple cubic graph with at most 28 vertices is 1-planar.

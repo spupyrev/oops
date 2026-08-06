@@ -375,12 +375,15 @@ find evidence/claim4/parent-shards -type f -name '*.g6' -print0 |
 
 Accept Claim 4 only if:
 
-- the counters in `certificate-logs` account for all 3,788,793 records, and
-  their total `#unknown` equals the number of lines in `residue.g6`;
-- the counters in `parent-logs` account for every line of
-  `data/claim4-residue-parents.g6`, with `#non-1-planar = 0` and
-  `#unknown = 0`.  These parents are nonplanar by construction, so their
-  total `#planar` is also zero.
+- the totals in `certificate-logs` are `#planar = 17`,
+  `#1-planar = 3,784,570`, and `#unknown = 4,206`, and `residue.g6`
+  contains 4,206 lines;
+- `data/claim4-residue-parents.g6` contains 1,508,639 graphs, and the totals
+  in `parent-logs` are `#1-planar = 1,508,639`, `#planar = 0`,
+  `#non-1-planar = 0`, and `#unknown = 0`.
+
+The completed run satisfied these conditions and took 52.5 hours on the
+48-core machine.
 
 ## Verify Claim 5
 
