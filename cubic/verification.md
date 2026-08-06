@@ -1,6 +1,7 @@
 # Reproducing the five computational claims
 
 This script verifies that every cubic graph with $n\le 28$ is 1-planar.
+It uses 48 parallel jobs; change `JOBS` below for a different machine.
 
 ## Prerequisites
 
@@ -20,8 +21,7 @@ NAUTY=/path/to/nauty2_9_3
 MINIBAUM_SOURCE=/path/to/minibaum5.c
 MINIBAUM=./minibaum5
 PARTS=256
-JOBS=${JOBS:-$(nproc)}
-SHARDS=${SHARDS:-256}
+JOBS=48
 export LC_ALL=C
 export NAUTY MINIBAUM PARTS
 
@@ -89,7 +89,7 @@ make_shards() {
   mkdir "$output"
 
   shuf "$input" > "$output/input"
-  split -n "l/$SHARDS" -d -a 3 --additional-suffix=.g6 \
+  split -n "l/$PARTS" -d -a 3 --additional-suffix=.g6 \
     "$output/input" "$output/shard-"
   cat "$output"/shard-*.g6 | cmp - "$output/input"
 }
@@ -150,20 +150,21 @@ least 5, then verify 2-flexibility:
 
 ```bash
 generate_minibaum_parts 24 5 data/claim2-biconnected-nonplanar
-
-test "$(wc -l data/claim2-biconnected-nonplanar/*.g6 | awk 'END {print $1}')" \
-  -eq 1620470
+cat data/claim2-biconnected-nonplanar/*.g6 > data/claim2.g6
+test "$(wc -l < data/claim2.g6)" -eq 1620470
 
 mkdir evidence/claim2
-printf '%s\0' data/claim2-biconnected-nonplanar/*.g6 | run_in_parallel '
+mkdir evidence/claim2/logs
+make_shards data/claim2.g6 evidence/claim2/shards
+printf '%s\0' evidence/claim2/shards/shard-*.g6 | run_in_parallel '
     input=$1
     name=$(basename "$input" .g6)
     ./oops -i="$input" -verify-cubic -colors=0 \
-      > "evidence/claim2/${name}.log" 2>&1
+      > "evidence/claim2/logs/${name}.log" 2>&1
   '
 
-test "$(sum_counter '#2-flexible' evidence/claim2/*.log)" -eq 1620470
-test "$(sum_counter '#unknown' evidence/claim2/*.log)" -eq 0
+test "$(sum_counter '#2-flexible' evidence/claim2/logs/*.log)" -eq 1620470
+test "$(sum_counter '#unknown' evidence/claim2/logs/*.log)" -eq 0
 ```
 
 ## Verify Claim 3
@@ -328,18 +329,20 @@ least 6, then verify it directly:
 
 ```bash
 generate_minibaum_parts 28 6 data/claim5-biconnected-nonplanar
-test "$(wc -l data/claim5-biconnected-nonplanar/*.g6 | awk 'END {print $1}')" \
-  -eq 4624501
+cat data/claim5-biconnected-nonplanar/*.g6 > data/claim5.g6
+test "$(wc -l < data/claim5.g6)" -eq 4624501
 
 mkdir evidence/claim5
-printf '%s\0' data/claim5-biconnected-nonplanar/*.g6 | run_in_parallel '
+mkdir evidence/claim5/logs
+make_shards data/claim5.g6 evidence/claim5/shards
+printf '%s\0' evidence/claim5/shards/shard-*.g6 | run_in_parallel '
     input=$1
     name=$(basename "$input" .g6)
     ./oops -i="$input" -colors=0 \
-      > "evidence/claim5/${name}.log" 2>&1
+      > "evidence/claim5/logs/${name}.log" 2>&1
   '
 
-test "$(sum_counter '#1-planar' evidence/claim5/*.log)" -eq 4624501
-test "$(sum_counter '#non-1-planar' evidence/claim5/*.log)" -eq 0
-test "$(sum_counter '#unknown' evidence/claim5/*.log)" -eq 0
+test "$(sum_counter '#1-planar' evidence/claim5/logs/*.log)" -eq 4624501
+test "$(sum_counter '#non-1-planar' evidence/claim5/logs/*.log)" -eq 0
+test "$(sum_counter '#unknown' evidence/claim5/logs/*.log)" -eq 0
 ```
