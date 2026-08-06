@@ -73,7 +73,7 @@ def is_expandable(oops, kind, order):
         result = subprocess.run(
             (
                 str(oops), f"-i={stream.name}", "-colors=0",
-                "-unsat=1", f"-fix-cross1={literals}", "-timeout=10",
+                "-unsat=1", f"-fix-cross1={literals}",
             ),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -81,7 +81,13 @@ def is_expandable(oops, kind, order):
         )
     if result.returncode != 0:
         raise RuntimeError(result.stdout)
-    return "#1-planar = 1" in result.stdout
+    if "#unknown = 1" in result.stdout:
+        raise RuntimeError(result.stdout)
+    if "#planar = 1" in result.stdout or "#1-planar = 1" in result.stdout:
+        return True
+    if "#non-1-planar = 1" in result.stdout:
+        return False
+    raise RuntimeError(f"OOPS returned no verdict:\n{result.stdout}")
 
 
 def main():
