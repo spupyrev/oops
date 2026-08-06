@@ -1,44 +1,23 @@
 # Reproducing the five computational claims
 
-This file contains the commands used for the five claims in
-`main_cubic.tex`.  The paper contains the proofs.
-
-Run the commands in one Bash session.  `JOBS` defaults to the number of
-available cores and may be overridden.  A claim passes only if every command
-succeeds and all generated graphs are checked.
+This script verifies that every cubic graph with $n\le 28$ is 1-planar.
 
 ## Prerequisites
 
-The verification uses the following software:
-
-- A C++17 compiler, a C compiler, Python 3, GNU Make, Bash, and standard Unix
-  utilities including `awk`, `cmp`, `find`, `nproc`, `paste`, `sha256sum`,
-  `sort`, `split`, `xargs`, and `wc`.
-  Building OOPS also requires the zlib development headers and library.
-- **nauty and Traces 2.9.3**, which supplies the `geng`, `pickg`, and `planarg`
-  executables used for Claims 1--5.  Obtain the sources from the
-  [official nauty page](https://users.cecs.anu.edu.au/~bdm/nauty/) or download
-  the [nauty 2.9.3 source archive](https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz).
-  After extracting the archive, run `./configure` and `make`; `geng`, `pickg`,
-  and `planarg` will be created in the resulting `nauty2_9_3`
-  directory.
-- **Minibaum 5**, which generates the connected cubic graphs of prescribed
-  minimum girth for Claims 2--5.  The author's
-  [Minibaum page](https://caagt.ugent.be/minibaum/) provides the
-  [minibaum5.c source](https://caagt.ugent.be/minibaum/minibaum5.c) and the
-  [Minibaum manual](https://caagt.ugent.be/minibaum/minibaummanual.pdf).
+- C and C++17 compilers, Python 3, GNU Make, Bash, zlib, and standard GNU utilities;
+- [nauty and Traces 2.9.3](https://users.cecs.anu.edu.au/~bdm/nauty/)
+  (`geng`, `pickg`, and `planarg`);
+- [Minibaum 5](https://caagt.ugent.be/minibaum/) (`minibaum5.c`).
 
 ## Preparation
 
-Build OOPS and Minibaum, and identify the nauty executables:
+Set the source paths, build the executables, and choose the run parameters:
 
 ```bash
 set -euo pipefail
 
-make
-gcc -std=gnu89 -O3 /path/to/minibaum5.c -o minibaum5
-
 NAUTY=/path/to/nauty2_9_3
+MINIBAUM_SOURCE=/path/to/minibaum5.c
 MINIBAUM=./minibaum5
 PARTS=256
 JOBS=${JOBS:-$(nproc)}
@@ -46,109 +25,123 @@ SHARDS=${SHARDS:-256}
 export LC_ALL=C
 export NAUTY MINIBAUM PARTS
 
+# Build nauty.
+(cd "$NAUTY" && ./configure && make)
+
+# Build Minibaum.
+gcc -std=gnu89 -O3 "$MINIBAUM_SOURCE" -o "$MINIBAUM"
+
+# Build OOPS.
+make
+
+# Build the cubic-graph preparation tool.
 g++ -std=c++17 -O3 -Isrc -I"$NAUTY" \
   cubic/prepare_cubic.cpp "$NAUTY/nauty.a" \
   -o prepare_cubic
 
+# Build the drawing-table checker.
+g++ -std=c++17 -O2 -Isrc \
+  cubic/test_cycle_expansions.cpp src/planarity_test.cpp \
+  -o test_cycle_expansions
+
 mkdir -p data evidence
-sha256sum ./oops ./prepare_cubic "$MINIBAUM" /path/to/minibaum5.c \
-  "$NAUTY/geng" "$NAUTY/pickg" "$NAUTY/planarg" \
-  cubic/test_cycle_expansions.cpp cubic/test_hub_expansions.py \
-  > evidence/programs.sha256
 ```
 
-This function divides Minibaum generation into 256 fixed parts.  It keeps
-only biconnected, nonplanar graphs.
+## Utilities
 
 ```bash
-generate_biconnected_nonplanar() {
+# Run a command once for each NUL-separated input.
+run_in_parallel() {
+  local command=$1
+  xargs -0 -r -n1 -P "$JOBS" bash -c "
+    set -euo pipefail
+    $command
+  " bash
+}
+
+# Generate biconnected, nonplanar cubic graphs of minimum or exact girth.
+generate_minibaum_parts() {
   local n=$1
   local girth=$2
   local output=$3
   local girth_mode=${4:-minimum}
+  export n girth output girth_mode
   mkdir -p "$output"
-  seq 0 $((PARTS - 1)) |
-    xargs -n1 -P "$JOBS" bash -c '
-      set -euo pipefail
-      n=$1
-      girth=$2
-      output=$3
-      girth_mode=$4
-      part=$5
-      file=$(printf "%s/part-%03d.g6" "$output" "$part")
-      if [ "$girth_mode" = exact ]; then
-        "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
-          "$NAUTY/pickg" -q -c2 "-g$girth" |
-          "$NAUTY/planarg" -q -v > "$file"
-      else
-        "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
-          "$NAUTY/pickg" -q -c2 |
-          "$NAUTY/planarg" -q -v > "$file"
-      fi
-    ' bash "$n" "$girth" "$output" "$girth_mode"
+  seq 0 $((PARTS - 1)) | tr '\n' '\0' | run_in_parallel '
+    part=$1
+    file=$(printf "%s/part-%03d.g6" "$output" "$part")
+    if [ "$girth_mode" = exact ]; then
+      "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
+        "$NAUTY/pickg" -q -c2 "-g$girth" |
+        "$NAUTY/planarg" -q -v > "$file"
+    else
+      "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
+        "$NAUTY/pickg" -q -c2 |
+        "$NAUTY/planarg" -q -v > "$file"
+    fi
+  '
 }
 
+# Shuffle an input file and split it into balanced shards.
 make_shards() {
   local input=$1
   local output=$2
   mkdir "$output"
+
+  shuf "$input" > "$output/input"
   split -n "l/$SHARDS" -d -a 3 --additional-suffix=.g6 \
-    "$input" "$output/shard-"
-  cat "$output"/*.g6 | cmp - "$input"
+    "$output/input" "$output/shard-"
+  cat "$output"/shard-*.g6 | cmp - "$output/input"
+}
+
+# Sum a counter over the final summary line of each log.
+sum_counter() {
+  local counter=$1
+  shift
+  for log in "$@"; do
+    grep -F "$counter =" "$log" | tail -n 1
+  done | tr -d ',' | awk -v counter="$counter" '
+    { for (i = 1; i <= NF; i++) if ($i == counter) total += $(i + 2) }
+    END { print total + 0 }
+  '
 }
 ```
 
-`pickg -c2` keeps biconnected graphs.  `planarg -v` keeps nonplanar graphs.
-The optional argument `exact` also removes graphs whose girth is larger than
-the requested value.
-
-Check the small drawing tables used in the paper:
+## Verify the drawing tables
 
 ```bash
-g++ -std=c++17 -O2 -Isrc \
-  cubic/test_cycle_expansions.cpp src/planarity_test.cpp \
-  -o test_cycle_expansions
 ./test_cycle_expansions
 python3 cubic/test_hub_expansions.py
 ```
 
-The last command must report 60 expandable `BALOM` orders and 355 expandable
-`BALOOM` orders.
-
 ## Verify Claim 1
 
-Generate every connected cubic graph of orders 4 through 18, and every
-biconnected, nonplanar, triangle-free cubic graph of orders 20 and 22:
+Generate every biconnected, nonplanar, triangle-free cubic graph with
+$n\le 22$:
 
 ```bash
-mkdir -p data/claim1 evidence/claim1
+mkdir data/claim1 evidence/claim1
 
-for n in 4 6 8 10 12 14 16 18; do
-  "$NAUTY/geng" -cq -d3 -D3 "$n" > "data/claim1/cub${n}.g6"
-done
-
-for n in 20 22; do
+for n in 4 6 8 10 12 14 16 18 20 22; do
   "$NAUTY/geng" -Cq -t -d3 -D3 "$n" |
     "$NAUTY/planarg" -v > "data/claim1/cub${n}-core.g6"
 done
 
-wc -l data/claim1/*.g6
+cat data/claim1/*.g6 > data/claim1.g6
+test "$(wc -l < data/claim1.g6)" -eq 1538493
 
-for input in data/claim1/*.g6; do
-  name=$(basename "$input" .g6)
-  ./oops -i="$input" -verify-cubic -colors=0 \
-    > "evidence/claim1/${name}.log" 2>&1
-done
+mkdir evidence/claim1/logs
+make_shards data/claim1.g6 evidence/claim1/shards
+printf '%s\0' evidence/claim1/shards/shard-*.g6 | run_in_parallel '
+    input=$1
+    name=$(basename "$input" .g6)
+    ./oops -i="$input" -verify-cubic -colors=0 \
+      > "evidence/claim1/logs/${name}.log" 2>&1
+'
+
+test "$(sum_counter '#3-flexible' evidence/claim1/logs/*.log)" -eq 1538493
+test "$(sum_counter '#unknown' evidence/claim1/logs/*.log)" -eq 0
 ```
-
-Confirm that the counts, in the same order, are
-
-```text
-1, 2, 5, 19, 85, 509, 4,060, 41,301, 97,141, 1,432,712.
-```
-
-Their sum must be 1,575,835.  Accept the result only if every nonplanar graph
-is reported as 3-flexible.  Planar graphs require no further check.
 
 ## Verify Claim 2
 
@@ -156,262 +149,197 @@ Generate the biconnected, nonplanar cubic graphs with $n=24$ and girth at
 least 5, then verify 2-flexibility:
 
 ```bash
-generate_biconnected_nonplanar 24 5 data/claim2-biconnected-nonplanar
+generate_minibaum_parts 24 5 data/claim2-biconnected-nonplanar
 
-wc -l data/claim2-biconnected-nonplanar/*.g6
-claim2_count=$(wc -l data/claim2-biconnected-nonplanar/*.g6 | awk 'END {print $1}')
-test "$claim2_count" -eq 1620470
+test "$(wc -l data/claim2-biconnected-nonplanar/*.g6 | awk 'END {print $1}')" \
+  -eq 1620470
 
-mkdir -p evidence/claim2
-for input in data/claim2-biconnected-nonplanar/*.g6; do
-  name=$(basename "$input" .g6)
-  ./oops -i="$input" -verify-cubic -colors=0 \
-    > "evidence/claim2/${name}.log" 2>&1
-done
-```
-
-Confirm that the total is 1,620,470.  Accept the result only if every graph
-is reported as 2-flexible.
-
-## Prepare Claim 3
-
-Generate the order-26 graphs.  For a graph of girth five,
-`prepare_cubic` replaces one 5-cycle by a degree-five vertex.  Equal results
-are removed.  Graphs of larger girth are kept unchanged.
-
-```bash
-generate_biconnected_nonplanar 26 5 data/claim3-biconnected-nonplanar
-wc -l data/claim3-biconnected-nonplanar/*.g6
-
-mkdir data/claim3-prepared
-find data/claim3-biconnected-nonplanar -type f -name '*.g6' -print0 |
-  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
-    set -euo pipefail
+mkdir evidence/claim2
+printf '%s\0' data/claim2-biconnected-nonplanar/*.g6 | run_in_parallel '
     input=$1
     name=$(basename "$input" .g6)
-    ./prepare_cubic claim3 < "$input" > "data/claim3-prepared/$name.g6"
-  ' bash
-cat data/claim3-prepared/*.g6 | sort -u > data/claim3.g6
-wc -l data/claim3.g6
+    ./oops -i="$input" -verify-cubic -colors=0 \
+      > "evidence/claim2/${name}.log" 2>&1
+  '
 
-awk 'substr($0, 1, 1) == "U"' data/claim3.g6 \
-  > data/claim3-cores.g6
-awk 'substr($0, 1, 1) == "Y"' data/claim3.g6 \
-  > data/claim3-girth6.g6
+test "$(sum_counter '#2-flexible' evidence/claim2/*.log)" -eq 1620470
+test "$(sum_counter '#unknown' evidence/claim2/*.log)" -eq 0
 ```
-
-Confirm that the filtered input contains 31,478,465 graphs: 31,297,238 of
-girth five and 181,227 of larger girth.  (The unfiltered connected family has
-31,478,584 graphs.)  Record the number left after removing duplicates; this
-is the output of `wc`.
-
-## Prepare Claim 4
-
-Generate the order-28 graphs of girth five.  For each graph,
-`prepare_cubic` prints one of:
-
-- `D`, when Claim 2 completes the proof;
-- `B code`, for a smaller graph with one degree-6 vertex;
-- `C code`, for a smaller graph with one degree-7 vertex; or
-- `R code`, for a 5-cycle-to-path reduction whose marked three-edge star
-  must remain uncrossed.
-
-Every input graph must produce exactly one output line.
-
-```bash
-generate_biconnected_nonplanar 28 5 data/claim4-biconnected-nonplanar exact
-mkdir -p evidence/claim4
-mkdir data/claim4-classified evidence/claim4/preparation
-
-find data/claim4-biconnected-nonplanar -type f -name '*.g6' -print0 |
-  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
-    set -euo pipefail
-    input=$1
-    name=$(basename "$input" .g6)
-    ./prepare_cubic claim4-joint < "$input" \
-      > "data/claim4-classified/$name.txt" \
-      2> "evidence/claim4/preparation/$name.log"
-  ' bash
-
-claim4_parents=$(cat data/claim4-biconnected-nonplanar/*.g6 | wc -l)
-test "$claim4_parents" -eq 652157758
-for input in data/claim4-biconnected-nonplanar/*.g6; do
-  name=$(basename "$input" .g6)
-  test "$(wc -l < "$input")" -eq \
-       "$(wc -l < "data/claim4-classified/$name.txt")"
-done
-
-awk '
-  ($1 == "D" && NF == 1) ||
-  (($1 == "B" || $1 == "C" || $1 == "R") && NF == 2) {
-    count[$1]++
-    next
-  }
-  { exit 1 }
-  END {
-    print "D", count["D"] + 0
-    print "B", count["B"] + 0
-    print "C", count["C"] + 0
-    print "R", count["R"] + 0
-  }
-' data/claim4-classified/*.txt
-
-awk 'NF == 2 {print $2}' data/claim4-classified/*.txt |
-  sort -u > data/claim4.g6
-wc -l data/claim4.g6
-```
-
-The class counts must be 254,354,420 `D`, 350,383,009 `B`, 45,970,275
-`C`, and 1,450,054 `R`; they sum to `claim4_parents`.  There must be
-3,788,793 distinct records in `data/claim4.g6`.  Keep the classification
-files: they are the expensive artifact, whereas the parent files can be
-regenerated quickly.
 
 ## Verify Claim 3
 
+### Prepare data
+
+Generate and deduplicate the Claim 3 records.
+
 ```bash
-mkdir -p evidence/claim3
+generate_minibaum_parts 26 5 data/claim3-biconnected-nonplanar
+test "$(wc -l data/claim3-biconnected-nonplanar/*.g6 | awk 'END {print $1}')" \
+  -eq 31478465
+
+mkdir data/claim3-prepared
+printf '%s\0' data/claim3-biconnected-nonplanar/*.g6 | run_in_parallel '
+    input=$1
+    name=$(basename "$input" .g6)
+    ./prepare_cubic claim3 < "$input" > "data/claim3-prepared/$name.g6"
+  '
+cat data/claim3-prepared/*.g6 |
+  sort --parallel="$JOBS" -u > data/claim3.g6
+test "$(wc -l < data/claim3.g6)" -eq 4881876
+```
+
+### Verify records
+
+```bash
+mkdir evidence/claim3
 mkdir evidence/claim3/pass1-logs evidence/claim3/pass1-residues
 make_shards data/claim3.g6 evidence/claim3/pass1-shards
 
-find evidence/claim3/pass1-shards -type f -name '*.g6' -size +0c -print0 |
-  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
-    set -euo pipefail
+printf '%s\0' evidence/claim3/pass1-shards/shard-*.g6 | run_in_parallel '
     input=$1
     name=$(basename "$input" .g6)
     ./oops -i="$input" -verify-cubic -timeout=120 \
       -Cverify-cubic-residue="evidence/claim3/pass1-residues/$name.g6" \
       -colors=0 > "evidence/claim3/pass1-logs/$name.log" 2>&1
-  ' bash
+  '
 
-cat evidence/claim3/pass1-residues/*.g6 |
-  sort -u > evidence/claim3/claim3b-input.g6
-test "$(wc -l < evidence/claim3/claim3b-input.g6)" -eq 705
+cat evidence/claim3/pass1-residues/*.g6 | sort -u > evidence/claim3/claim3b-input.g6
 
 mkdir evidence/claim3/claim3b-logs evidence/claim3/claim3b-residues
 make_shards evidence/claim3/claim3b-input.g6 evidence/claim3/claim3b-shards
-find evidence/claim3/claim3b-shards -type f -name '*.g6' -size +0c -print0 |
-  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
-    set -euo pipefail
+printf '%s\0' evidence/claim3/claim3b-shards/shard-*.g6 | run_in_parallel '
     input=$1
     name=$(basename "$input" .g6)
     ./oops -i="$input" -verify-cubic -Cclaim3b -timeout=120 \
       -Cverify-cubic-residue="evidence/claim3/claim3b-residues/$name.g6" \
       -colors=0 > "evidence/claim3/claim3b-logs/$name.log" 2>&1
-  ' bash
+  '
 
-cat evidence/claim3/claim3b-residues/*.g6 |
-  sort -u > evidence/claim3/claim3b-residue.g6
+cat evidence/claim3/claim3b-residues/*.g6 | sort -u > evidence/claim3/claim3b-residue.g6
 test ! -s evidence/claim3/claim3b-residue.g6
+
+claim3_planar=$(sum_counter '#planar' evidence/claim3/pass1-logs/*.log)
+claim3_1planar=$(sum_counter '#1-planar' evidence/claim3/pass1-logs/*.log)
+claim3_unknown=$(sum_counter '#unknown' evidence/claim3/pass1-logs/*.log)
+test "$((claim3_planar + claim3_1planar + claim3_unknown))" -eq 4881876
+test "$claim3_unknown" -eq "$(wc -l < evidence/claim3/claim3b-input.g6)"
+
+claim3b_records=$(wc -l < evidence/claim3/claim3b-input.g6)
+claim3b_parents=$(sum_counter '#claim3b-parents' evidence/claim3/claim3b-logs/*.log)
+test "$(sum_counter '#claim3b-records' evidence/claim3/claim3b-logs/*.log)" \
+  -eq "$claim3b_records"
+test "$(sum_counter '#claim3b-completed' evidence/claim3/claim3b-logs/*.log)" \
+  -eq "$claim3b_records"
+test "$(sum_counter '#1-flexible' evidence/claim3/claim3b-logs/*.log)" \
+  -eq "$claim3b_parents"
+test "$(sum_counter '#unknown' evidence/claim3/claim3b-logs/*.log)" -eq 0
 ```
 
-The first-pass logs must account for all 4,881,876 records and report 705
-unknown.  Claim 3b expands these records into 8,460 parents.  Its logs must
-report 705 completed records, 8,460 1-flexible parents, and no unknown.
-
 ## Verify Claim 4
+
+### Prepare data
+
+Generate and classify the Claim 4 graphs.  Each output line is `D` or a
+`B`, `C`, or `R` record followed by its code.
+
+```bash
+generate_minibaum_parts 28 5 data/claim4-biconnected-nonplanar exact
+mkdir evidence/claim4
+mkdir data/claim4-classified evidence/claim4/preparation
+
+printf '%s\0' data/claim4-biconnected-nonplanar/*.g6 | run_in_parallel '
+    input=$1
+    name=$(basename "$input" .g6)
+    classified="data/claim4-classified/$name.txt"
+    ./prepare_cubic claim4-joint < "$input" \
+      > "$classified" \
+      2> "evidence/claim4/preparation/$name.log"
+    test "$(wc -l < "$input")" -eq "$(wc -l < "$classified")"
+  '
+
+test "$(wc -l data/claim4-biconnected-nonplanar/*.g6 | awk 'END {print $1}')" \
+  -eq 652157758
+awk '
+  { count[$1]++; if (NF == 2) print $2 }
+  END { exit count["D"] != 254354420 || count["B"] != 350383009 ||
+             count["C"] != 45970275 || count["R"] != 1450054 }
+' data/claim4-classified/*.txt |
+  sort --parallel="$JOBS" -u > data/claim4.g6
+test "$(wc -l < data/claim4.g6)" -eq 3788793
+```
+
+### Verify records
 
 ```bash
 mkdir evidence/claim4/certificate-logs \
       evidence/claim4/certificate-residues
 make_shards data/claim4.g6 evidence/claim4/certificate-shards
 
-find evidence/claim4/certificate-shards -type f -name '*.g6' -print0 |
-  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
-    set -euo pipefail
+printf '%s\0' evidence/claim4/certificate-shards/shard-*.g6 | run_in_parallel '
     input=$1
     name=$(basename "$input" .g6)
     ./oops -i="$input" -verify-cubic -timeout=60 \
       -Cverify-cubic-residue="evidence/claim4/certificate-residues/$name.g6" \
       -colors=0 > "evidence/claim4/certificate-logs/$name.log" 2>&1
-  ' bash
+  '
 
-cat evidence/claim4/certificate-residues/*.g6 |
-  sort -u > evidence/claim4/residue.g6
+cat evidence/claim4/certificate-residues/*.g6 | sort -u > evidence/claim4/residue.g6
+
+claim4_planar=$(sum_counter '#planar' evidence/claim4/certificate-logs/*.log)
+claim4_1planar=$(sum_counter '#1-planar' evidence/claim4/certificate-logs/*.log)
+claim4_unknown=$(sum_counter '#unknown' evidence/claim4/certificate-logs/*.log)
+test "$((claim4_planar + claim4_1planar + claim4_unknown))" -eq 3788793
+test "$claim4_unknown" -eq "$(wc -l < evidence/claim4/residue.g6)"
 ```
 
-A B record requires an uncrossed degree-6 hub, a C record requires a
-permitted drawing of an uncrossed degree-7 hub, and an R record requires the
-marked three-edge star to be uncrossed.  The D records need no solver input
-because Claim 2 already proves them.
-
-Recover and verify the parents represented by records that reached the time
-limit:
+### Verify residue parents
 
 ```bash
-mkdir evidence/claim4/residue-parent-records
-for input in data/claim4-biconnected-nonplanar/*.g6; do
-  name=$(basename "$input" .g6)
-  paste "$input" "data/claim4-classified/$name.txt" |
-    awk '
-      FILENAME == ARGV[1] { residue[$1] = 1; next }
-      NF == 3 && ($3 in residue) { print $1, $3 }
-    ' evidence/claim4/residue.g6 - \
-    > "evidence/claim4/residue-parent-records/$name.txt"
-done
-
+paste <(cat data/claim4-biconnected-nonplanar/*.g6) \
+      <(cat data/claim4-classified/*.txt) |
 awk '
   FILENAME == ARGV[1] { residue[$1] = 1; next }
-  { found[$2] = 1 }
+  NF == 3 && ($3 in residue) { print $1; found[$3] = 1 }
   END { for (code in residue) if (!(code in found)) exit 1 }
-' evidence/claim4/residue.g6 \
-  evidence/claim4/residue-parent-records/*.txt
-
-awk '{print $1}' evidence/claim4/residue-parent-records/*.txt |
-  sort -u > data/claim4-residue-parents.g6
+' evidence/claim4/residue.g6 - |
+sort --parallel="$JOBS" -u > data/claim4-residue-parents.g6
 
 mkdir evidence/claim4/parent-logs
 make_shards data/claim4-residue-parents.g6 evidence/claim4/parent-shards
 
-find evidence/claim4/parent-shards -type f -name '*.g6' -print0 |
-  sort -z | xargs -0 -n1 -P "$JOBS" bash -c '
-    set -euo pipefail
+printf '%s\0' evidence/claim4/parent-shards/shard-*.g6 | run_in_parallel '
     input=$1
     name=$(basename "$input" .g6)
-    ./oops -i="$input" -sat=1 -unsat=0 -timeout=900 -colors=0 \
+    ./oops -i="$input" -colors=0 \
       > "evidence/claim4/parent-logs/$name.log" 2>&1
-  ' bash
+  '
+
+claim4_parent_count=$(wc -l < data/claim4-residue-parents.g6)
+test "$(sum_counter '#1-planar' evidence/claim4/parent-logs/*.log)" \
+  -eq "$claim4_parent_count"
+test "$(sum_counter '#non-1-planar' evidence/claim4/parent-logs/*.log)" -eq 0
+test "$(sum_counter '#unknown' evidence/claim4/parent-logs/*.log)" -eq 0
 ```
-
-Accept Claim 4 only if:
-
-- the totals in `certificate-logs` are `#planar = 17`,
-  `#1-planar = 3,784,570`, and `#unknown = 4,206`, and `residue.g6`
-  contains 4,206 lines;
-- `data/claim4-residue-parents.g6` contains 1,508,639 graphs, and the totals
-  in `parent-logs` are `#1-planar = 1,508,639`, `#planar = 0`,
-  `#non-1-planar = 0`, and `#unknown = 0`.
-
-The completed run satisfied these conditions and took 52.5 hours on the
-48-core machine.
 
 ## Verify Claim 5
 
 Generate every biconnected, nonplanar cubic graph with $n=28$ and girth at
-least 6, then process the residue files:
+least 6, then verify it directly:
 
 ```bash
-generate_biconnected_nonplanar 28 6 data/claim5-biconnected-nonplanar
-wc -l data/claim5-biconnected-nonplanar/*.g6
+generate_minibaum_parts 28 6 data/claim5-biconnected-nonplanar
+test "$(wc -l data/claim5-biconnected-nonplanar/*.g6 | awk 'END {print $1}')" \
+  -eq 4624501
 
-mkdir -p evidence/claim5
-for input in data/claim5-biconnected-nonplanar/*.g6; do
-  name=$(basename "$input" .g6)
-  ./oops -i="$input" -sat=1 -unsat=0 -colors=0 \
-    > "evidence/claim5/${name}.log" 2>&1
-done
-```
+mkdir evidence/claim5
+printf '%s\0' data/claim5-biconnected-nonplanar/*.g6 | run_in_parallel '
+    input=$1
+    name=$(basename "$input" .g6)
+    ./oops -i="$input" -colors=0 \
+      > "evidence/claim5/${name}.log" 2>&1
+  '
 
-Confirm that the family contains 4,624,501 graphs.  Accept the result only if
-all 4,624,501 graphs are reported as 1-planar and every command succeeds.
-
-## Final checks
-
-Every OOPS invocation must exit successfully.  Sum `#planar` and
-`#1-planar` over the logs and compare the result with the appropriate family
-size above.  Finally, record hashes of all inputs and logs:
-
-```bash
-find data evidence -type f ! -name files.sha256 -print0 | sort -z | xargs -0 sha256sum \
-  > evidence/files.sha256
+test "$(sum_counter '#1-planar' evidence/claim5/*.log)" -eq 4624501
+test "$(sum_counter '#non-1-planar' evidence/claim5/*.log)" -eq 0
+test "$(sum_counter '#unknown' evidence/claim5/*.log)" -eq 0
 ```

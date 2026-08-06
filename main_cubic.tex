@@ -610,18 +610,19 @@ patterns and testing the planarity of the corresponding graphs $G_M$.  For a
 planar graph, the empty crossing pattern suffices.
 
 \begin{claim}\label{clm:flexible22}
-    Every connected cubic graph with $n \leq 18$ is $3$-flexible.  Every
-    biconnected, nonplanar, triangle-free cubic graph with
-    $n \in \{20,22\}$ is $3$-flexible.
+    Every biconnected, nonplanar, triangle-free cubic graph with
+    $n\leq 22$ is $3$-flexible.
 \end{claim}
 
 \begin{proof}[Proof (computational)]
-    These families contain $1{,}575{,}835$ isomorphism classes.  For every
-    nonplanar graph $G$ in the enumeration and every set
+    This family contains $1{,}538{,}493$ isomorphism classes.  For every
+    graph $G$ in the enumeration and every set
     $F\subseteq E(G)$ with $|F|\leq 3$, the computation found a crossing
     pattern $M$ such that $G_M$ is planar and
     $F\cap\operatorname{supp}(M)=\varnothing$.  Hence $G$ has a 1-planar
-    drawing in which every edge of $F$ is uncrossed.
+    drawing in which every edge of $F$ is uncrossed.  The completed run
+    verified these graphs as part of a larger family of $1{,}575{,}835$
+    graphs and took 14 hours 41 minutes on the 48-core machine.
 \end{proof}
 
 \begin{claim}\label{clm:flexible24}
