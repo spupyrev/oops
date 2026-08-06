@@ -13,6 +13,7 @@ oops
 *.op
 *.od
 *.or
+/verification/
 
 # Python bytecode
 __pycache__/
@@ -30,8 +31,8 @@ __pycache__/
 /main_cubic.synctex.gz
 /main_cubic.toc
 /main_cubic.vtc
-speedup_plan.md
-oops_parallel_design_v3.md
 cubic/cubic28_progress_report.md
+
+# AI
 AGENTS.md
 CLAUDE.md
