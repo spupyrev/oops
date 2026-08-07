@@ -60,6 +60,8 @@
 \newcommand{\yes}{{\it \textcolor{defgreen}{yes}}}
 \newcommand{\no}{{\it \textcolor{defred}{no}}}
 
+\newcommand{\oops}{\texttt{OOPS}\xspace}
+
 \begin{document}
 
 \author{
@@ -76,7 +78,7 @@
     once---a natural generalization of planar graphs that has received increasing
     attention in graph drawing and beyond-planar graph theory.
 
-    We search for the smallest non-1-planar graph.
+    We search for the smallest cubic non-1-planar graph.
 \end{abstract}
 
 \section{Introduction}
@@ -106,16 +108,35 @@ drawings of several graphs and suggested that either the Coxeter graph or the Tu
 is not 1-planar. As pointed out in \cite{oops}, the former is indeed 1-planar.
 The latter is conjectured to be non-1-planar in \cite{oops}.
 
-\section{Lower Bound}
+The paper consists of two parts. In \cref{sect:ub} we find two graphs of
+order $n=30$ that are non-1-planar. In \cref{sect:lb} we verify that
+all cubic graphs of order $n \le 28$ are 1-planar. Note that cubic graphs
+necessarily have even number of vertices.
+Most of the proofs in the paper are computational and verify 1-planarity
+via a recently developed Optimized-One-Planarity-Solver (\oops)~\cite{oops} that
+relies on encoding the problem using SAT.
 
-% TODO: reduction rules for 3 faces?
+\section{Two Cubic Graphs of Order 30 are Non-1-Planar}
+\label{sect:ub}
 
-We verify the 1-planarity of several families of cubic graphs; refer
-to \cref{table:cubic}. In particular, (i) all cubic graphs with up to $n=24$ vertices and (ii) all cubic bipartite graphs with up to $n=28$ vertices are 1-planar.
-Note that there are around $150{\times}10^6$ instances across (i) and (ii),
-and the total computation took $\approx$$1.5$ machine-months, averaging less than a second per instance. Thus, verifying the 1-planarity of all cubic graphs with $n<30$ remains a challenging task that will likely require novel ideas.
+This section will be filled out later.
 
-\begin{table}[!h]
+\section{All Cubic Graphs of Order at most 28 are 1-Planar}
+\label{sect:lb}
+
+Our goal is to prove that every simple cubic graph with at most 28 vertices
+is 1-planar.  Testing all graphs directly is impractical: there are
+$2{,}094{,}480{,}864$ connected cubic graphs with $n=26$ and
+$40{,}497{,}138{,}011$ with $n=28$.  Even at ten milliseconds per graph
+(which one can achieve with \oops for \emph{simplest} instances),
+the latter family alone would require more than twelve CPU-years.
+\cref{table:cubic} and \cref{table:subcubic} list some families
+of cubic graphs whose 1-planarity was verified in \cite{oops}, along with
+the runtimes on a multi-core machine.
+For example, the total computation of all cubic graphs with up to $n=24$ vertices and all cubic bipartite graphs with up to $n=28$ vertices combined
+took $\approx$$1.5$ machine-months, averaging less than a second per instance.
+
+\begin{table}[!t]
     \small
     \centering
     \caption{Computational results for cubic graphs.  The reported elapsed
@@ -142,10 +163,9 @@ and the total computation took $\approx$$1.5$ machine-months, averaging less tha
     \end{tabular}
 \end{table}
 
-The next table gives corresponding counts for several subcubic graph
-families.
+TODO: merge two tables
 
-\begin{table}[!h]
+\begin{table}[!t]
     \small
     \centering
     \caption{Computational results for selected subcubic graph families.}
@@ -169,6 +189,8 @@ families.
         \bottomrule
     \end{tabular}
 \end{table}
+
+\subsection{Building Blocks}
 
 Our goal is to find the \df{smallest subcubic non-1-planar} graphs.  We order
 graphs lexicographically by $(|V|,|E|)$ and let $G$ be a minimum non-1-planar
@@ -581,7 +603,7 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
     \end{tabular}
 \end{table}
 
-\section{Upper Bound}
+\subsection{Verification}
 
 Our goal is to prove that every simple cubic graph with at most 28 vertices
 is 1-planar.  Testing all graphs directly is impractical: there are
