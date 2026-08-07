@@ -20,7 +20,7 @@ set -euo pipefail
 NAUTY=/path/to/nauty2_9_3
 MINIBAUM_SOURCE=/path/to/minibaum5.c
 MINIBAUM=./minibaum5
-SHARDS=256
+SHARDS=288
 JOBS=48
 export LC_ALL=C
 export NAUTY MINIBAUM SHARDS
