@@ -20,10 +20,10 @@ set -euo pipefail
 NAUTY=/path/to/nauty2_9_3
 MINIBAUM_SOURCE=/path/to/minibaum5.c
 MINIBAUM=./minibaum5
-PARTS=256
+SHARDS=256
 JOBS=48
 export LC_ALL=C
-export NAUTY MINIBAUM PARTS
+export NAUTY MINIBAUM SHARDS
 
 # Build nauty.
 (cd "$NAUTY" && ./configure && make)
@@ -67,15 +67,15 @@ generate_minibaum_parts() {
   local girth_mode=${4:-minimum}
   export n girth output girth_mode
   mkdir -p "$output"
-  seq 0 $((PARTS - 1)) | tr '\n' '\0' | run_in_parallel '
+  seq 0 $((SHARDS - 1)) | tr '\n' '\0' | run_in_parallel '
     part=$1
     file=$(printf "%s/n%02d-part-%03d.g6" "$output" "$n" "$part")
     if [ "$girth_mode" = exact ]; then
-      "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
+      "$MINIBAUM" "$n" "$girth" s g m "$part" "$SHARDS" |
         "$NAUTY/pickg" -q -c2 "-g$girth" |
         "$NAUTY/planarg" -q -v > "$file"
     else
-      "$MINIBAUM" "$n" "$girth" s g m "$part" "$PARTS" |
+      "$MINIBAUM" "$n" "$girth" s g m "$part" "$SHARDS" |
         "$NAUTY/pickg" -q -c2 |
         "$NAUTY/planarg" -q -v > "$file"
     fi
@@ -89,7 +89,7 @@ make_shards() {
   mkdir "$output"
 
   shuf "$input" > "$output/input"
-  split -n "l/$PARTS" -d -a 3 --additional-suffix=.g6 \
+  split -n "l/$SHARDS" -d -a 3 --additional-suffix=.g6 \
     "$output/input" "$output/shard-"
   cat "$output"/shard-*.g6 | cmp - "$output/input"
 }
