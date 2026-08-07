@@ -19,12 +19,13 @@
 \usepackage{array}
 \usepackage[nocompress]{cite}
 \usepackage[pdfpagelabels,colorlinks,allcolors=blue]{hyperref}
-\usepackage[nameinlink,capitalize,noabbrev]{cleveref}
+\usepackage[nameinlink,capitalize,noabbrev,sort]{cleveref}
 
 \theoremstyle{plain}
 \newtheorem{definition}{Definition}
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
 \newtheorem{claim}{Claim}
 \crefname{claim}{Claim}{Claims}
 \Crefname{claim}{Claim}{Claims}
@@ -192,131 +193,138 @@ TODO: merge two tables
 
 \subsection{Building Blocks}
 
-Our goal is to find the \df{smallest subcubic non-1-planar} graphs.  We order
+Our goal is to find the \emph{smallest subcubic non-1-planar} graphs.  We order
 graphs lexicographically by $(|V|,|E|)$ and let $G$ be a minimum non-1-planar
 graph of maximum degree at most three.  Thus every smaller subcubic graph is
-1-planar.  This formulation is useful even though the graphs in our
-enumeration are cubic: any cubic counterexample contains such a minimal
-subcubic counterexample of no larger order.
+1-planar. TODO: define \df{smallest}
+
+Our first goal is to show that a smallest subcubic non-1-planar graph is biconnected, cubic, and triangle-free.
 
 \begin{lemma}
+    \label{lm:bi}
     A smallest subcubic non-1-planar graph is biconnected.
 \end{lemma}
 
 \begin{proof}
-    A disconnected graph is 1-planar if each of its components is 1-planar.
-    Likewise, 1-planar drawings of the blocks incident to a cut vertex can be
-    placed in disjoint wedges around that vertex.  Hence a non-1-planar graph
-    has a non-1-planar block.  Such a block would be smaller than $G$ unless
-    $G$ itself is biconnected.
+    Suppose, for a contradiction, that $G$ is a smallest subcubic
+    non-1-planar graph and that $G$ is not biconnected.  If $G$ is
+    disconnected, then each of its components has smaller order than $G$ and
+    is therefore 1-planar.  Drawing these components in disjoint regions
+    produces a 1-planar drawing of $G$, a contradiction.
+    Hence $G$ is connected and has a cut vertex.  Every block of $G$ is a
+    subcubic graph of smaller order and is therefore 1-planar.  The drawings
+    of the blocks can be placed in disjoint wedges around their common cut
+    vertices, producing a 1-planar drawing of $G$.  This is again a
+    contradiction.
 \end{proof}
 
 \begin{lemma}
+    \label{lm:cubic}
     A smallest subcubic non-1-planar graph is cubic.
 \end{lemma}
 
 \begin{proof}
-    A vertex of degree zero or one can be deleted and then reinserted without
-    creating a crossing.  Assume that $G$ contains a vertex $v$ of degree two,
-    with neighbors $u$ and $w$. Consider three cases.
-    \begin{itemize}
+    Suppose, for a contradiction, that $G$ is a smallest subcubic
+    non-1-planar graph and that $G$ is not cubic. By \cref{lm:bi},
+    $G$ is biconnected and therefore has minimum degree at least two.  Since
+    $G$ is subcubic but not cubic, it has a vertex $v$ of degree two.  Let
+    $u$ and $w$ be the neighbors of $v$.  Consider three cases.
+    \begin{enumerate}[(a)]
         \item If $uw\notin E$, remove $v$ and insert $uw$.  The result $H$ is
         a smaller subcubic graph and hence is 1-planar.  In a drawing of $H$,
         replace the curve for $uw$ by the path $(u,v,w)$.  At most one path
-        edge inherits the possible crossing of $uw$.
+        edge inherits the possible crossing of $uw$, so this produces a
+        1-planar drawing of $G$, a contradiction.
 
         \item Suppose $uw\in E$ and $u,w$ have another common neighbor $x$.
-        If there are vertices outside $\{u,v,w,x\}$, then $x$ is a cut vertex.
-        Otherwise the graph is planar.  Both alternatives contradict the
-        choice of $G$.
+        If $V(G)=\{u,v,w,x\}$, then $G$ is planar (the diamond graph, $K_4-e$), contradicting the choice
+        of $G$.  Otherwise, the vertices $u,v,w$ have no neighbors outside
+        $\{u,v,w,x\}$, so $x$ is a cut vertex of $G$.  This contradicts the
+        preceding lemma.
 
         \item Suppose $uw\in E$ and $u,w$ have no other common neighbor.
-        Merge $u,v,w$ into one vertex.  No loop or parallel edge is created,
-        and the new vertex has degree at most two.  The result is a smaller
-        subcubic graph.  In its 1-planar drawing, expand the merged vertex
-        inside a sufficiently small disk into the triangle $(u,v,w)$ while
-        preserving all external incidences.
-    \end{itemize}
+        Contract the triangle $(u,v,w)$ to obtain a simple subcubic graph
+        $H$ of smaller order.  In a 1-planar drawing of $H$, expand the
+        contracted vertex inside a small disk into $(u,v,w)$.  This gives a
+        1-planar drawing of $G$, a contradiction.
+    \end{enumerate}
 \end{proof}
 
-We use the following elementary replacement observation.
+\begin{comment}
+A \df{planar two-terminal patch} is a planar graph $P$ with two designated
+vertices $a,b$ that lie on a common face in some planar embedding of $P$.
+To replace an edge $xy$ by $P$, delete $xy$, insert a disjoint copy of $P$,
+and add the edges $xa$ and $yb$.
 
-\begin{lemma}[Planar two-terminal replacement]\label{lem:two-terminal-replacement}
-    Let $P$ be a planar graph with two vertices $a,b$ incident to a common
-    face.  Suppose that $G$ is obtained from a graph $H$ by deleting an edge
-    $xy$, inserting a disjoint copy of $P$, and adding the edges $xa$ and
-    $yb$.  If $H$ is 1-planar, then $G$ is 1-planar.
-    Moreover, let $F$ be a set of edges of $G$.  Form $F_H$ by retaining every
-    edge of $F$ outside the replacement and, if $F$ meets the inserted patch
-    or either attachment, adding $xy$.  Then $|F_H|\le |F|$, and a 1-planar
-    drawing of $H$ in which every edge of $F_H$ is uncrossed expands to one of
-    $G$ in which every edge of $F$ is uncrossed.
+\begin{lemma}\label{lem:two-terminal-replacement}
+    Let $G$ be obtained from $H$ by replacing an edge $xy$ with a planar
+    two-terminal patch.  A 1-planar drawing of $H$ can be transformed
+    into a 1-planar drawing of $G$ in which every edge of
+    $E(H)\setminus\{xy\}$ retains its crossing status.  If $xy$ is uncrossed,
+    then the entire replacement is uncrossed.
 \end{lemma}
 
 \begin{proof}
-    Take a 1-planar drawing of $H$ and remove the curve for $xy$.  Draw $P$
-    in a small disk around $x$, using a common face of $a,b$ as its outer
-    face.  Draw $xa$ inside the disk and route $yb$ along the former curve of
-    $xy$.  All new edges in the disk are crossing-free, while $yb$ inherits
-    the at most one crossing of $xy$.
-    For the strengthened statement, if $F$ meets the replacement then $xy$ is
-    uncrossed.  Choose the routing disk around its whole curve; the planar
-    patch and both attachments are then crossing-free.  Every retained
-    outside edge keeps its old crossing status.
+    Let $P$ be the inserted patch, with terminals $a$ and $b$.  Fix a
+    1-planar drawing of $H$ and remove the curve representing $xy$.  Place a
+    planar drawing of $P$ near $x$, using a common face of $a$ and $b$ as its
+    outer face.  Join $x$ to $a$ locally and route $yb$ along the removed
+    curve.  Thus $yb$ inherits the possible crossing of $xy$, while all other
+    edges of the replacement are uncrossed.
 \end{proof}
+\end{comment}
 
-\begin{lemma}\label{lem:minimal-triangle-free}
-    A smallest cubic non-1-planar graph is triangle-free.
+\begin{lemma}
+    \label{lem:minimal-triangle-free}
+    A smallest subcubic non-1-planar graph is triangle-free.
 \end{lemma}
 
 \begin{proof}
-    For a contradiction, assume $G$ has a triangle $T=(u,v,w)$.  Since $G$ is
-    cubic, each vertex of $T$ has exactly one neighbor outside $T$; denote
-    them by $u',v',w'$. Consider cases.
+    Suppose, for a contradiction, that $G$ is a smallest subcubic
+    non-1-planar graph and that $G$ contains a triangle $T=(u,v,w)$.  By
+    \cref{lm:bi,lm:cubic}, $G$ is biconnected and cubic.  Hence each vertex
+    of $T$ has exactly one neighbor outside $T$; denote these neighbors by
+    $u',v',w'$, and consider three cases.
 
-    \begin{itemize}
-        \item If $u',v',w'$ are pairwise distinct, contract $T$ into one
-        vertex.  The result is a smaller simple subcubic graph and is therefore
-        1-planar.  Expanding the contracted vertex into $T$ inside a small
-        disk introduces no crossing.
+    \begin{enumerate}[(a)]
+        \item Suppose $u',v',w'$ are pairwise distinct.  Contract $T$ to a
+        single vertex.  The resulting graph is simple, subcubic, and of
+        smaller order, so it is 1-planar.  Expanding the contracted vertex
+        inside a small disk gives a 1-planar drawing of $G$, a contradiction.
 
-        \item If $u'=v'=w'$, then connectedness and cubicity imply that
-        $G=K_4$, which is planar.
+        \item Suppose $u'=v'=w'$.  Then connectedness and cubicity imply that
+        $G=K_4$, contradicting the non-1-planarity of $G$.
 
-        \item It remains to consider the case $u'=v'=x$ and $w'=y\ne x$.
-        The subgraph $P_0$ induced by $u,v,w,x$ is a diamond.  Its terminals
-        are $x,w$, and $P_0+xw=K_4$ is planar.  Let $p$ be the third neighbor
-        of $x$, outside the diamond.  If $p=y$, then $y$ is a cut vertex,
-        contradicting biconnectivity.  If $p\ne y$ and $py\notin E$, replace
-        the diamond by the edge $py$.  This gives a smaller subcubic graph,
-        and \cref{lem:two-terminal-replacement} expands any of its 1-planar
-        drawings back into a drawing of $G$.
+        \item Otherwise, after relabeling, $u'=v'=x$ and $w'=y\ne x$.  The
+        vertices $u,v,w,x$ induce a diamond.  Let $p$ be the third neighbor
+        of $x$.  If $p=y$, then the diamond is attached to the rest of $G$
+        only through $y$, so $y$ is a cut vertex, contradicting
+        biconnectivity.
 
-        Finally suppose $py\in E$.  Absorb $p,y$ and the three edges
-        $xp,py,yw$ into the planar patch.  The new terminals $p,y$ are
-        incident to a common face (indeed, they are adjacent).  Let their two
-        as-yet unaccounted-for neighbors be $p_1,y_1$.  If $p_1=y_1$, that
-        vertex is a cut vertex.  If they are distinct and nonadjacent, replace
-        the enlarged patch by $p_1y_1$ and apply
-        \cref{lem:two-terminal-replacement}.  If
-        they are adjacent, absorb them as well and repeat.
-
-        Every absorbed terminal pair consists of new vertices: all vertices
-        of an earlier pair already have their three incident edges inside the
-        patch or leading to the next pair.  Since $G$ is finite, the process
-        must therefore reach either a common outside neighbor (a cut vertex)
-        or two distinct nonadjacent outside neighbors (a valid replacement).
-        Both outcomes contradict the choice of $G$.
-    \end{itemize}
+        Hence $p\ne y$.  Contract the diamond to a single vertex $z$.  The
+        resulting graph $H$ is simple, subcubic, and of smaller order, so it
+        is 1-planar.  In a 1-planar drawing of $H$, expand $z$ inside a small
+        disk into the diamond, attaching $zp$ at $x$ and $zy$ at $w$.  This
+        gives a 1-planar drawing of $G$, a contradiction.
+    \end{enumerate}
 \end{proof}
 
-For the flexibility statements we use a strengthened form of the same
-induction.
-Call a graph \emph{$k$-flexible} if, for every set of at most $k$ of its
-edges, it has a 1-planar drawing in which all those edges are uncrossed.
+\Cref{lm:bi,lm:cubic,lem:minimal-triangle-free} imply the following.
 
-\begin{lemma}[Minimal obstruction to flexibility]\label{lem:flexibility-core}
-    Let $k$ be a nonnegative integer.  A lexicographically smallest subcubic graph that is not
+\begin{corollary}\label{cor:minimal-subcubic}
+    A smallest subcubic non-1-planar graph is biconnected, cubic, and
+    triangle-free.
+\end{corollary}
+
+We next strengthen \cref{cor:minimal-subcubic} by prescribing edges that must
+remain uncrossed.  A graph $G$ is \df{$k$-flexible} if, for every set
+$F\subseteq E(G)$ with $|F|\leq k$, it has a 1-planar drawing in which every
+edge of $F$ is uncrossed.  In particular, $0$-flexibility is equivalent to
+1-planarity.
+
+\begin{lemma}
+    \label{lem:flexibility-core}
+    For every integer $k\geq 0$, a smallest subcubic graph that is not
     $k$-flexible is biconnected, cubic, and triangle-free.
 \end{lemma}
 
@@ -605,12 +613,6 @@ biconnected, nonplanar cubic graphs of order 24 and girth at least five.
 
 \subsection{Verification}
 
-Our goal is to prove that every simple cubic graph with at most 28 vertices
-is 1-planar.  Testing all graphs directly is impractical: there are
-$2{,}094{,}480{,}864$ connected cubic graphs with $n=26$ and
-$40{,}497{,}138{,}011$ with $n=28$.  Even at ten milliseconds per graph, the
-latter family alone would require more than twelve CPU-years.
-
 The reductions above leave five computational claims.  All enumerations below
 are exhaustive and contain one representative of each isomorphism class.
 
@@ -825,11 +827,11 @@ directly as 1-planar.  The complete computation took 52.5 hours on the
         \toprule
         computation & instances & running time & verified \\
         \midrule
-        \cref{clm:flexible22} & $1{,}538{,}493$ & 17 hours 49 minutes (measured) & yes \\
-        \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes (measured) & yes \\
-        \cref{clm:flexible26} & $4{,}881{,}876+8{,}460^\ast$ & 23 hours 24 minutes (measured) & yes \\
-        \cref{clm:girth5-28}  & $3{,}788{,}793+1{,}508{,}639^\ast$ & 52.5 hours (measured) & yes \\
-        \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days (measured) & yes \\
+        \cref{clm:flexible22} & $1{,}538{,}493$ & 17 hours 49 minutes & yes \\
+        \cref{clm:flexible24} & $1{,}620{,}470$ & 41 hours 21 minutes & yes \\
+        \cref{clm:flexible26} & $4{,}881{,}876+8{,}460^\ast$ & 23 hours 24 minutes & yes \\
+        \cref{clm:girth5-28}  & $3{,}788{,}793+1{,}508{,}639^\ast$ & 52.5 hours & yes \\
+        \cref{clm:girth6-28}  & $4{,}624{,}501$ & 3 days & yes \\
         \bottomrule
     \end{tabular}
     \par\smallskip
