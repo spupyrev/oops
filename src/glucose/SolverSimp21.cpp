@@ -11,46 +11,7 @@
 using namespace std;
 using namespace Simp21;
 
-/// Options:
-static const char *_cat = "CORE";
 static constexpr int64_t PROGRESS_INTERVAL_MS = 60000;
-
-static DoubleOption opt_step_size(_cat, "step-size", "Initial step size", 0.40, DoubleRange(0, false, 1, false));
-static DoubleOption opt_step_size_dec(_cat, "step-size-dec", "Step size decrement", 0.000001,
-                                      DoubleRange(0, false, 1, false));
-static DoubleOption opt_min_step_size(_cat, "min-step-size", "Minimal step size", 0.06,
-                                      DoubleRange(0, false, 1, false));
-static DoubleOption opt_var_decay(_cat, "var-decay", "The variable activity decay factor", 0.80,
-                                  DoubleRange(0, false, 1, false));
-static DoubleOption opt_clause_decay(_cat, "cla-decay", "The clause activity decay factor", 0.999,
-                                     DoubleRange(0, false, 1, false));
-static IntOption opt_ccmin_mode(_cat, "ccmin-mode", "Controls conflict clause minimization (0=none, 1=basic, 2=deep)",
-                                2, IntRange(0, 2));
-static IntOption opt_phase_saving(_cat, "phase-saving",
-                                  "Controls the level of phase saving (0=none, 1=limited, 2=full)", 2, IntRange(0, 2));
-static IntOption opt_restart_first(_cat, "rfirst", "The base restart interval", 100, IntRange(1, INT32_MAX));
-static DoubleOption opt_restart_inc(_cat, "rinc", "Restart interval increase factor", 2,
-                                    DoubleRange(1, false, HUGE_VAL, false));
-static DoubleOption opt_garbage_frac(_cat, "gc-frac",
-                                     "The fraction of wasted memory allowed before a garbage collection is triggered",
-                                     0.20, DoubleRange(0, false, HUGE_VAL, false));
-static IntOption opt_chrono(_cat, "chrono", "Controls if to perform chrono backtrack", 100, IntRange(-1, INT32_MAX));
-static IntOption opt_conf_to_chrono(_cat, "confl-to-chrono", "Controls number of conflicts to perform chrono backtrack",
-                                    4000, IntRange(-1, INT32_MAX));
-
-static IntOption opt_max_lbd_dup("DUP-LEARNTS", "lbd-limit",
-                                 "specifies the maximum lbd of learnts to be screened for duplicates.", 12,
-                                 IntRange(0, INT32_MAX));
-static IntOption opt_min_dupl_app("DUP-LEARNTS", "min-dup-app",
-                                  "specifies the minimum number of learnts to be included into db.", 3,
-                                  IntRange(2, INT32_MAX));
-static IntOption opt_dupl_db_init_size("DUP-LEARNTS", "dupdb-init", "specifies the initial maximal duplicates DB size.",
-                                       500000, IntRange(1, INT32_MAX));
-
-static IntOption opt_VSIDS_props_limit(
-    "DUP-LEARNTS", "VSIDS-lim",
-    "specifies the number of propagations after which the solver switches between LRB and VSIDS(in millions).", 30,
-    IntRange(1, INT32_MAX));
 
 //=================================================================================================
 // Fast pow(0.95, age) for small non-negative integer ages.
@@ -132,11 +93,11 @@ Solver::Solver()
     :
       // Parameters (user settable):
       //
-      verbosity(0), step_size(opt_step_size), step_size_dec(opt_step_size_dec),
-      min_step_size(opt_min_step_size), timer(5000), var_decay(opt_var_decay), clause_decay(opt_clause_decay),
-      VSIDS(false), ccmin_mode(opt_ccmin_mode),
-      phase_saving(opt_phase_saving), garbage_frac(opt_garbage_frac),
-      restart_first(opt_restart_first), restart_inc(opt_restart_inc),
+      verbosity(0), step_size(0.40), step_size_dec(0.000001),
+      min_step_size(0.06), timer(5000), var_decay(0.80), clause_decay(0.999),
+      VSIDS(false), ccmin_mode(2),
+      phase_saving(2), garbage_frac(0.20),
+      restart_first(100), restart_inc(2.0),
 
       // Parameters (the rest):
       //
@@ -157,7 +118,7 @@ Solver::Solver()
       order_heap_VSIDS(VarOrderLt(activity_VSIDS)), order_heap_distance(VarOrderLt(activity_distance)), remove_satisfied(true),
 
       core_lbd_cut(2), global_lbd_sum(0), lbd_queue(50), next_T2_reduce(10000), next_L_reduce(15000),
-      confl_to_chrono(opt_conf_to_chrono), chrono(opt_chrono),
+      confl_to_chrono(4000), chrono(100),
 
       counter(0),
 
@@ -170,10 +131,10 @@ Solver::Solver()
 
       // simplifyAll adjust occasion
       curSimplify(1), nbconfbeforesimplify(1000), incSimplify(1000) {
-  min_number_of_learnts_copies = opt_min_dupl_app;
-  max_lbd_dup = opt_max_lbd_dup;
-  dupl_db_init_size = opt_dupl_db_init_size;
-  VSIDS_props_limit = opt_VSIDS_props_limit * 1000000;
+  min_number_of_learnts_copies = 3;
+  max_lbd_dup = 12;
+  dupl_db_init_size = 500000;
+  VSIDS_props_limit = 30 * 1000000;
   DISTANCE = true;
   cur_solustion_used = false;
   freeze_restart_num = 0;
